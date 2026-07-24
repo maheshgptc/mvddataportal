@@ -28,10 +28,10 @@
 </head>
 <body>
 
-  <!-- App Main Layout: Left Sidebar Menu Bar + Main Content Area -->
+  <!-- App Main Root Layout: Left Sidebar Navigation + Right Main Area -->
   <div class="app-layout">
 
-    <!-- LEFT SIDEBAR NAVIGATION MENU BAR -->
+    <!-- LEFT NAVIGATION SIDEBAR MENU BAR -->
     <aside class="portal-sidebar">
       <div class="sidebar-header">
         <img src="mvd_logo.png" alt="Kerala Motor Vehicles Department Official Emblem" class="brand-emblem-img">
@@ -43,29 +43,21 @@
 
       <div class="sidebar-menu-label">Navigation Menu</div>
 
-      <!-- Vertical Left Navigation Menu Items (Populated via app.js) -->
+      <!-- Vertical Left Menu Items (Populated via app.js) -->
       <div class="sidebar-menu" id="dynamicPortalMenuBar">
         <!-- Dynamic module buttons rendered here -->
       </div>
 
-      <!-- Access Mode & Admin Controls in Sidebar Footer -->
-      <div style="padding: 16px; border-top: 1px solid rgba(255, 255, 255, 0.1); display: flex; flex-direction: column; gap: 12px; margin-top: auto;">
-        <div class="sidebar-menu-label" style="padding: 0;">Access Mode</div>
-        <nav class="nav-tabs" role="tablist" style="width: 100%; justify-content: space-between;">
-          <button class="nav-tab-btn active" id="tabPublicBtn" onclick="switchSession('public')" style="flex: 1; justify-content: center;">
-            <i class="fa-solid fa-users"></i> Public
-          </button>
-          <button class="nav-tab-btn" id="tabAdminBtn" onclick="triggerAdminLogin()" style="flex: 1; justify-content: center;">
-            <i class="fa-solid fa-user-gear"></i> Admin
-          </button>
-        </nav>
-
-        <span class="session-badge session-public" id="currentSessionBadge" style="justify-content: center;">
-          <i class="fa-solid fa-eye"></i> Public Session
-        </span>
+      <!-- Admin Access Control Button in Sidebar Footer -->
+      <div class="sidebar-footer">
+        <div class="sidebar-menu-label" style="padding: 0;">Portal Administration</div>
+        
+        <button id="adminPortalToggleBtn" class="btn btn-outline btn-sm" style="color: white; border-color: rgba(255, 255, 255, 0.3); width: 100%; justify-content: center;" onclick="triggerAdminLogin()">
+          <i class="fa-solid fa-user-gear"></i> Admin Portal
+        </button>
 
         <!-- Admin Logout Button (Visible only when Admin is logged in) -->
-        <button id="adminLogoutHeaderBtn" class="btn btn-danger btn-sm" style="display: none; width: 100%;" onclick="logoutAdmin()">
+        <button id="adminLogoutHeaderBtn" class="btn btn-danger btn-sm" style="display: none; width: 100%; justify-content: center;" onclick="logoutAdmin()">
           <i class="fa-solid fa-right-from-bracket"></i> Logout Admin
         </button>
       </div>
@@ -81,50 +73,39 @@
           <span>Motor Vehicles Department • Government of Kerala</span>
         </div>
         <div style="display: flex; align-items: center; gap: 16px;">
-          <!-- Backend Status Indicator -->
-          <span id="backendStatusBadge" class="badge badge-working" style="font-weight: 700; font-size: 0.75rem;">
-            <i class="fa-solid fa-cloud-arrow-up"></i> Supabase Cloud Sync Active
-          </span>
           <span id="liveClockDisplay"><i class="fa-regular fa-clock"></i> Loading System Time...</span>
         </div>
       </div>
 
       <!-- Main Content Wrapper -->
       <main class="main-wrapper">
-        
-
 
         <!-- MODULE VIEW CONTAINER FOR NON-IT EQUIPMENT MODULES -->
         <div id="genericModuleContainer" style="display: none;">
           <!-- Dynamically populated when selecting non-IT modules from Menu Bar -->
         </div>
 
-        <!-- PUBLIC SESSION VIEWS CONTAINER -->
+        <!-- MAIN IT EQUIPMENT PORTAL CONTAINER -->
         <div id="publicContainer">
-          <!-- Secondary Tab Selector for Public Session: Entry vs View Data -->
-          <div class="table-toolbar" style="background: white; padding: 12px 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
-            <div style="display: flex; gap: 10px; flex-wrap: wrap;" id="publicModuleNavTabs">
-              <button class="btn btn-primary" id="btnPublicEntry" onclick="switchPublicTab('entry')">
-                <i class="fa-solid fa-file-pen"></i> Submit / Update Office Entry
-              </button>
-              <button class="btn btn-outline" id="btnPublicView" onclick="switchPublicTab('view')">
-                <i class="fa-solid fa-table-list"></i> View Data Window
-              </button>
+          <!-- Form Header Toolbar -->
+          <div class="table-toolbar" style="background: white; padding: 14px 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color);">
+            <div style="font-weight: 700; color: var(--primary-900); font-size: 1.05rem;">
+              <i class="fa-solid fa-file-pen"></i> MVD IT Equipment List & Office Entry
             </div>
             <div style="font-size: 0.85rem; color: var(--text-muted);">
               <i class="fa-solid fa-circle-info"></i> Auto-reflection active: Select an office to load existing data.
             </div>
           </div>
 
-          <!-- PUBLIC ENTRY FORM SECTION -->
+          <!-- ENTRY FORM SECTION -->
           <div id="publicEntrySection">
             <form id="itEquipmentForm" onsubmit="handleFormSubmit(event)">
               
-              <!-- 1. Office Selection & Network Details -->
+              <!-- 1. Office Identification -->
               <div class="card-section">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-building-flag"></i> 1. Office Identification & Network Infrastructure
+                    <i class="fa-solid fa-building-flag"></i> 1. Office Identification
                   </h2>
                   <span class="section-tag">Required</span>
                 </div>
@@ -142,10 +123,40 @@
                       <span id="reflectionAlertText">Existing entry found for this office. Values auto-filled below!</span>
                     </div>
                   </div>
+                </div>
 
+                <!-- Reporting / Entry Officer Details -->
+                <div class="form-grid-3" style="margin-top: 20px;">
+                  <div class="form-group">
+                    <label for="entryOfficerName"><i class="fa-solid fa-user-pen"></i> Entry Officer Name *</label>
+                    <input type="text" id="entryOfficerName" class="form-control" placeholder="Full name of reporting officer" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="entryOfficerDesignation"><i class="fa-solid fa-user-tag"></i> Designation *</label>
+                    <input type="text" id="entryOfficerDesignation" class="form-control" placeholder="e.g. Senior Superintendent / Joint RTO" required>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="entryOfficerMobile"><i class="fa-solid fa-phone"></i> Mobile Number *</label>
+                    <input type="tel" id="entryOfficerMobile" class="form-control" placeholder="10-digit mobile number" pattern="[0-9]{10}" maxlength="10" required>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Network Infrastructure & Operating System -->
+              <div class="card-section">
+                <div class="section-header">
+                  <h2 class="section-title">
+                    <i class="fa-solid fa-network-wired"></i> 2. Network Infrastructure & Operating System
+                  </h2>
+                  <span class="section-tag">Connectivity & OS</span>
+                </div>
+
+                <div class="form-grid-2">
                   <!-- Network Dropdown -->
                   <div class="form-group">
-                    <label for="availableNetworkSelect"><i class="fa-solid fa-network-wired"></i> Available Network *</label>
+                    <label for="availableNetworkSelect"><i class="fa-solid fa-wifi"></i> Available Network *</label>
                     <select id="availableNetworkSelect" class="form-control" required onchange="handleNetworkChange(this.value)">
                       <option value="">-- Select Available Network --</option>
                       <option value="KSWAN">KSWAN</option>
@@ -157,6 +168,12 @@
                       <option value="Others">Others</option>
                     </select>
                   </div>
+
+                  <!-- Network Speed -->
+                  <div class="form-group">
+                    <label for="networkSpeedInput"><i class="fa-solid fa-gauge-high"></i> Network Speed</label>
+                    <input type="text" id="networkSpeedInput" class="form-control" placeholder="e.g. 100 Mbps, 1 Gbps, 20 Mbps FTTH">
+                  </div>
                 </div>
 
                 <!-- Conditional Others Network Details -->
@@ -165,24 +182,17 @@
                   <input type="text" id="otherNetworkInput" class="form-control" placeholder="Specify ISP, provider name, or leased line details...">
                 </div>
 
-                <div class="form-grid-2" style="margin-top: 16px;">
-                  <div class="form-group">
-                    <label for="networkSpeedInput"><i class="fa-solid fa-gauge-high"></i> Network Speed</label>
-                    <input type="text" id="networkSpeedInput" class="form-control" placeholder="e.g. 100 Mbps, 1 Gbps, 20 Mbps FTTH">
-                  </div>
-
-                  <div class="form-group">
-                    <label for="operatingSystemInput"><i class="fa-solid fa-laptop-code"></i> Operating System(s) used with versions</label>
-                    <input type="text" id="operatingSystemInput" class="form-control" placeholder="e.g. Ubuntu 22.04 LTS, Windows 11 Pro, BOSS Linux 9.0" required>
-                  </div>
+                <div class="form-group" style="margin-top: 16px;">
+                  <label for="operatingSystemInput"><i class="fa-solid fa-laptop-code"></i> Operating System(s) used with versions *</label>
+                  <input type="text" id="operatingSystemInput" class="form-control" placeholder="e.g. Ubuntu 22.04 LTS, Windows 11 Pro, BOSS Linux 9.0" required>
                 </div>
               </div>
 
-              <!-- 2. Main Systems Breakdown (Working vs. Not Working) -->
+              <!-- 3. Main Systems Breakdown (Working vs. Not Working) -->
               <div class="card-section">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-desktop"></i> 2. Core IT Hardware Equipment Status
+                    <i class="fa-solid fa-desktop"></i> 3. Core IT Hardware Equipment Status
                   </h2>
                   <span class="section-tag">Working vs. Not Working</span>
                 </div>
@@ -250,11 +260,11 @@
                 </div>
               </div>
 
-              <!-- 3. Printers & Imaging Section -->
+              <!-- 4. Printers & Imaging Section -->
               <div class="card-section">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-print"></i> 3. Printer & Imaging Equipment Section
+                    <i class="fa-solid fa-print"></i> 4. Printer & Imaging Equipment Section
                   </h2>
                   <span class="section-tag">Status & Multipurpose Marking</span>
                 </div>
@@ -354,11 +364,11 @@
                 </div>
               </div>
 
-              <!-- 4. UPS & Batteries Section -->
+              <!-- 5. UPS & Batteries Section -->
               <div class="card-section">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-car-battery"></i> 4. Power & Battery Infrastructure
+                    <i class="fa-solid fa-car-battery"></i> 5. Power & Battery Infrastructure
                   </h2>
                   <span class="section-tag">UPS & Battery Health</span>
                 </div>
@@ -396,11 +406,11 @@
                 </div>
               </div>
 
-              <!-- 5. System Age Distribution (Desktops, Laptops, PCs) -->
+              <!-- 6. System Age Distribution (Desktops, Laptops, PCs) -->
               <div class="card-section">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-hourglass-half"></i> 5. System Age Distribution (Desktop, Laptop, PCs)
+                    <i class="fa-solid fa-hourglass-half"></i> 6. System Age Distribution (Desktop, Laptop, PCs)
                   </h2>
                   <span class="section-tag">Hardware Lifecycle Profile</span>
                 </div>
@@ -428,25 +438,17 @@
                 </div>
               </div>
 
-              <!-- 6. Non-Working Desktop Summary & Specific Remarks -->
+              <!-- 7. Specific Condition Remarks -->
               <div class="card-section">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-clipboard-list"></i> 6. Non-Working Summary & Specific Condition Remarks
+                    <i class="fa-solid fa-comment-dots"></i> 7. Specific Condition Remarks
                   </h2>
                 </div>
 
-                <div class="form-grid-2">
-                  <div class="form-group">
-                    <label for="desktopNotWorkingSummary"><i class="fa-solid fa-circle-exclamation"></i> No. of Desktop units which are not working</label>
-                    <input type="number" id="desktopNotWorkingSummary" class="form-control input-not-working" min="0" value="0" required readonly style="font-weight: 700; font-size: 1.1rem;">
-                    <small style="color: var(--text-muted);">Auto-calculated from Non-Working CPU units.</small>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="remarksInput"><i class="fa-solid fa-comment-dots"></i> Remarks (Enter specific condition of IT systems and equipments)</label>
-                    <textarea id="remarksInput" class="form-control" placeholder="Enter details regarding system defects, warranty status, AMC contracts, or pending replacement requests..."></textarea>
-                  </div>
+                <div class="form-group">
+                  <label for="remarksInput"><i class="fa-solid fa-comment-dots"></i> Remarks (Enter specific condition of IT systems and equipments)</label>
+                  <textarea id="remarksInput" class="form-control" placeholder="Enter details regarding system defects, warranty status, AMC contracts, or pending replacement requests..."></textarea>
                 </div>
 
                 <!-- Submit Button Bar -->
@@ -463,60 +465,6 @@
             </form>
           </div>
 
-          <!-- PUBLIC VIEW DATA WINDOW SECTION -->
-          <div id="publicViewSection" style="display: none;">
-            <div class="card-section">
-              <div class="section-header">
-                <h2 class="section-title">
-                  <i class="fa-solid fa-table"></i> Public View Data Window - Entered Office IT Details
-                </h2>
-                <button class="btn btn-outline btn-sm" onclick="exportDataToCSV()">
-                  <i class="fa-solid fa-file-csv"></i> Export CSV
-                </button>
-              </div>
-
-              <div class="table-toolbar">
-                <div class="search-box">
-                  <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="text" id="publicSearchInput" class="form-control" placeholder="Search by office name, network, OS..." onkeyup="filterPublicTable()">
-                </div>
-                
-                <select id="publicCategoryFilter" class="form-control" style="max-width: 220px;" onchange="filterPublicTable()">
-                  <option value="ALL">All Categories</option>
-                  <option value="RTO">RTO Offices</option>
-                  <option value="SRTO">Sub-RTO Offices</option>
-                  <option value="Enforcement">Enforcement RTOs</option>
-                  <option value="Checkpost">Checkposts</option>
-                  <option value="TC">Transport Commissionerate / DTC</option>
-                </select>
-              </div>
-
-              <div class="data-table-container">
-                <table class="data-table" id="publicDataTable">
-                  <thead>
-                    <tr>
-                      <th>Office Name</th>
-                      <th>Network</th>
-                      <th>Speed</th>
-                      <th>Monitors (W/NW)</th>
-                      <th>CPUs (W/NW)</th>
-                      <th>Laptops (W/NW)</th>
-                      <th>AIO PCs (W/NW)</th>
-                      <th>Working Dot Matrix</th>
-                      <th>UPS (W/NW)</th>
-                      <th>Batteries (Use/Unused)</th>
-                      <th>Last Updated</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="publicTableBody">
-                    <!-- Dynamically populated -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
         </div>
 
         <!-- ADMIN SESSION CONTAINER -->
@@ -527,13 +475,13 @@
             <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
               <div>
                 <h2 style="font-size: 1.3rem; font-weight: 700; color: #ffffff;"><i class="fa-solid fa-user-shield"></i> MVD Administrative Portal</h2>
-                <p style="font-size: 0.85rem; color: #93c5fd;">Manage state inventory, view analytics dashboard, configure future menu modules, and toggle public accessibility.</p>
+                <p style="font-size: 0.85rem; color: #93c5fd;">Manage state inventory, view analytics dashboard, configure future menu modules, and manage portal parameters.</p>
               </div>
 
               <div style="display: flex; align-items: center; gap: 16px;">
                 <!-- Explicit Admin Logout Button in Admin Banner -->
                 <button class="btn btn-danger" onclick="logoutAdmin()">
-                  <i class="fa-solid fa-right-from-bracket"></i> Logout Admin
+                  <i class="fa-solid fa-right-from-bracket"></i> Exit Admin Mode
                 </button>
               </div>
             </div>
@@ -558,41 +506,60 @@
           <!-- ADMIN DASHBOARD SUBVIEW -->
           <div id="adminDashboardSubView">
             
-            <!-- KPI Cards Grid -->
+            <!-- Dashboard Filter Bar -->
+            <div class="card-section" style="padding: 16px 24px; margin-bottom: 20px; background: #ffffff;">
+              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
+                <div style="display: flex; align-items: center; gap: 10px;">
+                  <i class="fa-solid fa-filter" style="color: var(--primary-600); font-size: 1.1rem;"></i>
+                  <span style="font-weight: 700; color: var(--primary-900);">Dashboard Office Scope Filter:</span>
+                </div>
+                <div style="flex: 1; max-width: 420px; min-width: 250px;">
+                  <select id="dashboardOfficeFilter" class="form-control" onchange="renderAdminDashboard()" style="font-weight: 600;">
+                    <option value="ALL">-- Statewide Aggregate (All MVD Offices) --</option>
+                    <!-- Populated dynamically via JS -->
+                  </select>
+                </div>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">
+                  <i class="fa-solid fa-arrow-pointer"></i> <strong>Interactive Drill-Down:</strong> Click any KPI card to view detailed breakdown.
+                </div>
+              </div>
+            </div>
+
+            <!-- KPI Cards Grid with Interactive Drill-Down -->
             <div class="dashboard-grid-4">
-              <div class="metric-card emerald">
+              <div class="metric-card emerald" onclick="drillDownDashboard('offices')" style="cursor: pointer;" title="Click to view Reported vs Pending Offices Breakdown">
                 <div class="metric-icon"><i class="fa-solid fa-building-circle-check"></i></div>
                 <div class="metric-content">
-                  <h4>Offices Reported</h4>
+                  <h4>Offices Reported <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-emerald);"></i></h4>
                   <div class="metric-value" id="kpiOfficesReported">0 / 100+</div>
-                  <div class="metric-sub">Statewide MVD Office Entries</div>
+                  <div class="metric-sub">Click for Office Status List</div>
                 </div>
               </div>
 
-              <div class="metric-card gold">
+              <div class="metric-card gold" onclick="drillDownDashboard('systems')" style="cursor: pointer;" title="Click to view Systems Distribution Breakdown">
                 <div class="metric-icon"><i class="fa-solid fa-computer"></i></div>
                 <div class="metric-content">
-                  <h4>Total IT Systems</h4>
+                  <h4>Total IT Systems <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-gold);"></i></h4>
                   <div class="metric-value" id="kpiTotalSystems">0</div>
-                  <div class="metric-sub">Monitors, CPUs, Laptops & AIOs</div>
+                  <div class="metric-sub">Click for System Types Breakdown</div>
                 </div>
               </div>
 
-              <div class="metric-card rose">
+              <div class="metric-card rose" onclick="drillDownDashboard('defective')" style="cursor: pointer;" title="Click to view Defective Hardware Breakdown">
                 <div class="metric-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
                 <div class="metric-content">
-                  <h4>Non-Working Hardware</h4>
+                  <h4>Non-Working Hardware <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-rose);"></i></h4>
                   <div class="metric-value" id="kpiNonWorkingHardware">0</div>
-                  <div class="metric-sub">Pending Maintenance / Replacement</div>
+                  <div class="metric-sub">Click for Defective Items List</div>
                 </div>
               </div>
 
-              <div class="metric-card purple">
+              <div class="metric-card purple" onclick="drillDownDashboard('network')" style="cursor: pointer;" title="Click to view KSWAN / KFONE Network Distribution">
                 <div class="metric-icon"><i class="fa-solid fa-network-wired"></i></div>
                 <div class="metric-content">
-                  <h4>KSWAN / KFONE Offices</h4>
+                  <h4>KSWAN / KFONE Offices <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-purple);"></i></h4>
                   <div class="metric-value" id="kpiGovNetworkCount">0</div>
-                  <div class="metric-sub">State WAN Network Coverage</div>
+                  <div class="metric-sub">Click for Network Provider List</div>
                 </div>
               </div>
             </div>
@@ -699,7 +666,7 @@
                 </button>
               </div>
               <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 20px;">
-                Provision to configure, enable, or hide portal menus. Toggling a menu hides its submission form and view windows from public users.
+                Provision to configure, enable, or hide portal menus. Toggling a menu hides its submission form and view windows from portal users.
               </p>
 
               <div id="menuManagerContainer" class="form-grid-2">
@@ -727,7 +694,6 @@
       </footer>
 
     </div>
-
   </div>
 
   <!-- Admin Passcode Modal Dialog -->
@@ -737,6 +703,7 @@
         <h3><i class="fa-solid fa-lock"></i> Admin Authorization</h3>
         <button class="btn btn-outline btn-sm" onclick="closeAdminModal()"><i class="fa-solid fa-xmark"></i></button>
       </div>
+      
       <form onsubmit="verifyAdminPasscode(event)">
         <div class="form-group" style="margin-bottom: 20px;">
           <label for="adminPasscodeInput">Admin Passcode *</label>
@@ -786,7 +753,7 @@
     </div>
   </div>
 
-  <!-- Office Details Modal View for Public / Admin -->
+  <!-- Office Details Modal View -->
   <div id="officeDetailModal" class="modal-overlay" style="display: none;">
     <div class="modal-card" style="max-width: 680px;">
       <div class="modal-header">

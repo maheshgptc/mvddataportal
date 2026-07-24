@@ -359,21 +359,11 @@ function renderGenericModuleView(mod) {
 
 // --- 7. SUPABASE SYNC ENGINE ---
 async function syncWithSupabaseBackend() {
-  const badge = document.getElementById('backendStatusBadge');
   if (!supabaseClient) {
-    if (badge) {
-      badge.className = 'badge badge-warning';
-      badge.innerHTML = `<i class="fa-solid fa-hard-drive"></i> Local Storage Mode`;
-    }
     return;
   }
 
   try {
-    if (badge) {
-      badge.className = 'badge badge-info';
-      badge.innerHTML = `<i class="fa-solid fa-rotate fa-spin"></i> Syncing Supabase...`;
-    }
-
     const { data: equipData, error: equipErr } = await supabaseClient
       .from('mvd_it_equipment')
       .select('*');
@@ -407,6 +397,9 @@ async function syncWithSupabaseBackend() {
           ageAbove8: row.systems_above_8yrs ?? 0,
           desktopNotWorkingSummary: row.desktop_units_not_working ?? 0,
           remarks: row.remarks || '',
+          entryOfficerName: row.entry_officer_name || '',
+          entryOfficerDesignation: row.entry_officer_designation || '',
+          entryOfficerMobile: row.entry_officer_mobile || '',
           lastUpdated: row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'
         };
       });
@@ -433,11 +426,6 @@ async function syncWithSupabaseBackend() {
       syncPublicVisibilityUI();
     }
 
-    if (badge) {
-      badge.className = 'badge badge-working';
-      badge.innerHTML = `<i class="fa-solid fa-cloud-check"></i> Supabase Live Backend`;
-    }
-
     renderPortalMenuBar();
     renderPublicDataTable();
     renderAdminDataTable();
@@ -446,10 +434,6 @@ async function syncWithSupabaseBackend() {
 
   } catch (err) {
     console.error("Supabase sync error:", err);
-    if (badge) {
-      badge.className = 'badge badge-warning';
-      badge.innerHTML = `<i class="fa-solid fa-cloud-slash"></i> Offline / Fallback Mode`;
-    }
   }
 }
 
@@ -464,6 +448,9 @@ async function saveRecordToSupabase(record) {
       network_provider_other: record.otherNetworkDetails,
       network_speed: record.networkSpeed,
       os_with_version: record.operatingSystem,
+      entry_officer_name: record.entryOfficerName,
+      entry_officer_designation: record.entryOfficerDesignation,
+      entry_officer_mobile: record.entryOfficerMobile,
       monitors_working: record.monitorsWorking,
       monitors_not_working: record.monitorsNotWorking,
       cpu_working: record.cpuWorking,
@@ -605,6 +592,10 @@ function populateFormWithData(data) {
   document.getElementById('networkSpeedInput').value = data.networkSpeed || '';
   document.getElementById('operatingSystemInput').value = data.operatingSystem || '';
 
+  if (document.getElementById('entryOfficerName')) document.getElementById('entryOfficerName').value = data.entryOfficerName || '';
+  if (document.getElementById('entryOfficerDesignation')) document.getElementById('entryOfficerDesignation').value = data.entryOfficerDesignation || '';
+  if (document.getElementById('entryOfficerMobile')) document.getElementById('entryOfficerMobile').value = data.entryOfficerMobile || '';
+
   document.getElementById('monitorsWorking').value = data.monitorsWorking ?? 0;
   document.getElementById('monitorsNotWorking').value = data.monitorsNotWorking ?? 0;
   document.getElementById('cpuWorking').value = data.cpuWorking ?? 0;
@@ -645,7 +636,8 @@ function populateFormWithData(data) {
   document.getElementById('age5To8').value = data.age5To8 ?? 0;
   document.getElementById('ageAbove8').value = data.ageAbove8 ?? 0;
 
-  document.getElementById('desktopNotWorkingSummary').value = data.desktopNotWorkingSummary ?? (data.cpuNotWorking ?? 0);
+  const desktopSumEl = document.getElementById('desktopNotWorkingSummary');
+  if (desktopSumEl) desktopSumEl.value = data.desktopNotWorkingSummary ?? (data.cpuNotWorking ?? 0);
   document.getElementById('remarksInput').value = data.remarks || '';
 }
 
@@ -655,6 +647,10 @@ function resetPublicFormFieldsOnly() {
   document.getElementById('otherNetworkInput').value = '';
   document.getElementById('networkSpeedInput').value = '';
   document.getElementById('operatingSystemInput').value = '';
+
+  if (document.getElementById('entryOfficerName')) document.getElementById('entryOfficerName').value = '';
+  if (document.getElementById('entryOfficerDesignation')) document.getElementById('entryOfficerDesignation').value = '';
+  if (document.getElementById('entryOfficerMobile')) document.getElementById('entryOfficerMobile').value = '';
 
   const numIds = [
     'monitorsWorking', 'monitorsNotWorking', 'cpuWorking', 'cpuNotWorking',
@@ -697,7 +693,8 @@ function handleNetworkChange(value) {
 
 function calculateNonWorkingDesktops() {
   const cpuNotWorking = parseInt(document.getElementById('cpuNotWorking').value) || 0;
-  document.getElementById('desktopNotWorkingSummary').value = cpuNotWorking;
+  const desktopSumEl = document.getElementById('desktopNotWorkingSummary');
+  if (desktopSumEl) desktopSumEl.value = cpuNotWorking;
 }
 
 // --- 10. FORM SUBMISSION & BACKEND SAVING ---
@@ -725,6 +722,9 @@ async function handleFormSubmit(e) {
     otherNetworkDetails: document.getElementById('otherNetworkInput').value.trim(),
     networkSpeed: document.getElementById('networkSpeedInput').value.trim(),
     operatingSystem: document.getElementById('operatingSystemInput').value.trim(),
+    entryOfficerName: document.getElementById('entryOfficerName')?.value.trim() || '',
+    entryOfficerDesignation: document.getElementById('entryOfficerDesignation')?.value.trim() || '',
+    entryOfficerMobile: document.getElementById('entryOfficerMobile')?.value.trim() || '',
 
     monitorsWorking: parseInt(document.getElementById('monitorsWorking').value) || 0,
     monitorsNotWorking: parseInt(document.getElementById('monitorsNotWorking').value) || 0,
@@ -785,13 +785,8 @@ async function handleFormSubmit(e) {
 
   showToast(`IT Equipment details for "${officeName}" saved successfully!`, 'success');
 
-  renderPublicDataTable();
   renderAdminDataTable();
   if (activeSession === 'admin') renderAdminDashboard();
-
-  if (activeSession === 'public') {
-    switchPublicTab('view');
-  }
 }
 
 // --- 11. ADMIN AUTHENTICATION & LOGOUT ENGINE ---
@@ -1030,11 +1025,35 @@ function filterPublicTable() {
   });
 }
 
-// --- 14. ADMIN PORTAL & DASHBOARD RENDERER ---
-function renderAdminDashboard() {
-  const entries = Object.values(inventoryStore);
+// --- 14. ADMIN PORTAL & DASHBOARD RENDERER WITH OFFICE FILTER & DRILL-DOWN ---
+function populateDashboardOfficeFilter() {
+  const filter = document.getElementById('dashboardOfficeFilter');
+  if (!filter) return;
 
-  const totalOffices = entries.length;
+  const currentVal = filter.value || 'ALL';
+  filter.innerHTML = '<option value="ALL">-- Statewide Aggregate (All MVD Offices) --</option>';
+
+  MVD_OFFICES.forEach(off => {
+    const isReported = !!inventoryStore[off];
+    const opt = document.createElement('option');
+    opt.value = off;
+    opt.textContent = `${off} ${isReported ? '✓ (Reported)' : '(Pending)'}`;
+    if (off === currentVal) opt.selected = true;
+    filter.appendChild(opt);
+  });
+}
+
+function renderAdminDashboard() {
+  populateDashboardOfficeFilter();
+
+  const filterVal = document.getElementById('dashboardOfficeFilter')?.value || 'ALL';
+  let entries = Object.values(inventoryStore);
+
+  if (filterVal !== 'ALL') {
+    entries = inventoryStore[filterVal] ? [inventoryStore[filterVal]] : [];
+  }
+
+  const totalOffices = filterVal === 'ALL' ? entries.length : (entries.length > 0 ? 1 : 0);
   let totalSystems = 0;
   let nonWorkingHardware = 0;
   let govNetworkCount = 0;
@@ -1072,7 +1091,7 @@ function renderAdminDashboard() {
     totalAbove8 += (e.ageAbove8 || 0);
   });
 
-  document.getElementById('kpiOfficesReported').textContent = `${totalOffices} / ${MVD_OFFICES.length}`;
+  document.getElementById('kpiOfficesReported').textContent = filterVal === 'ALL' ? `${totalOffices} / ${MVD_OFFICES.length}` : (totalOffices > 0 ? 'Reported ✓' : 'Pending');
   document.getElementById('kpiTotalSystems').textContent = totalSystems;
   document.getElementById('kpiNonWorkingHardware').textContent = nonWorkingHardware;
   document.getElementById('kpiGovNetworkCount').textContent = govNetworkCount;
@@ -1095,7 +1114,7 @@ function renderAdminDashboard() {
       data: {
         labels: ['Working Systems', 'Defective / Non-Working Systems'],
         datasets: [{
-          data: [totalWorkingHW || 1, totalNotWorkingHW || 0],
+          data: [totalWorkingHW || (totalNotWorkingHW === 0 ? 1 : 0), totalNotWorkingHW || 0],
           backgroundColor: ['#10b981', '#ef4444'],
           borderWidth: 2,
           borderColor: '#ffffff'
@@ -1133,6 +1152,160 @@ function renderAdminDashboard() {
   }
 }
 
+// --- DASHBOARD INTERACTIVE DRILL-DOWN ENGINE ---
+function drillDownDashboard(type) {
+  const modal = document.getElementById('officeDetailModal');
+  const title = document.getElementById('modalOfficeTitle');
+  const body = document.getElementById('modalOfficeBody');
+
+  if (!modal || !title || !body) return;
+
+  const filterVal = document.getElementById('dashboardOfficeFilter')?.value || 'ALL';
+  let entries = Object.values(inventoryStore);
+  if (filterVal !== 'ALL') {
+    entries = inventoryStore[filterVal] ? [inventoryStore[filterVal]] : [];
+  }
+
+  if (type === 'offices') {
+    title.innerHTML = `<i class="fa-solid fa-building-circle-check"></i> Offices Submission Drill-Down (${entries.length} Reported / ${MVD_OFFICES.length} Total)`;
+
+    const reportedNames = entries.map(e => e.officeName);
+    const pendingNames = MVD_OFFICES.filter(off => !inventoryStore[off]);
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 18px;">
+        <div>
+          <h4 style="color: #047857; margin-bottom: 10px;"><i class="fa-solid fa-circle-check"></i> Reported MVD Offices (${reportedNames.length})</h4>
+          <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+            <table class="data-table">
+              <thead><tr><th>Office Name</th><th>Reporting Officer</th><th>Last Updated</th><th>Action</th></tr></thead>
+              <tbody>
+                ${entries.map(e => `
+                  <tr>
+                    <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                    <td>${escapeHtml(e.entryOfficerName || 'N/A')} (${escapeHtml(e.entryOfficerDesignation || 'Officer')})</td>
+                    <td><small>${escapeHtml(e.lastUpdated)}</small></td>
+                    <td><button class="btn btn-outline btn-sm" onclick="viewOfficeDetail('${escapeHtml(e.officeName)}')"><i class="fa-solid fa-eye"></i> View</button></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div>
+          <h4 style="color: #b91c1c; margin-bottom: 10px;"><i class="fa-solid fa-clock"></i> Pending Submission Offices (${pendingNames.length})</h4>
+          <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: #fef2f2;">
+            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
+              ${pendingNames.map(off => `<div style="font-size: 0.85rem; color: #991b1b;"><i class="fa-regular fa-square"></i> ${escapeHtml(off)}</div>`).join('')}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (type === 'systems') {
+    title.innerHTML = `<i class="fa-solid fa-computer"></i> IT Systems Equipment Distribution Drill-Down`;
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: var(--text-muted); font-size: 0.88rem;">Detailed hardware Breakdown by Office for selected scope:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>Monitors (W/NW)</th>
+                <th>CPUs (W/NW)</th>
+                <th>Laptops (W/NW)</th>
+                <th>AIO PCs (W/NW)</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td>${e.monitorsWorking} W / <span style="color:#b91c1c;">${e.monitorsNotWorking} NW</span></td>
+                  <td>${e.cpuWorking} W / <span style="color:#b91c1c;">${e.cpuNotWorking} NW</span></td>
+                  <td>${e.laptopsWorking} W / <span style="color:#b91c1c;">${e.laptopsNotWorking} NW</span></td>
+                  <td>${e.aioWorking} W / <span style="color:#b91c1c;">${e.aioNotWorking} NW</span></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (type === 'defective') {
+    title.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color: #ef4444;"></i> Defective Hardware & Defect Audit Drill-Down`;
+
+    const defectiveEntries = entries.filter(e => (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking + e.upsNotWorking) > 0);
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: #b91c1c; font-size: 0.88rem; font-weight: 600;">Found ${defectiveEntries.length} offices with non-working hardware items pending maintenance:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>Defective Monitors</th>
+                <th>Defective CPUs</th>
+                <th>Defective Laptops / AIO</th>
+                <th>Defective UPS</th>
+                <th>Condition Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${defectiveEntries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td style="color:#b91c1c; font-weight:700;">${e.monitorsNotWorking}</td>
+                  <td style="color:#b91c1c; font-weight:700;">${e.cpuNotWorking}</td>
+                  <td style="color:#b91c1c; font-weight:700;">${e.laptopsNotWorking + e.aioNotWorking}</td>
+                  <td style="color:#b91c1c; font-weight:700;">${e.upsNotWorking}</td>
+                  <td><small>${escapeHtml(e.remarks || 'None')}</small></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (type === 'network') {
+    title.innerHTML = `<i class="fa-solid fa-network-wired"></i> Network Infrastructure Coverage Drill-Down`;
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: var(--text-muted); font-size: 0.88rem;">Network Connectivity provider and speed status by office:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>Network Provider</th>
+                <th>Bandwidth Speed</th>
+                <th>OS & Version</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td><span class="badge badge-info">${escapeHtml(e.availableNetwork === 'Others' ? e.otherNetworkDetails : e.availableNetwork)}</span></td>
+                  <td>${escapeHtml(e.networkSpeed || 'N/A')}</td>
+                  <td><small>${escapeHtml(e.operatingSystem || 'N/A')}</small></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  }
+
+  modal.style.display = 'flex';
+}
+
 function renderAdminDataTable() {
   const tbody = document.getElementById('adminTableBody');
   if (!tbody) return;
@@ -1149,7 +1322,10 @@ function renderAdminDataTable() {
 
     return `
       <tr>
-        <td><strong>${escapeHtml(item.officeName)}</strong></td>
+        <td>
+          <strong>${escapeHtml(item.officeName)}</strong><br>
+          <small style="color: var(--text-muted);"><i class="fa-solid fa-user-pen"></i> ${escapeHtml(item.entryOfficerName || 'N/A')} (${escapeHtml(item.entryOfficerDesignation || 'Officer')}) • 📞 ${escapeHtml(item.entryOfficerMobile || 'N/A')}</small>
+        </td>
         <td><span class="badge badge-info">${escapeHtml(netLabel)}</span><br><small>${escapeHtml(item.networkSpeed || '')}</small></td>
         <td><small>${escapeHtml(item.operatingSystem || 'N/A')}</small></td>
         <td>${item.monitorsWorking} W / <span style="color:#b91c1c;">${item.monitorsNotWorking} NW</span></td>
@@ -1206,34 +1382,19 @@ async function deleteOfficeEntry(officeName) {
 function switchSession(sessionType) {
   activeSession = sessionType;
 
-  const publicTabBtn = document.getElementById('tabPublicBtn');
-  const adminTabBtn = document.getElementById('tabAdminBtn');
-  const badge = document.getElementById('currentSessionBadge');
-
   const publicContainer = document.getElementById('publicContainer');
   const adminContainer = document.getElementById('adminContainer');
 
   renderPortalMenuBar();
 
-  if (sessionType === 'public') {
-    publicTabBtn.classList.add('active');
-    adminTabBtn.classList.remove('active');
-
-    badge.className = 'session-badge session-public';
-    badge.innerHTML = `<i class="fa-solid fa-eye"></i> Public Session`;
-
-    adminContainer.style.display = 'none';
-
+  if (sessionType === 'public' || sessionType === 'standard') {
+    if (adminContainer) adminContainer.style.display = 'none';
     selectModuleMenu(activeModuleId);
   } else if (sessionType === 'admin') {
-    adminTabBtn.classList.add('active');
-    publicTabBtn.classList.remove('active');
-
-    badge.className = 'session-badge session-admin';
-    badge.innerHTML = `<i class="fa-solid fa-user-shield"></i> Admin Portal`;
-    document.getElementById('genericModuleContainer').style.display = 'none';
-    publicContainer.style.display = 'none';
-    adminContainer.style.display = 'block';
+    const genericCont = document.getElementById('genericModuleContainer');
+    if (genericCont) genericCont.style.display = 'none';
+    if (publicContainer) publicContainer.style.display = 'none';
+    if (adminContainer) adminContainer.style.display = 'block';
 
     renderAdminDashboard();
     renderAdminDataTable();
@@ -1249,15 +1410,15 @@ function switchPublicTab(tab) {
   const viewSec = document.getElementById('publicViewSection');
 
   if (tab === 'entry') {
-    entryBtn.className = 'btn btn-primary';
-    viewBtn.className = 'btn btn-outline';
-    entrySec.style.display = 'block';
-    viewSec.style.display = 'none';
+    if (entryBtn) entryBtn.className = 'btn btn-primary';
+    if (viewBtn) viewBtn.className = 'btn btn-outline';
+    if (entrySec) entrySec.style.display = 'block';
+    if (viewSec) viewSec.style.display = 'none';
   } else {
-    viewBtn.className = 'btn btn-primary';
-    entryBtn.className = 'btn btn-outline';
-    entrySec.style.display = 'none';
-    viewSec.style.display = 'block';
+    if (viewBtn) viewBtn.className = 'btn btn-primary';
+    if (entryBtn) entryBtn.className = 'btn btn-outline';
+    if (entrySec) entrySec.style.display = 'none';
+    if (viewSec) viewSec.style.display = 'block';
     renderPublicDataTable();
   }
 }
@@ -1358,6 +1519,8 @@ function viewOfficeDetail(officeName) {
       <div style="background: #f1f5f9; padding: 12px; border-radius: 8px;">
         <strong>Network & OS:</strong> ${escapeHtml(item.availableNetwork)} (${escapeHtml(item.networkSpeed || 'N/A')})<br>
         <strong>OS Version:</strong> ${escapeHtml(item.operatingSystem)}<br>
+        <strong>Reporting Officer:</strong> ${escapeHtml(item.entryOfficerName || 'N/A')} (${escapeHtml(item.entryOfficerDesignation || 'Officer')})<br>
+        <strong>Mobile Number:</strong> 📞 ${escapeHtml(item.entryOfficerMobile || 'N/A')}<br>
         <small style="color: var(--text-muted);">Last Updated: ${escapeHtml(item.lastUpdated || 'N/A')}</small>
       </div>
 
@@ -1421,7 +1584,7 @@ function exportDataToCSV() {
   }
 
   const headers = [
-    "Office Name", "Network", "Network Details", "Network Speed", "Operating System",
+    "Office Name", "Entry Officer Name", "Designation", "Mobile Number", "Network", "Network Details", "Network Speed", "Operating System",
     "Monitors Working", "Monitors Not Working", "CPU Working", "CPU Not Working",
     "Laptops Working", "Laptops Not Working", "AIO Working", "AIO Not Working",
     "Dot Matrix Working", "Dot Matrix Not Working", "Dot Matrix Multi",
@@ -1440,6 +1603,9 @@ function exportDataToCSV() {
     const p = e.printers || {};
     const row = [
       `"${(e.officeName || '').replace(/"/g, '""')}"`,
+      `"${(e.entryOfficerName || '').replace(/"/g, '""')}"`,
+      `"${(e.entryOfficerDesignation || '').replace(/"/g, '""')}"`,
+      `"${(e.entryOfficerMobile || '').replace(/"/g, '""')}"`,
       `"${(e.availableNetwork || '').replace(/"/g, '""')}"`,
       `"${(e.otherNetworkDetails || '').replace(/"/g, '""')}"`,
       `"${(e.networkSpeed || '').replace(/"/g, '""')}"`,
@@ -1509,4 +1675,25 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
+}
+
+// --- 21. MOBILE NAVIGATION SIDEBAR DRAWER CONTROLLER ---
+function toggleMobileSidebar(forceState) {
+  const sidebar = document.getElementById('portalSidebar');
+  const overlay = document.getElementById('mobileSidebarOverlay');
+
+  if (!sidebar) return;
+
+  if (typeof forceState === 'boolean') {
+    if (forceState) {
+      sidebar.classList.add('mobile-open');
+      if (overlay) overlay.classList.add('active');
+    } else {
+      sidebar.classList.remove('mobile-open');
+      if (overlay) overlay.classList.remove('active');
+    }
+  } else {
+    const isOpen = sidebar.classList.toggle('mobile-open');
+    if (overlay) overlay.classList.toggle('active', isOpen);
+  }
 }
