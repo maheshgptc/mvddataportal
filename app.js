@@ -278,7 +278,11 @@ function checkGoogleAuthSession() {
   return false;
 }
 
-let currentGoogleClientId = localStorage.getItem('mvd_google_client_id') || '85912401824-mvditportal.apps.googleusercontent.com';
+let currentGoogleClientId = localStorage.getItem('mvd_google_client_id');
+if (!currentGoogleClientId || currentGoogleClientId.includes('85912401824')) {
+  currentGoogleClientId = '955275031545-8l74gce2pjgen354h14s97977o95j6tk.apps.googleusercontent.com';
+  localStorage.setItem('mvd_google_client_id', currentGoogleClientId);
+}
 
 function configureGoogleClientId() {
   const newId = prompt('Configure Google Cloud OAuth 2.0 Client ID:\n(Enter your Client ID from Google Cloud Console: console.cloud.google.com)', currentGoogleClientId);
@@ -682,6 +686,11 @@ async function syncWithSupabaseBackend() {
       appSettings.publicVisible = settingsData.public_visible;
       appSettings.adminPasscode = settingsData.admin_passcode || 'admin123';
       
+      if (settingsData.google_client_id) {
+        currentGoogleClientId = settingsData.google_client_id;
+        localStorage.setItem('mvd_google_client_id', currentGoogleClientId);
+      }
+
       if (settingsData.menu_visibility && Array.isArray(settingsData.menu_visibility)) {
         portalModules = settingsData.menu_visibility;
         localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
