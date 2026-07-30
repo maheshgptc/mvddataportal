@@ -669,6 +669,15 @@ async function syncWithSupabaseBackend() {
           entryOfficerDesignation: row.entry_officer_designation || '',
           entryOfficerMobile: row.entry_officer_mobile || '',
           submittedByEmail: row.submitted_by_email || '',
+          createdOfficerName: row.created_officer_name || row.entry_officer_name || '',
+          createdOfficerDesignation: row.created_officer_designation || row.entry_officer_designation || '',
+          createdOfficerMobile: row.created_officer_mobile || row.entry_officer_mobile || '',
+          createdOfficerEmail: row.created_officer_email || row.submitted_by_email || '',
+          createdDate: row.created_date || (row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'),
+          updatedOfficerName: row.updated_officer_name || row.entry_officer_name || '',
+          updatedOfficerDesignation: row.updated_officer_designation || row.entry_officer_designation || '',
+          updatedOfficerMobile: row.updated_officer_mobile || row.entry_officer_mobile || '',
+          updatedOfficerEmail: row.updated_officer_email || row.submitted_by_email || '',
           lastUpdated: row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'
         };
       });
@@ -726,6 +735,15 @@ async function saveRecordToSupabase(record) {
       entry_officer_designation: record.entryOfficerDesignation,
       entry_officer_mobile: record.entryOfficerMobile,
       submitted_by_email: record.submittedByEmail || record.entryOfficerEmail || '',
+      created_officer_name: record.createdOfficerName || record.entryOfficerName || '',
+      created_officer_designation: record.createdOfficerDesignation || record.entryOfficerDesignation || '',
+      created_officer_mobile: record.createdOfficerMobile || record.entryOfficerMobile || '',
+      created_officer_email: record.createdOfficerEmail || record.submittedByEmail || '',
+      created_date: record.createdDate || record.lastUpdated || '',
+      updated_officer_name: record.updatedOfficerName || record.entryOfficerName || '',
+      updated_officer_designation: record.updatedOfficerDesignation || record.entryOfficerDesignation || '',
+      updated_officer_mobile: record.updatedOfficerMobile || record.entryOfficerMobile || '',
+      updated_officer_email: record.updatedOfficerEmail || record.submittedByEmail || '',
       monitors_working: record.monitorsWorking,
       monitors_not_working: record.monitorsNotWorking,
       cpu_working: record.cpuWorking,
@@ -1176,10 +1194,29 @@ async function handleFormSubmit(e) {
       return el ? !!el.checked : false;
     };
 
+    const existingRec = inventoryStore[officeName];
+    const loggedEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
+    const loggedName = (googleAuthUser && googleAuthUser.name) ? googleAuthUser.name : '';
+
     const record = {
       officeName,
-      submittedByEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
-      entryOfficerEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
+      submittedByEmail: loggedEmail || existingRec?.submittedByEmail || '',
+      entryOfficerEmail: loggedEmail || existingRec?.entryOfficerEmail || '',
+      
+      // Entered Officer Details (Original Submitter)
+      createdOfficerName: existingRec?.createdOfficerName || getStr('entryOfficerName') || loggedName || 'Officer',
+      createdOfficerDesignation: existingRec?.createdOfficerDesignation || getStr('entryOfficerDesignation') || 'Officer',
+      createdOfficerMobile: existingRec?.createdOfficerMobile || getStr('entryOfficerMobile') || 'N/A',
+      createdOfficerEmail: existingRec?.createdOfficerEmail || loggedEmail || 'N/A',
+      createdDate: existingRec?.createdDate || formattedDate,
+
+      // Updated Officer Details (Latest Editor)
+      updatedOfficerName: getStr('entryOfficerName') || loggedName || 'Officer',
+      updatedOfficerDesignation: getStr('entryOfficerDesignation') || 'Officer',
+      updatedOfficerMobile: getStr('entryOfficerMobile') || 'N/A',
+      updatedOfficerEmail: loggedEmail || existingRec?.updatedOfficerEmail || 'N/A',
+      lastUpdated: formattedDate,
+
       availableNetwork: networkVal,
       otherNetworkDetails: getStr('otherNetworkInput'),
       networkSpeed: getStr('networkSpeedInput'),
@@ -2051,7 +2088,7 @@ function renderAdminDataTable() {
 
   const entries = Object.values(inventoryStore);
   if (entries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="13" style="text-align: center; color: var(--text-muted); padding: 30px;">No entries stored.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: var(--text-muted); padding: 30px;">No entries stored.</td></tr>`;
     return;
   }
 
@@ -2059,11 +2096,34 @@ function renderAdminDataTable() {
     const netLabel = item.availableNetwork === 'Others' ? `Other (${item.otherNetworkDetails})` : item.availableNetwork;
     const dotWorking = item.printers?.dotMatrix?.working ?? 0;
 
+    const createdName = item.createdOfficerName || item.entryOfficerName || 'N/A';
+    const createdDesig = item.createdOfficerDesignation || item.entryOfficerDesignation || 'Officer';
+    const createdEmail = item.createdOfficerEmail || item.submittedByEmail || 'N/A';
+    const createdTime = item.createdDate || item.lastUpdated || 'N/A';
+
+    const updatedName = item.updatedOfficerName || item.entryOfficerName || 'N/A';
+    const updatedDesig = item.updatedOfficerDesignation || item.entryOfficerDesignation || 'Officer';
+    const updatedEmail = item.updatedOfficerEmail || item.submittedByEmail || 'N/A';
+    const updatedTime = item.lastUpdated || 'N/A';
+
     return `
       <tr>
         <td>
-          <strong>${escapeHtml(item.officeName)}</strong><br>
-          <small style="color: var(--text-muted);"><i class="fa-solid fa-user-pen"></i> ${escapeHtml(item.entryOfficerName || 'N/A')} (${escapeHtml(item.entryOfficerDesignation || 'Officer')}) • 📞 ${escapeHtml(item.entryOfficerMobile || 'N/A')}</small>
+          <strong style="color: var(--primary-900); font-size: 0.92rem;">${escapeHtml(item.officeName)}</strong>
+        </td>
+        <td>
+          <div style="font-size: 0.84rem; line-height: 1.45;">
+            <strong>${escapeHtml(createdName)}</strong> <small style="color: var(--text-muted);">(${escapeHtml(createdDesig)})</small><br>
+            <span style="color: #0369a1; font-weight: 600; font-size: 0.78rem;"><i class="fa-solid fa-envelope"></i> ${escapeHtml(createdEmail)}</span><br>
+            <small style="color: #64748b;"><i class="fa-regular fa-calendar-check"></i> ${escapeHtml(createdTime)}</small>
+          </div>
+        </td>
+        <td>
+          <div style="font-size: 0.84rem; line-height: 1.45;">
+            <strong>${escapeHtml(updatedName)}</strong> <small style="color: var(--text-muted);">(${escapeHtml(updatedDesig)})</small><br>
+            <span style="color: #047857; font-weight: 600; font-size: 0.78rem;"><i class="fa-solid fa-envelope"></i> ${escapeHtml(updatedEmail)}</span><br>
+            <small style="color: #047857;"><i class="fa-regular fa-clock"></i> ${escapeHtml(updatedTime)}</small>
+          </div>
         </td>
         <td><span class="badge badge-info">${escapeHtml(netLabel)}</span><br><small>${escapeHtml(item.networkSpeed || '')}</small></td>
         <td><small>${escapeHtml(item.operatingSystem || 'N/A')}</small></td>
