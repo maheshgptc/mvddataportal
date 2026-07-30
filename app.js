@@ -279,8 +279,8 @@ function checkGoogleAuthSession() {
 }
 
 let currentGoogleClientId = localStorage.getItem('mvd_google_client_id');
-if (!currentGoogleClientId || currentGoogleClientId.includes('85912401824')) {
-  currentGoogleClientId = '955275031545-8l74gce2pjgen354h14s97977o95j6tk.apps.googleusercontent.com';
+if (!currentGoogleClientId || currentGoogleClientId !== '198593192187-6v1hi3b8p5oqtahlana8hrr901h6s4dj.apps.googleusercontent.com') {
+  currentGoogleClientId = '198593192187-6v1hi3b8p5oqtahlana8hrr901h6s4dj.apps.googleusercontent.com';
   localStorage.setItem('mvd_google_client_id', currentGoogleClientId);
 }
 
