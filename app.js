@@ -1120,131 +1120,136 @@ function calculateNonWorkingDesktops() {
 
 // --- 10. FORM SUBMISSION & BACKEND SAVING ---
 async function handleFormSubmit(e) {
-  e.preventDefault();
+  if (e) e.preventDefault();
 
-  const officeName = document.getElementById('officeSelect').value;
-  if (!officeName) {
-    showToast('Please select an Office Name', 'error');
-    return;
-  }
+  try {
+    const officeSelect = document.getElementById('officeSelect');
+    const officeName = officeSelect ? officeSelect.value : '';
+    if (!officeName) {
+      showToast('Please select an Office Name first', 'error');
+      return;
+    }
 
-  const certCheck = document.getElementById('certificationCheckbox');
-  if (certCheck && !certCheck.checked) {
-    showToast('Please certify that the above information is true and correct before submitting.', 'warning');
-    return;
-  }
+    const certCheck = document.getElementById('certificationCheckbox');
+    if (certCheck && !certCheck.checked) {
+      showToast('Please certify that the above information is true and correct before submitting.', 'warning');
+      return;
+    }
 
-  const networkVal = document.getElementById('availableNetworkSelect').value;
-  if (networkVal === 'Others' && !document.getElementById('otherNetworkInput').value.trim()) {
-    showToast('Please specify details for Other Network', 'warning');
-    return;
-  }
+    const netSelect = document.getElementById('availableNetworkSelect');
+    const networkVal = netSelect ? netSelect.value : '';
+    const otherNetInput = document.getElementById('otherNetworkInput');
+    if (networkVal === 'Others' && otherNetInput && !otherNetInput.value.trim()) {
+      showToast('Please specify details for Other Network', 'warning');
+      return;
+    }
 
-  const upsCapVal = document.getElementById('upsCapacitySelect')?.value;
-  if (upsCapVal === 'Other' && !document.getElementById('upsCapacityOtherInput')?.value.trim()) {
-    showToast('Please specify Other UPS Capacity (kVA)', 'warning');
-    return;
-  }
+    const upsCapVal = document.getElementById('upsCapacitySelect')?.value || '';
+    const upsCapOther = document.getElementById('upsCapacityOtherInput')?.value.trim() || '';
+    if (upsCapVal === 'Other' && !upsCapOther) {
+      showToast('Please specify Other UPS Capacity (kVA)', 'warning');
+      return;
+    }
 
-  const srvSent = document.getElementById('serviceReportSentSelect')?.value;
-  if (srvSent === 'Yes' && !document.getElementById('serviceReportDateInput')?.value) {
-    showToast('Please enter the Date of Sending Service Report to TCO', 'warning');
-    return;
-  }
+    const srvSent = document.getElementById('serviceReportSentSelect')?.value || '';
+    const srvDate = document.getElementById('serviceReportDateInput')?.value || '';
+    if (srvSent === 'Yes' && !srvDate) {
+      showToast('Please enter the Date of Sending Service Report to TCO', 'warning');
+      return;
+    }
 
-  const now = new Date();
-  const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+    const now = new Date();
+    const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
 
-  const record = {
-    officeName,
-    submittedByEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
-    entryOfficerEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
-    availableNetwork: networkVal,
-    otherNetworkDetails: document.getElementById('otherNetworkInput').value.trim(),
-    networkSpeed: document.getElementById('networkSpeedInput').value.trim(),
-    operatingSystem: document.getElementById('operatingSystemInput').value.trim(),
-    entryOfficerName: document.getElementById('entryOfficerName')?.value.trim() || '',
-    entryOfficerDesignation: document.getElementById('entryOfficerDesignation')?.value.trim() || '',
-    entryOfficerMobile: document.getElementById('entryOfficerMobile')?.value.trim() || '',
+    const getNum = (id) => {
+      const el = document.getElementById(id);
+      return el ? (parseInt(el.value) || 0) : 0;
+    };
 
-    monitorsWorking: parseInt(document.getElementById('monitorsWorking').value) || 0,
-    monitorsNotWorking: parseInt(document.getElementById('monitorsNotWorking').value) || 0,
-    cpuWorking: parseInt(document.getElementById('cpuWorking').value) || 0,
-    cpuNotWorking: parseInt(document.getElementById('cpuNotWorking').value) || 0,
-    laptopsWorking: parseInt(document.getElementById('laptopsWorking').value) || 0,
-    laptopsNotWorking: parseInt(document.getElementById('laptopsNotWorking').value) || 0,
-    aioWorking: parseInt(document.getElementById('aioWorking').value) || 0,
-    aioNotWorking: parseInt(document.getElementById('aioNotWorking').value) || 0,
+    const getStr = (id) => {
+      const el = document.getElementById(id);
+      return el ? el.value.trim() : '';
+    };
 
-    printers: {
-      dotMatrix: {
-        working: parseInt(document.getElementById('printerDotMatrixWorking').value) || 0,
-        notWorking: parseInt(document.getElementById('printerDotMatrixNotWorking').value) || 0,
-        multipurpose: document.getElementById('printerDotMatrixMulti').checked
+    const getCheck = (id) => {
+      const el = document.getElementById(id);
+      return el ? !!el.checked : false;
+    };
+
+    const record = {
+      officeName,
+      submittedByEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
+      entryOfficerEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
+      availableNetwork: networkVal,
+      otherNetworkDetails: getStr('otherNetworkInput'),
+      networkSpeed: getStr('networkSpeedInput'),
+      operatingSystem: getStr('operatingSystemInput'),
+      entryOfficerName: getStr('entryOfficerName'),
+      entryOfficerDesignation: getStr('entryOfficerDesignation'),
+      entryOfficerMobile: getStr('entryOfficerMobile'),
+
+      monitorsWorking: getNum('monitorsWorking'),
+      monitorsNotWorking: getNum('monitorsNotWorking'),
+      cpuWorking: getNum('cpuWorking'),
+      cpuNotWorking: getNum('cpuNotWorking'),
+      laptopsWorking: getNum('laptopsWorking'),
+      laptopsNotWorking: getNum('laptopsNotWorking'),
+      aioWorking: getNum('aioWorking'),
+      aioNotWorking: getNum('aioNotWorking'),
+
+      printers: {
+        dotMatrix: { working: getNum('printerDotMatrixWorking'), notWorking: getNum('printerDotMatrixNotWorking'), multipurpose: getCheck('printerDotMatrixMulti') },
+        inkjet: { working: getNum('printerInkjetWorking'), notWorking: getNum('printerInkjetNotWorking'), multipurpose: getCheck('printerInkjetMulti') },
+        laser: { working: getNum('printerLaserWorking'), notWorking: getNum('printerLaserNotWorking'), multipurpose: getCheck('printerLaserMulti') },
+        xerox: { working: getNum('printerXeroxWorking'), notWorking: getNum('printerXeroxNotWorking'), multipurpose: getCheck('printerXeroxMulti') },
+        others: { working: getNum('printerOthersWorking'), notWorking: getNum('printerOthersNotWorking'), multipurpose: getCheck('printerOthersMulti') }
       },
-      inkjet: {
-        working: parseInt(document.getElementById('printerInkjetWorking').value) || 0,
-        notWorking: parseInt(document.getElementById('printerInkjetNotWorking').value) || 0,
-        multipurpose: document.getElementById('printerInkjetMulti').checked
-      },
-      laser: {
-        working: parseInt(document.getElementById('printerLaserWorking').value) || 0,
-        notWorking: parseInt(document.getElementById('printerLaserNotWorking').value) || 0,
-        multipurpose: document.getElementById('printerLaserMulti').checked
-      },
-      xerox: {
-        working: parseInt(document.getElementById('printerXeroxWorking').value) || 0,
-        notWorking: parseInt(document.getElementById('printerXeroxNotWorking').value) || 0,
-        multipurpose: document.getElementById('printerXeroxMulti').checked
-      },
-      others: {
-        working: parseInt(document.getElementById('printerOthersWorking').value) || 0,
-        notWorking: parseInt(document.getElementById('printerOthersNotWorking').value) || 0,
-        multipurpose: document.getElementById('printerOthersMulti').checked
-      }
-    },
 
-    upsAvailable: document.getElementById('upsAvailableSelect')?.value || 'Yes',
-    upsUnitsCount: parseInt(document.getElementById('upsUnitsCount')?.value) || 0,
-    upsCapacity: upsCapVal || '',
-    upsCapacityOther: document.getElementById('upsCapacityOtherInput')?.value.trim() || '',
-    upsCondition: document.getElementById('upsConditionSelect')?.value || '',
-    batteryMake: document.getElementById('batteryMakeInput')?.value.trim() || '',
-    batteryAh: parseInt(document.getElementById('batteryAhInput')?.value) || 0,
-    minBatteriesRequired: parseInt(document.getElementById('minBatteriesRequiredInput')?.value) || 0,
-    serviceReportSent: srvSent || '',
-    serviceReportDate: document.getElementById('serviceReportDateInput')?.value || '',
-    powerRemarks: document.getElementById('powerRemarksInput')?.value.trim() || '',
-    certified: true,
+      upsAvailable: getStr('upsAvailableSelect') || 'Yes',
+      upsUnitsCount: getNum('upsUnitsCount'),
+      upsCapacity: upsCapVal,
+      upsCapacityOther: upsCapOther,
+      upsCondition: getStr('upsConditionSelect'),
+      batteryMake: getStr('batteryMakeInput'),
+      batteryAh: getNum('batteryAhInput'),
+      minBatteriesRequired: getNum('minBatteriesRequiredInput'),
+      serviceReportSent: srvSent,
+      serviceReportDate: srvDate,
+      powerRemarks: getStr('powerRemarksInput'),
+      certified: true,
 
-    upsWorking: parseInt(document.getElementById('upsWorking')?.value) || (document.getElementById('upsConditionSelect')?.value === 'Good' || document.getElementById('upsConditionSelect')?.value === 'Working with Minor Issues' ? (parseInt(document.getElementById('upsUnitsCount')?.value) || 1) : 0),
-    upsNotWorking: parseInt(document.getElementById('upsNotWorking')?.value) || (document.getElementById('upsConditionSelect')?.value === 'Not Working' || document.getElementById('upsConditionSelect')?.value === 'Requires Repair' ? (parseInt(document.getElementById('upsUnitsCount')?.value) || 1) : 0),
-    batteriesInUse: parseInt(document.getElementById('batteriesInUse')?.value) || (parseInt(document.getElementById('minBatteriesRequiredInput')?.value) || 0),
-    batteriesNotInUse: parseInt(document.getElementById('batteriesNotInUse')?.value) || 0,
+      upsWorking: getNum('upsWorking') || (getStr('upsConditionSelect') === 'Good' || getStr('upsConditionSelect') === 'Working with Minor Issues' ? (getNum('upsUnitsCount') || 1) : 0),
+      upsNotWorking: getNum('upsNotWorking') || (getStr('upsConditionSelect') === 'Not Working' || getStr('upsConditionSelect') === 'Requires Repair' ? (getNum('upsUnitsCount') || 1) : 0),
+      batteriesInUse: getNum('batteriesInUse') || getNum('minBatteriesRequiredInput'),
+      batteriesNotInUse: getNum('batteriesNotInUse'),
 
-    ageUnder3: parseInt(document.getElementById('ageUnder3').value) || 0,
-    age3To5: parseInt(document.getElementById('age3To5').value) || 0,
-    age5To8: parseInt(document.getElementById('age5To8').value) || 0,
-    ageAbove8: parseInt(document.getElementById('ageAbove8').value) || 0,
+      ageUnder3: getNum('ageUnder3'),
+      age3To5: getNum('age3To5'),
+      age5To8: getNum('age5To8'),
+      ageAbove8: getNum('ageAbove8'),
 
-    desktopNotWorkingSummary: parseInt(document.getElementById('desktopNotWorkingSummary').value) || 0,
-    remarks: document.getElementById('remarksInput').value.trim(),
-    lastUpdated: formattedDate
-  };
+      desktopNotWorkingSummary: getNum('desktopNotWorkingSummary') || getNum('cpuNotWorking'),
+      remarks: getStr('remarksInput'),
+      lastUpdated: formattedDate
+    };
 
-  inventoryStore[officeName] = record;
-  localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
+    inventoryStore[officeName] = record;
+    localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
 
-  await saveRecordToSupabase(record);
+    await saveRecordToSupabase(record);
 
-  showToast(`IT Equipment details for "${officeName}" saved successfully!`, 'success');
+    showToast(`IT Equipment details for "${officeName}" saved successfully!`, 'success');
 
-  renderAdminDataTable();
-  renderPublicDataTable();
-  if (activeSession === 'admin') renderAdminDashboard();
+    renderAdminDataTable();
+    renderPublicDataTable();
+    if (activeSession === 'admin') renderAdminDashboard();
 
-  // Show the entered office name & summary in New Window popup!
-  openEnteredOfficeSummaryWindow(officeName);
+    // Show the entered office name & summary in New Window popup!
+    openEnteredOfficeSummaryWindow(officeName);
+  } catch (err) {
+    console.error('Error in handleFormSubmit:', err);
+    showToast(`Error submitting form: ${err.message}`, 'error');
+  }
 }
 
 // --- PUBLIC NEW WINDOW OFFICE SUMMARY ENGINE ---
