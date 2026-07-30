@@ -249,8 +249,9 @@ localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
 let chartHealthInstance = null;
 let chartAgeInstance = null;
 
-// --- 4. GOOGLE AUTHENTICATION STATE & MANDATORY ACCESS CONTROL ---
+// --- 4. OFFICIAL GOOGLE OAUTH 2.0 AUTHENTICATION & MANDATORY ACCESS CONTROL ---
 let googleAuthUser = null;
+let googleTokenClient = null;
 
 function checkGoogleAuthSession() {
   const saved = localStorage.getItem('mvd_google_user_session');
@@ -260,8 +261,10 @@ function checkGoogleAuthSession() {
   if (saved) {
     try {
       googleAuthUser = JSON.parse(saved);
-      applyGoogleAuthSession(googleAuthUser);
-      return true;
+      if (googleAuthUser && googleAuthUser.email) {
+        applyGoogleAuthSession(googleAuthUser);
+        return true;
+      }
     } catch (e) {
       console.error('Failed to parse Google user session', e);
       localStorage.removeItem('mvd_google_user_session');
@@ -271,55 +274,103 @@ function checkGoogleAuthSession() {
   if (overlay) overlay.style.display = 'flex';
   if (appLayout) appLayout.style.display = 'none';
 
-  // Initialize GIS if loaded
-  if (window.google && google.accounts && google.accounts.id) {
-    try {
-      google.accounts.id.initialize({
-        client_id: '85912401824-mvditportal.apps.googleusercontent.com',
-        callback: handleGoogleCredentialResponse,
-        auto_prompt: false
-      });
-    } catch (err) {
-      console.log('Google Identity Services initialized');
-    }
-  }
+  initGoogleIdentityServices();
   return false;
 }
 
-function triggerGoogleSignIn() {
-  // If GIS SDK prompt is available
-  if (window.google && google.accounts && google.accounts.id) {
+function initGoogleIdentityServices() {
+  if (window.google && google.accounts) {
     try {
-      google.accounts.id.prompt((notification) => {
-        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
-          promptCustomGoogleSignIn();
-        }
+      // 1. Initialize GIS ID Client
+      google.accounts.id.initialize({
+        client_id: '85912401824-mvditportal.apps.googleusercontent.com',
+        callback: handleGoogleCredentialResponse,
+        auto_prompt: true
       });
-      return;
-    } catch (e) {
-      console.log('GIS prompt fallback');
+
+      // Render official authentic Google Sign-In button
+      const btnDiv = document.getElementById('googleSignInButtonDiv');
+      const customBtn = document.getElementById('googleCustomSigninBtn');
+      if (btnDiv) {
+        google.accounts.id.renderButton(btnDiv, {
+          type: 'standard',
+          theme: 'outline',
+          size: 'large',
+          text: 'signin_with',
+          shape: 'rectangular',
+          logo_alignment: 'left',
+          width: 320
+        });
+        if (customBtn) customBtn.style.display = 'none';
+      } else if (customBtn) {
+        customBtn.style.display = 'flex';
+      }
+
+      // 2. Initialize OAuth 2.0 Token Client for OAuth Popup
+      if (google.accounts.oauth2) {
+        googleTokenClient = google.accounts.oauth2.initTokenClient({
+          client_id: '85912401824-mvditportal.apps.googleusercontent.com',
+          scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
+          callback: async (tokenResponse) => {
+            if (tokenResponse && tokenResponse.access_token) {
+              await fetchGoogleUserProfile(tokenResponse.access_token);
+            }
+          }
+        });
+      }
+    } catch (err) {
+      console.error('GIS init error:', err);
     }
+  } else {
+    setTimeout(initGoogleIdentityServices, 400);
   }
-  promptCustomGoogleSignIn();
 }
 
-function promptCustomGoogleSignIn() {
-  const emailInput = prompt('Enter your Official Google / Departmental Email Address:\n(e.g., officer.mvd@kerala.gov.in or user@gmail.com)', 'officer.mvd@kerala.gov.in');
-  if (!emailInput || !emailInput.trim()) return;
+function triggerGoogleSignIn() {
+  // Trigger official Google OAuth 2.0 Token Client Popup
+  if (googleTokenClient) {
+    googleTokenClient.requestAccessToken();
+    return;
+  }
 
-  const email = emailInput.trim();
-  const namePart = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-  const name = prompt('Enter Officer Full Name:', namePart) || namePart;
+  // Fallback to GIS prompt if token client is initializing
+  if (window.google && google.accounts && google.accounts.id) {
+    google.accounts.id.prompt((notification) => {
+      if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+        showToast('Please click the official Google Sign-In button above.', 'warning');
+      }
+    });
+    return;
+  }
 
-  const userObj = {
-    name,
-    email,
-    picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0B3B24&color=86efac&bold=true`,
-    loginTime: new Date().toISOString(),
-    authProvider: 'Google OAuth 2.0 (Verified)'
-  };
+  showToast('Connecting to Google Authentication servers... Please wait.', 'info');
+  initGoogleIdentityServices();
+}
 
-  handleGoogleAuthSuccess(userObj);
+async function fetchGoogleUserProfile(accessToken) {
+  try {
+    showToast('Verifying Google Account identity with Google servers...', 'info');
+    const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+      headers: { Authorization: `Bearer ${accessToken}` }
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch profile from Google');
+
+    const profile = await response.json();
+    const userObj = {
+      name: profile.name || profile.given_name || profile.email,
+      email: profile.email,
+      picture: profile.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name || profile.email)}&background=0B3B24&color=86efac`,
+      emailVerified: profile.email_verified,
+      loginTime: new Date().toISOString(),
+      authProvider: 'Google OAuth 2.0 Verified'
+    };
+
+    handleGoogleAuthSuccess(userObj);
+  } catch (err) {
+    console.error('Google profile verification error:', err);
+    showToast('Google OAuth verification failed. Please try again.', 'error');
+  }
 }
 
 function handleGoogleCredentialResponse(response) {
@@ -332,20 +383,23 @@ function handleGoogleCredentialResponse(response) {
       }).join(''));
 
       const payload = JSON.parse(jsonPayload);
-      const userObj = {
-        name: payload.name || payload.email,
-        email: payload.email,
-        picture: payload.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(payload.name || payload.email)}&background=0B3B24&color=86efac`,
-        loginTime: new Date().toISOString(),
-        authProvider: 'Google OAuth 2.0 (GIS)'
-      };
-      handleGoogleAuthSuccess(userObj);
-      return;
+      if (payload && payload.email) {
+        const userObj = {
+          name: payload.name || payload.email,
+          email: payload.email,
+          picture: payload.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(payload.name || payload.email)}&background=0B3B24&color=86efac`,
+          emailVerified: payload.email_verified,
+          loginTime: new Date().toISOString(),
+          authProvider: 'Google Identity Services (GIS Token)'
+        };
+        handleGoogleAuthSuccess(userObj);
+        return;
+      }
     }
   } catch (err) {
     console.error('Error parsing Google Credential Token:', err);
   }
-  promptCustomGoogleSignIn();
+  showToast('Could not verify Google login. Please sign in with Google.', 'error');
 }
 
 function handleGoogleAuthSuccess(userObj) {
