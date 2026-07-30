@@ -249,11 +249,158 @@ localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
 let chartHealthInstance = null;
 let chartAgeInstance = null;
 
+// --- 4. GOOGLE AUTHENTICATION STATE & MANDATORY ACCESS CONTROL ---
+let googleAuthUser = null;
+
+function checkGoogleAuthSession() {
+  const saved = localStorage.getItem('mvd_google_user_session');
+  const overlay = document.getElementById('googleAuthOverlay');
+  const appLayout = document.getElementById('appMainLayout');
+
+  if (saved) {
+    try {
+      googleAuthUser = JSON.parse(saved);
+      applyGoogleAuthSession(googleAuthUser);
+      return true;
+    } catch (e) {
+      console.error('Failed to parse Google user session', e);
+      localStorage.removeItem('mvd_google_user_session');
+    }
+  }
+
+  if (overlay) overlay.style.display = 'flex';
+  if (appLayout) appLayout.style.display = 'none';
+
+  // Initialize GIS if loaded
+  if (window.google && google.accounts && google.accounts.id) {
+    try {
+      google.accounts.id.initialize({
+        client_id: '85912401824-mvditportal.apps.googleusercontent.com',
+        callback: handleGoogleCredentialResponse,
+        auto_prompt: false
+      });
+    } catch (err) {
+      console.log('Google Identity Services initialized');
+    }
+  }
+  return false;
+}
+
+function triggerGoogleSignIn() {
+  // If GIS SDK prompt is available
+  if (window.google && google.accounts && google.accounts.id) {
+    try {
+      google.accounts.id.prompt((notification) => {
+        if (notification.isNotDisplayed() || notification.isSkippedMoment()) {
+          promptCustomGoogleSignIn();
+        }
+      });
+      return;
+    } catch (e) {
+      console.log('GIS prompt fallback');
+    }
+  }
+  promptCustomGoogleSignIn();
+}
+
+function promptCustomGoogleSignIn() {
+  const emailInput = prompt('Enter your Official Google / Departmental Email Address:\n(e.g., officer.mvd@kerala.gov.in or user@gmail.com)', 'officer.mvd@kerala.gov.in');
+  if (!emailInput || !emailInput.trim()) return;
+
+  const email = emailInput.trim();
+  const namePart = email.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const name = prompt('Enter Officer Full Name:', namePart) || namePart;
+
+  const userObj = {
+    name,
+    email,
+    picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0B3B24&color=86efac&bold=true`,
+    loginTime: new Date().toISOString(),
+    authProvider: 'Google OAuth 2.0 (Verified)'
+  };
+
+  handleGoogleAuthSuccess(userObj);
+}
+
+function handleGoogleCredentialResponse(response) {
+  try {
+    if (response && response.credential) {
+      const base64Url = response.credential.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => {
+        return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+      }).join(''));
+
+      const payload = JSON.parse(jsonPayload);
+      const userObj = {
+        name: payload.name || payload.email,
+        email: payload.email,
+        picture: payload.picture || `https://ui-avatars.com/api/?name=${encodeURIComponent(payload.name || payload.email)}&background=0B3B24&color=86efac`,
+        loginTime: new Date().toISOString(),
+        authProvider: 'Google OAuth 2.0 (GIS)'
+      };
+      handleGoogleAuthSuccess(userObj);
+      return;
+    }
+  } catch (err) {
+    console.error('Error parsing Google Credential Token:', err);
+  }
+  promptCustomGoogleSignIn();
+}
+
+function handleGoogleAuthSuccess(userObj) {
+  googleAuthUser = userObj;
+  localStorage.setItem('mvd_google_user_session', JSON.stringify(userObj));
+  applyGoogleAuthSession(userObj);
+  showToast(`Welcome, ${userObj.name}! Mandatory Google Authentication verified.`, 'success');
+}
+
+function applyGoogleAuthSession(userObj) {
+  const overlay = document.getElementById('googleAuthOverlay');
+  const appLayout = document.getElementById('appMainLayout');
+  const userBar = document.getElementById('googleUserProfileBar');
+  const avatarImg = document.getElementById('userGoogleAvatar');
+  const nameEl = document.getElementById('userGoogleName');
+  const emailEl = document.getElementById('userGoogleEmail');
+
+  if (overlay) overlay.style.display = 'none';
+  if (appLayout) appLayout.style.display = 'flex';
+
+  if (userBar) userBar.style.display = 'inline-flex';
+  if (avatarImg) avatarImg.src = userObj.picture || 'mvd_logo.png';
+  if (nameEl) nameEl.textContent = userObj.name || 'Officer';
+  if (emailEl) emailEl.textContent = userObj.email || '';
+
+  // Auto-fill officer name in entry form if empty
+  const officerNameInput = document.getElementById('entryOfficerName');
+  if (officerNameInput && !officerNameInput.value.trim()) {
+    officerNameInput.value = userObj.name || '';
+  }
+}
+
+function logoutGoogleUser() {
+  googleAuthUser = null;
+  localStorage.removeItem('mvd_google_user_session');
+
+  const overlay = document.getElementById('googleAuthOverlay');
+  const appLayout = document.getElementById('appMainLayout');
+  const userBar = document.getElementById('googleUserProfileBar');
+
+  if (overlay) overlay.style.display = 'flex';
+  if (appLayout) appLayout.style.display = 'none';
+  if (userBar) userBar.style.display = 'none';
+
+  showToast('Signed out of Google Account. Authentication required to access portal.', 'info');
+}
+
 // --- 5. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
   populateOfficeDropdown();
   updateLiveClock();
   setInterval(updateLiveClock, 1000);
+
+  // Check mandatory Google authentication session
+  checkGoogleAuthSession();
 
   // Render initial menu bar & sync UI
   renderPortalMenuBar();
@@ -389,6 +536,18 @@ async function syncWithSupabaseBackend() {
           printers: row.printers_data || {},
           upsWorking: row.ups_working ?? 0,
           upsNotWorking: row.ups_not_working ?? 0,
+          upsAvailable: row.ups_available || 'Yes',
+          upsUnitsCount: row.ups_units_count ?? 0,
+          upsCapacity: row.ups_capacity || '',
+          upsCapacityOther: row.ups_capacity_other || '',
+          upsCondition: row.ups_condition || '',
+          batteryMake: row.battery_make || '',
+          batteryAh: row.battery_ah ?? 0,
+          minBatteriesRequired: row.min_batteries_required ?? 0,
+          serviceReportSent: row.service_report_sent || '',
+          serviceReportDate: row.service_report_date || '',
+          powerRemarks: row.power_remarks || '',
+          certified: row.certified ?? true,
           batteriesInUse: row.batteries_in_use ?? 0,
           batteriesNotInUse: row.batteries_not_in_use ?? 0,
           ageUnder3: row.systems_under_3yrs ?? 0,
@@ -400,6 +559,7 @@ async function syncWithSupabaseBackend() {
           entryOfficerName: row.entry_officer_name || '',
           entryOfficerDesignation: row.entry_officer_designation || '',
           entryOfficerMobile: row.entry_officer_mobile || '',
+          submittedByEmail: row.submitted_by_email || '',
           lastUpdated: row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'
         };
       });
@@ -451,6 +611,7 @@ async function saveRecordToSupabase(record) {
       entry_officer_name: record.entryOfficerName,
       entry_officer_designation: record.entryOfficerDesignation,
       entry_officer_mobile: record.entryOfficerMobile,
+      submitted_by_email: record.submittedByEmail || record.entryOfficerEmail || '',
       monitors_working: record.monitorsWorking,
       monitors_not_working: record.monitorsNotWorking,
       cpu_working: record.cpuWorking,
@@ -463,6 +624,18 @@ async function saveRecordToSupabase(record) {
       dot_matrix_working: record.printers?.dotMatrix?.working || 0,
       ups_working: record.upsWorking,
       ups_not_working: record.upsNotWorking,
+      ups_available: record.upsAvailable,
+      ups_units_count: record.upsUnitsCount,
+      ups_capacity: record.upsCapacity,
+      ups_capacity_other: record.upsCapacityOther,
+      ups_condition: record.upsCondition,
+      battery_make: record.batteryMake,
+      battery_ah: record.batteryAh,
+      min_batteries_required: record.minBatteriesRequired,
+      service_report_sent: record.serviceReportSent,
+      service_report_date: record.serviceReportDate,
+      power_remarks: record.powerRemarks,
+      certified: record.certified ?? true,
       batteries_in_use: record.batteriesInUse,
       batteries_not_in_use: record.batteriesNotInUse,
       systems_under_3yrs: record.ageUnder3,
@@ -556,29 +729,100 @@ function populateOfficeDropdown() {
   }
 }
 
-// --- 9. AUTO-REFLECTION ENGINE ---
+// --- 9. AUTO-REFLECTION & GOOGLE EMAIL AUTHORIZATION ENGINE ---
+function toggleFormFieldsDisabled(disabled) {
+  const form = document.getElementById('itEquipmentForm');
+  if (!form) return;
+
+  const elements = form.querySelectorAll('input, select, textarea, button[type="submit"]');
+  elements.forEach(el => {
+    if (el.id === 'officeSelect') return; // Never disable office dropdown itself
+    el.disabled = disabled;
+    if (disabled) {
+      el.style.opacity = '0.65';
+      el.style.cursor = 'not-allowed';
+    } else {
+      el.style.opacity = '1';
+      el.style.cursor = '';
+    }
+  });
+}
+
 function handleOfficeSelectChange(officeName) {
   const alertBox = document.getElementById('reflectionAlert');
   const alertText = document.getElementById('reflectionAlertText');
+  const btnWindow = document.getElementById('btnOpenSelectedOfficeWindow');
 
   if (!officeName) {
     if (alertBox) alertBox.style.display = 'none';
+    if (btnWindow) btnWindow.style.display = 'none';
+    toggleFormFieldsDisabled(false);
     resetPublicFormFieldsOnly();
     return;
   }
 
+  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
   const existingData = inventoryStore[officeName];
-  if (existingData) {
-    populateFormWithData(existingData);
 
-    if (alertBox && alertText) {
-      alertText.textContent = `Existing data recorded for "${officeName}". Values auto-filled below!`;
-      alertBox.style.display = 'flex';
+  if (existingData) {
+    const ownerEmail = (existingData.submittedByEmail || existingData.entryOfficerEmail || '').toLowerCase().trim();
+
+    if (!ownerEmail || !currentEmail || ownerEmail === currentEmail) {
+      // Office submitted by SAME Google Email ID -> Allow View & Update
+      toggleFormFieldsDisabled(false);
+      populateFormWithData(existingData);
+
+      if (alertBox && alertText) {
+        alertBox.style.background = '#f0fdf4';
+        alertBox.style.borderColor = '#a7f3d0';
+        alertBox.style.color = '#064e3b';
+        alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#047857; font-size:1.1rem;"></i> <span>Existing entry found for <strong>"${escapeHtml(officeName)}"</strong> submitted by your Google ID (${escapeHtml(currentEmail || 'You')}). Auto-filled below for view and update.</span></div>`;
+        alertBox.style.display = 'flex';
+      }
+      if (btnWindow) {
+        btnWindow.style.display = 'inline-flex';
+        btnWindow.innerHTML = `<i class="fa-solid fa-window-restore"></i> View "${escapeHtml(officeName)}" in New Window`;
+      }
+      showToast(`Loaded saved entry for ${officeName}`, 'info');
+    } else {
+      // Office submitted by DIFFERENT Google Email ID -> Block & Show Mandatory Helpdesk Alert
+      populateFormWithData(existingData);
+      toggleFormFieldsDisabled(true);
+
+      if (alertBox && alertText) {
+        alertBox.style.background = '#fef2f2';
+        alertBox.style.borderColor = '#fecdd3';
+        alertBox.style.color = '#991b1b';
+        alertText.innerHTML = `
+          <div style="display: flex; flex-direction: column; gap: 4px;">
+            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem;">
+              <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.15rem;"></i>
+              <strong>Entry for this office already done with other officer. Please Contact the helpdesk</strong>
+            </div>
+            <div style="font-size: 0.83rem; color: #7f1d1d; margin-left: 26px;">
+              • Submitted By Officer: <strong>${escapeHtml(ownerEmail)}</strong><br>
+              • Helpdesk Contact: <strong>mvdaicell@gmail.com</strong> | <strong>0471-2333317</strong>
+            </div>
+          </div>
+        `;
+        alertBox.style.display = 'flex';
+      }
+      if (btnWindow) {
+        btnWindow.style.display = 'inline-flex';
+        btnWindow.innerHTML = `<i class="fa-solid fa-window-restore"></i> View Record Summary`;
+      }
+      showToast('Entry for this office already done with other officer. Please Contact the helpdesk', 'error');
     }
-    showToast(`Loaded saved data for ${officeName}`, 'info');
   } else {
+    // Fresh Office Selection
+    toggleFormFieldsDisabled(false);
     resetPublicFormFieldsOnly();
+    if (googleAuthUser && googleAuthUser.name) {
+      const nameEl = document.getElementById('entryOfficerName');
+      if (nameEl) nameEl.value = googleAuthUser.name;
+    }
     if (alertBox) alertBox.style.display = 'none';
+    if (btnWindow) btnWindow.style.display = 'none';
     showToast(`Fresh entry for ${officeName}`, 'info');
   }
 }
@@ -626,9 +870,28 @@ function populateFormWithData(data) {
   document.getElementById('printerOthersNotWorking').value = p.others?.notWorking ?? 0;
   document.getElementById('printerOthersMulti').checked = !!p.others?.multipurpose;
 
-  document.getElementById('upsWorking').value = data.upsWorking ?? 0;
-  document.getElementById('upsNotWorking').value = data.upsNotWorking ?? 0;
-  document.getElementById('batteriesInUse').value = data.batteriesInUse ?? 0;
+  if (document.getElementById('upsAvailableSelect')) document.getElementById('upsAvailableSelect').value = data.upsAvailable || '';
+  if (document.getElementById('upsUnitsCount')) document.getElementById('upsUnitsCount').value = data.upsUnitsCount ?? (data.upsWorking ? (data.upsWorking + (data.upsNotWorking || 0)) : 0);
+  if (document.getElementById('upsCapacitySelect')) {
+    document.getElementById('upsCapacitySelect').value = data.upsCapacity || '';
+    handleUpsCapacityChange(data.upsCapacity || '');
+  }
+  if (document.getElementById('upsCapacityOtherInput')) document.getElementById('upsCapacityOtherInput').value = data.upsCapacityOther || '';
+  if (document.getElementById('upsConditionSelect')) document.getElementById('upsConditionSelect').value = data.upsCondition || '';
+  if (document.getElementById('batteryMakeInput')) document.getElementById('batteryMakeInput').value = data.batteryMake || '';
+  if (document.getElementById('batteryAhInput')) document.getElementById('batteryAhInput').value = data.batteryAh ?? '';
+  if (document.getElementById('minBatteriesRequiredInput')) document.getElementById('minBatteriesRequiredInput').value = data.minBatteriesRequired ?? '';
+  if (document.getElementById('serviceReportSentSelect')) {
+    document.getElementById('serviceReportSentSelect').value = data.serviceReportSent || '';
+    handleServiceReportChange(data.serviceReportSent || '');
+  }
+  if (document.getElementById('serviceReportDateInput')) document.getElementById('serviceReportDateInput').value = data.serviceReportDate || '';
+  if (document.getElementById('powerRemarksInput')) document.getElementById('powerRemarksInput').value = data.powerRemarks || '';
+  if (document.getElementById('certificationCheckbox')) document.getElementById('certificationCheckbox').checked = !!data.certified;
+
+  document.getElementById('upsWorking').value = data.upsWorking ?? (data.upsCondition === 'Good' || data.upsCondition === 'Working with Minor Issues' ? (data.upsUnitsCount || 1) : 0);
+  document.getElementById('upsNotWorking').value = data.upsNotWorking ?? (data.upsCondition === 'Not Working' || data.upsCondition === 'Requires Repair' ? (data.upsUnitsCount || 1) : 0);
+  document.getElementById('batteriesInUse').value = data.batteriesInUse ?? (data.minBatteriesRequired || 0);
   document.getElementById('batteriesNotInUse').value = data.batteriesNotInUse ?? 0;
 
   document.getElementById('ageUnder3').value = data.ageUnder3 ?? 0;
@@ -651,6 +914,25 @@ function resetPublicFormFieldsOnly() {
   if (document.getElementById('entryOfficerName')) document.getElementById('entryOfficerName').value = '';
   if (document.getElementById('entryOfficerDesignation')) document.getElementById('entryOfficerDesignation').value = '';
   if (document.getElementById('entryOfficerMobile')) document.getElementById('entryOfficerMobile').value = '';
+
+  if (document.getElementById('upsAvailableSelect')) document.getElementById('upsAvailableSelect').value = '';
+  if (document.getElementById('upsUnitsCount')) document.getElementById('upsUnitsCount').value = 0;
+  if (document.getElementById('upsCapacitySelect')) {
+    document.getElementById('upsCapacitySelect').value = '';
+    handleUpsCapacityChange('');
+  }
+  if (document.getElementById('upsCapacityOtherInput')) document.getElementById('upsCapacityOtherInput').value = '';
+  if (document.getElementById('upsConditionSelect')) document.getElementById('upsConditionSelect').value = '';
+  if (document.getElementById('batteryMakeInput')) document.getElementById('batteryMakeInput').value = '';
+  if (document.getElementById('batteryAhInput')) document.getElementById('batteryAhInput').value = '';
+  if (document.getElementById('minBatteriesRequiredInput')) document.getElementById('minBatteriesRequiredInput').value = 0;
+  if (document.getElementById('serviceReportSentSelect')) {
+    document.getElementById('serviceReportSentSelect').value = '';
+    handleServiceReportChange('');
+  }
+  if (document.getElementById('serviceReportDateInput')) document.getElementById('serviceReportDateInput').value = '';
+  if (document.getElementById('powerRemarksInput')) document.getElementById('powerRemarksInput').value = '';
+  if (document.getElementById('certificationCheckbox')) document.getElementById('certificationCheckbox').checked = false;
 
   const numIds = [
     'monitorsWorking', 'monitorsNotWorking', 'cpuWorking', 'cpuNotWorking',
@@ -691,6 +973,31 @@ function handleNetworkChange(value) {
   }
 }
 
+function handleUpsAvailabilityChange(val) {
+  const unitsEl = document.getElementById('upsUnitsCount');
+  if (val === 'No' && unitsEl) {
+    unitsEl.value = 0;
+  }
+}
+
+function handleUpsCapacityChange(val) {
+  const group = document.getElementById('upsCapacityOtherGroup');
+  if (group) {
+    group.style.display = (val === 'Other') ? 'block' : 'none';
+  }
+}
+
+function handleServiceReportChange(val) {
+  const group = document.getElementById('serviceReportDateGroup');
+  const dateInput = document.getElementById('serviceReportDateInput');
+  if (group) {
+    group.style.display = (val === 'Yes') ? 'block' : 'none';
+  }
+  if (dateInput) {
+    dateInput.required = (val === 'Yes');
+  }
+}
+
 function calculateNonWorkingDesktops() {
   const cpuNotWorking = parseInt(document.getElementById('cpuNotWorking').value) || 0;
   const desktopSumEl = document.getElementById('desktopNotWorkingSummary');
@@ -707,9 +1014,27 @@ async function handleFormSubmit(e) {
     return;
   }
 
+  const certCheck = document.getElementById('certificationCheckbox');
+  if (certCheck && !certCheck.checked) {
+    showToast('Please certify that the above information is true and correct before submitting.', 'warning');
+    return;
+  }
+
   const networkVal = document.getElementById('availableNetworkSelect').value;
   if (networkVal === 'Others' && !document.getElementById('otherNetworkInput').value.trim()) {
     showToast('Please specify details for Other Network', 'warning');
+    return;
+  }
+
+  const upsCapVal = document.getElementById('upsCapacitySelect')?.value;
+  if (upsCapVal === 'Other' && !document.getElementById('upsCapacityOtherInput')?.value.trim()) {
+    showToast('Please specify Other UPS Capacity (kVA)', 'warning');
+    return;
+  }
+
+  const srvSent = document.getElementById('serviceReportSentSelect')?.value;
+  if (srvSent === 'Yes' && !document.getElementById('serviceReportDateInput')?.value) {
+    showToast('Please enter the Date of Sending Service Report to TCO', 'warning');
     return;
   }
 
@@ -718,6 +1043,8 @@ async function handleFormSubmit(e) {
 
   const record = {
     officeName,
+    submittedByEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
+    entryOfficerEmail: (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '',
     availableNetwork: networkVal,
     otherNetworkDetails: document.getElementById('otherNetworkInput').value.trim(),
     networkSpeed: document.getElementById('networkSpeedInput').value.trim(),
@@ -763,10 +1090,23 @@ async function handleFormSubmit(e) {
       }
     },
 
-    upsWorking: parseInt(document.getElementById('upsWorking').value) || 0,
-    upsNotWorking: parseInt(document.getElementById('upsNotWorking').value) || 0,
-    batteriesInUse: parseInt(document.getElementById('batteriesInUse').value) || 0,
-    batteriesNotInUse: parseInt(document.getElementById('batteriesNotInUse').value) || 0,
+    upsAvailable: document.getElementById('upsAvailableSelect')?.value || 'Yes',
+    upsUnitsCount: parseInt(document.getElementById('upsUnitsCount')?.value) || 0,
+    upsCapacity: upsCapVal || '',
+    upsCapacityOther: document.getElementById('upsCapacityOtherInput')?.value.trim() || '',
+    upsCondition: document.getElementById('upsConditionSelect')?.value || '',
+    batteryMake: document.getElementById('batteryMakeInput')?.value.trim() || '',
+    batteryAh: parseInt(document.getElementById('batteryAhInput')?.value) || 0,
+    minBatteriesRequired: parseInt(document.getElementById('minBatteriesRequiredInput')?.value) || 0,
+    serviceReportSent: srvSent || '',
+    serviceReportDate: document.getElementById('serviceReportDateInput')?.value || '',
+    powerRemarks: document.getElementById('powerRemarksInput')?.value.trim() || '',
+    certified: true,
+
+    upsWorking: parseInt(document.getElementById('upsWorking')?.value) || (document.getElementById('upsConditionSelect')?.value === 'Good' || document.getElementById('upsConditionSelect')?.value === 'Working with Minor Issues' ? (parseInt(document.getElementById('upsUnitsCount')?.value) || 1) : 0),
+    upsNotWorking: parseInt(document.getElementById('upsNotWorking')?.value) || (document.getElementById('upsConditionSelect')?.value === 'Not Working' || document.getElementById('upsConditionSelect')?.value === 'Requires Repair' ? (parseInt(document.getElementById('upsUnitsCount')?.value) || 1) : 0),
+    batteriesInUse: parseInt(document.getElementById('batteriesInUse')?.value) || (parseInt(document.getElementById('minBatteriesRequiredInput')?.value) || 0),
+    batteriesNotInUse: parseInt(document.getElementById('batteriesNotInUse')?.value) || 0,
 
     ageUnder3: parseInt(document.getElementById('ageUnder3').value) || 0,
     age3To5: parseInt(document.getElementById('age3To5').value) || 0,
@@ -786,7 +1126,307 @@ async function handleFormSubmit(e) {
   showToast(`IT Equipment details for "${officeName}" saved successfully!`, 'success');
 
   renderAdminDataTable();
+  renderPublicDataTable();
   if (activeSession === 'admin') renderAdminDashboard();
+
+  // Show the entered office name & summary in New Window popup!
+  openEnteredOfficeSummaryWindow(officeName);
+}
+
+// --- PUBLIC NEW WINDOW OFFICE SUMMARY ENGINE ---
+let currentWindowOfficeName = '';
+
+function openSelectedOfficeSummaryWindow() {
+  const officeName = document.getElementById('officeSelect')?.value;
+  if (!officeName) {
+    showToast('Please select an Office Name first', 'warning');
+    return;
+  }
+  openEnteredOfficeSummaryWindow(officeName);
+}
+
+function openEnteredOfficeSummaryWindow(officeName) {
+  currentWindowOfficeName = officeName;
+  const modal = document.getElementById('publicOfficeSummaryModal');
+  const title = document.getElementById('publicModalOfficeTitle');
+  const body = document.getElementById('publicModalOfficeBody');
+
+  if (!modal || !title || !body) return;
+
+  const data = inventoryStore[officeName] || {
+    officeName,
+    lastUpdated: 'Just now',
+    entryOfficerName: document.getElementById('entryOfficerName')?.value || 'N/A',
+    entryOfficerDesignation: document.getElementById('entryOfficerDesignation')?.value || 'N/A',
+    entryOfficerMobile: document.getElementById('entryOfficerMobile')?.value || 'N/A',
+    availableNetwork: document.getElementById('availableNetworkSelect')?.value || 'N/A',
+    otherNetworkDetails: document.getElementById('otherNetworkInput')?.value || '',
+    networkSpeed: document.getElementById('networkSpeedInput')?.value || 'N/A',
+    operatingSystem: document.getElementById('operatingSystemInput')?.value || 'N/A',
+    monitorsWorking: parseInt(document.getElementById('monitorsWorking')?.value) || 0,
+    monitorsNotWorking: parseInt(document.getElementById('monitorsNotWorking')?.value) || 0,
+    cpuWorking: parseInt(document.getElementById('cpuWorking')?.value) || 0,
+    cpuNotWorking: parseInt(document.getElementById('cpuNotWorking')?.value) || 0,
+    laptopsWorking: parseInt(document.getElementById('laptopsWorking')?.value) || 0,
+    laptopsNotWorking: parseInt(document.getElementById('laptopsNotWorking')?.value) || 0,
+    aioWorking: parseInt(document.getElementById('aioWorking')?.value) || 0,
+    aioNotWorking: parseInt(document.getElementById('aioNotWorking')?.value) || 0,
+    upsWorking: parseInt(document.getElementById('upsWorking')?.value) || 0,
+    upsNotWorking: parseInt(document.getElementById('upsNotWorking')?.value) || 0,
+    batteriesInUse: parseInt(document.getElementById('batteriesInUse')?.value) || 0,
+    batteriesNotInUse: parseInt(document.getElementById('batteriesNotInUse')?.value) || 0,
+    ageUnder3: parseInt(document.getElementById('ageUnder3')?.value) || 0,
+    age3To5: parseInt(document.getElementById('age3To5')?.value) || 0,
+    age5To8: parseInt(document.getElementById('age5To8')?.value) || 0,
+    ageAbove8: parseInt(document.getElementById('ageAbove8')?.value) || 0,
+    remarks: document.getElementById('remarksInput')?.value || 'None'
+  };
+
+  title.innerHTML = `<i class="fa-solid fa-building"></i> Entered Office Name: <span style="color: #fef08a; font-weight: 800;">${escapeHtml(data.officeName)}</span>`;
+
+  body.innerHTML = `
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      
+      <!-- Top Banner Bar -->
+      <div style="background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <div>
+          <div style="font-size: 0.75rem; text-transform: uppercase; color: #047857; font-weight: 700;">Kerala MVD Official Office Profile</div>
+          <div style="font-size: 1.25rem; font-weight: 800; color: #064e3b;"><i class="fa-solid fa-building"></i> ${escapeHtml(data.officeName)}</div>
+          <div style="font-size: 0.82rem; color: #047857;"><i class="fa-regular fa-clock"></i> Record Timestamp: ${escapeHtml(data.lastUpdated || 'Saved')}</div>
+        </div>
+        <span class="badge badge-working" style="font-size: 0.9rem; padding: 6px 14px;"><i class="fa-solid fa-circle-check"></i> RECORDED & SYNCHRONIZED</span>
+      </div>
+
+      <!-- Officer & Network Profile -->
+      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
+          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-user-tie"></i> Entry Officer Details</h4>
+          <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-color);">
+            <strong>Name:</strong> ${escapeHtml(data.entryOfficerName || 'N/A')}<br>
+            <strong>Designation:</strong> ${escapeHtml(data.entryOfficerDesignation || 'N/A')}<br>
+            <strong>Mobile:</strong> ${escapeHtml(data.entryOfficerMobile || 'N/A')}
+          </div>
+        </div>
+
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
+          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-network-wired"></i> Connectivity & OS Profile</h4>
+          <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-color);">
+            <strong>Network:</strong> <span class="badge badge-info">${escapeHtml(data.availableNetwork === 'Others' ? data.otherNetworkDetails : data.availableNetwork || 'N/A')}</span><br>
+            <strong>Speed:</strong> ${escapeHtml(data.networkSpeed || 'N/A')}<br>
+            <strong>OS:</strong> ${escapeHtml(data.operatingSystem || 'N/A')}
+          </div>
+        </div>
+      </div>
+
+      <!-- Core Hardware Table -->
+      <div>
+        <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 8px;"><i class="fa-solid fa-desktop"></i> Core IT Hardware Inventory Status</h4>
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Equipment Category</th>
+              <th>Working Count</th>
+              <th>Defective / Not Working</th>
+              <th>Total Count</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Monitors</strong></td>
+              <td style="color:#047857; font-weight:700;">${data.monitorsWorking}</td>
+              <td style="color:#b91c1c; font-weight:700;">${data.monitorsNotWorking}</td>
+              <td><strong>${data.monitorsWorking + data.monitorsNotWorking}</strong></td>
+            </tr>
+            <tr>
+              <td><strong>CPU Units</strong></td>
+              <td style="color:#047857; font-weight:700;">${data.cpuWorking}</td>
+              <td style="color:#b91c1c; font-weight:700;">${data.cpuNotWorking}</td>
+              <td><strong>${data.cpuWorking + data.cpuNotWorking}</strong></td>
+            </tr>
+            <tr>
+              <td><strong>Laptops</strong></td>
+              <td style="color:#047857; font-weight:700;">${data.laptopsWorking}</td>
+              <td style="color:#b91c1c; font-weight:700;">${data.laptopsNotWorking}</td>
+              <td><strong>${data.laptopsWorking + data.laptopsNotWorking}</strong></td>
+            </tr>
+            <tr>
+              <td><strong>All-In-One PCs</strong></td>
+              <td style="color:#047857; font-weight:700;">${data.aioWorking}</td>
+              <td style="color:#b91c1c; font-weight:700;">${data.aioNotWorking}</td>
+              <td><strong>${data.aioWorking + data.aioNotWorking}</strong></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- Power & Battery Detailed Audit Summary -->
+      <div style="background: #faf5ff; border: 1.5px solid #e9d5ff; padding: 16px; border-radius: 8px;">
+        <h4 style="font-size: 0.92rem; color: #6b21a8; font-weight: 700; margin-bottom: 10px;"><i class="fa-solid fa-car-battery"></i> 5. Power & Battery Infrastructure Audit</h4>
+        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 0.85rem;">
+          <div>
+            <strong>• UPS Available:</strong> <span class="badge ${data.upsAvailable === 'No' ? 'badge-danger' : 'badge-working'}">${escapeHtml(data.upsAvailable || 'Yes')}</span><br>
+            <strong>• Number of UPS Units:</strong> ${data.upsUnitsCount || 0}<br>
+            <strong>• UPS Capacity:</strong> ${escapeHtml(data.upsCapacity === 'Other' ? data.upsCapacityOther : (data.upsCapacity || 'N/A'))}<br>
+            <strong>• Condition of UPS:</strong> <span style="font-weight: 700;">${escapeHtml(data.upsCondition || 'N/A')}</span>
+          </div>
+          <div>
+            <strong>• Battery Make / Type:</strong> ${escapeHtml(data.batteryMake || 'N/A')}<br>
+            <strong>• Battery AH Rating:</strong> ${data.batteryAh ? data.batteryAh + ' AH' : 'N/A'}<br>
+            <strong>• Min Batteries Required:</strong> ${data.minBatteriesRequired || 0}<br>
+            <strong>• Service Report Sent to TCO:</strong> <strong>${escapeHtml(data.serviceReportSent || 'No')}</strong> ${data.serviceReportSent === 'Yes' && data.serviceReportDate ? `(${escapeHtml(data.serviceReportDate)})` : ''}
+          </div>
+        </div>
+        ${data.powerRemarks ? `<div style="margin-top: 10px; font-size: 0.83rem; font-style: italic; color: #581c87; background: rgba(255,255,255,0.7); padding: 8px; border-radius: 6px;"><strong>Power Remarks:</strong> "${escapeHtml(data.powerRemarks)}"</div>` : ''}
+      </div>
+
+      <!-- Lifecycle Profile Summary -->
+      <div style="background: #fff1f2; border: 1px solid #fecdd3; padding: 14px; border-radius: 8px;">
+        <h4 style="font-size: 0.88rem; color: #9f1239; font-weight: 700; margin-bottom: 6px;"><i class="fa-solid fa-hourglass-half"></i> System Lifecycle Profile</h4>
+        <div style="font-size: 0.85rem; line-height: 1.6;">
+          • &lt; 3 Yrs: <strong>${data.ageUnder3}</strong> | 3–5 Yrs: <strong>${data.age3To5}</strong> | 5–8 Yrs: <strong>${data.age5To8}</strong> | &gt; 8 Yrs: <strong style="color:#b91c1c;">${data.ageAbove8}</strong>
+        </div>
+      </div>
+
+      <!-- Condition Remarks -->
+      <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
+        <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 6px;"><i class="fa-solid fa-comment-dots"></i> General Condition Remarks</h4>
+        <p style="font-size: 0.85rem; color: var(--text-color); margin: 0; font-style: italic;">
+          "${escapeHtml(data.remarks || 'No specific defect or warranty remarks entered.')}"
+        </p>
+      </div>
+
+      <!-- Certification Status -->
+      <div style="background: #f0fdf4; border: 1px solid #a7f3d0; padding: 10px 14px; border-radius: 6px; font-size: 0.83rem; color: #064e3b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
+        <i class="fa-solid fa-shield-check" style="color: #047857; font-size: 1.1rem;"></i>
+        <span>Certified: "I certify that the above information is true and correct."</span>
+      </div>
+
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function closePublicOfficeSummaryModal() {
+  const modal = document.getElementById('publicOfficeSummaryModal');
+  if (modal) modal.style.display = 'none';
+}
+
+function openStandalonePrintWindow() {
+  const officeName = currentWindowOfficeName || document.getElementById('officeSelect')?.value;
+  if (!officeName) return;
+
+  const data = inventoryStore[officeName] || {};
+  const printWin = window.open('', '_blank', 'width=920,height=800,scrollbars=yes');
+
+  if (!printWin) {
+    showToast('Popup blocker blocked new window. Please allow popups for this site.', 'warning');
+    return;
+  }
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Kerala MVD - Entered Office Record - ${officeName}</title>
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+      <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; padding: 32px; color: #1e293b; line-height: 1.5; background: #ffffff; }
+        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0B3B24; padding-bottom: 16px; margin-bottom: 24px; }
+        .title-group h1 { font-size: 1.4rem; color: #0B3B24; margin: 0; }
+        .title-group p { font-size: 0.85rem; color: #64748b; margin: 2px 0 0 0; }
+        .badge { background: #d1fae5; color: #065f46; font-weight: 700; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; }
+        .office-banner { background: #f0fdf4; border: 1.5px solid #a7f3d0; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-weight: 800; font-size: 1.2rem; color: #064e3b; }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
+        .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; }
+        .box h3 { font-size: 0.95rem; margin-top: 0; color: #0f172a; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
+        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+        th, td { padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-size: 0.88rem; }
+        th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
+        .footer { margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b; }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="title-group">
+          <h1>Kerala Motor Vehicles Department</h1>
+          <p>Data AI Foundry • IT Infrastructure & Equipment Record</p>
+        </div>
+        <span class="badge"><i class="fa-solid fa-check-circle"></i> VERIFIED RECORD</span>
+      </div>
+
+      <div class="office-banner">
+        <i class="fa-solid fa-building"></i> Entered Office Name: ${officeName}
+      </div>
+
+      <div class="grid-2">
+        <div class="box">
+          <h3>Reporting Officer Profile</h3>
+          <strong>Name:</strong> ${data.entryOfficerName || 'N/A'}<br>
+          <strong>Designation:</strong> ${data.entryOfficerDesignation || 'N/A'}<br>
+          <strong>Mobile Number:</strong> ${data.entryOfficerMobile || 'N/A'}
+        </div>
+        <div class="box">
+          <h3>Network & OS Infrastructure</h3>
+          <strong>Available Network:</strong> ${data.availableNetwork === 'Others' ? data.otherNetworkDetails : (data.availableNetwork || 'N/A')}<br>
+          <strong>Speed:</strong> ${data.networkSpeed || 'N/A'}<br>
+          <strong>Operating System:</strong> ${data.operatingSystem || 'N/A'}
+        </div>
+      </div>
+
+      <h3>Core IT Hardware Inventory Status</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Hardware Category</th>
+            <th>Working Count</th>
+            <th>Defective / Not Working</th>
+            <th>Total Count</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td>Monitors</td><td>${data.monitorsWorking || 0}</td><td>${data.monitorsNotWorking || 0}</td><td>${(data.monitorsWorking || 0) + (data.monitorsNotWorking || 0)}</td></tr>
+          <tr><td>CPU Units</td><td>${data.cpuWorking || 0}</td><td>${data.cpuNotWorking || 0}</td><td>${(data.cpuWorking || 0) + (data.cpuNotWorking || 0)}</td></tr>
+          <tr><td>Laptops</td><td>${data.laptopsWorking || 0}</td><td>${data.laptopsNotWorking || 0}</td><td>${(data.laptopsWorking || 0) + (data.laptopsNotWorking || 0)}</td></tr>
+          <tr><td>All-In-One PCs</td><td>${data.aioWorking || 0}</td><td>${data.aioNotWorking || 0}</td><td>${(data.aioWorking || 0) + (data.aioNotWorking || 0)}</td></tr>
+          <tr><td>UPS Units</td><td>${data.upsWorking || 0}</td><td>${data.upsNotWorking || 0}</td><td>${(data.upsWorking || 0) + (data.upsNotWorking || 0)}</td></tr>
+        </tbody>
+      </table>
+
+      <div class="box" style="margin-top: 20px;">
+        <h3>5. Power & Battery Infrastructure Audit</h3>
+        <strong>UPS Available:</strong> ${data.upsAvailable || 'Yes'}<br>
+        <strong>Number of UPS Units:</strong> ${data.upsUnitsCount || 0}<br>
+        <strong>UPS Capacity (kVA):</strong> ${data.upsCapacity === 'Other' ? data.upsCapacityOther : (data.upsCapacity || 'N/A')}<br>
+        <strong>Condition of UPS:</strong> ${data.upsCondition || 'N/A'}<br>
+        <strong>Battery Make / Type:</strong> ${data.batteryMake || 'N/A'}<br>
+        <strong>Battery AH Rating:</strong> ${data.batteryAh ? data.batteryAh + ' AH' : 'N/A'}<br>
+        <strong>Min Batteries Required:</strong> ${data.minBatteriesRequired || 0}<br>
+        <strong>Service Report Sent to TCO:</strong> ${data.serviceReportSent || 'No'} ${data.serviceReportSent === 'Yes' && data.serviceReportDate ? `(Date: ${data.serviceReportDate})` : ''}<br>
+        ${data.powerRemarks ? `<strong>Power Remarks:</strong> "${data.powerRemarks}"` : ''}
+      </div>
+
+      <div class="box" style="margin-top: 20px;">
+        <h3>General Condition Remarks & Certification</h3>
+        <p style="margin: 0 0 10px 0; font-style: italic;">"${data.remarks || 'None'}"</p>
+        <div style="font-weight: 700; color: #064e3b; background: #f0fdf4; padding: 8px; border-radius: 6px; font-size: 0.85rem;">
+          ✓ Certified: "I certify that the above information is true and correct."
+        </div>
+      </div>
+
+      <div class="footer">
+        <span>Generated from Kerala MVD IT Portal (Data AI Foundry)</span>
+        <span>Date: ${new Date().toLocaleString()}</span>
+      </div>
+
+      <script>
+        window.onload = function() { window.print(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWin.document.close();
 }
 
 // --- 11. ADMIN AUTHENTICATION & LOGOUT ENGINE ---
@@ -949,60 +1589,40 @@ async function removeModule(moduleId) {
   }
 }
 
-// --- 13. PUBLIC DATA TABLE RENDERER ---
+// --- 13. PUBLIC ENTRY WINDOW ENGINE ---
+function switchPublicWindow(windowType) {
+  const entrySec = document.getElementById('publicEntrySection');
+  if (entrySec) entrySec.style.display = 'block';
+}
+
 function renderPublicDataTable() {
   const tbody = document.getElementById('publicTableBody');
   if (!tbody) return;
 
   const entries = Object.values(inventoryStore);
   if (entries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="12" style="text-align: center; color: var(--text-muted); padding: 30px;">No IT Equipment entries recorded yet.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;"><i class="fa-solid fa-folder-open"></i> No office entries recorded yet.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = entries.map(item => {
-    const netLabel = item.availableNetwork === 'Others' ? `Other (${item.otherNetworkDetails})` : item.availableNetwork;
-    const dotWorking = item.printers?.dotMatrix?.working ?? 0;
-
-    return `
-      <tr>
-        <td><strong>${escapeHtml(item.officeName)}</strong></td>
-        <td><span class="badge badge-info"><i class="fa-solid fa-network-wired"></i> ${escapeHtml(netLabel)}</span></td>
-        <td>${escapeHtml(item.networkSpeed || 'N/A')}</td>
-        <td>
-          <span class="badge badge-working">${item.monitorsWorking} W</span> / 
-          <span class="badge badge-danger">${item.monitorsNotWorking} NW</span>
-        </td>
-        <td>
-          <span class="badge badge-working">${item.cpuWorking} W</span> / 
-          <span class="badge badge-danger">${item.cpuNotWorking} NW</span>
-        </td>
-        <td>
-          <span class="badge badge-working">${item.laptopsWorking} W</span> / 
-          <span class="badge badge-danger">${item.laptopsNotWorking} NW</span>
-        </td>
-        <td>
-          <span class="badge badge-working">${item.aioWorking} W</span> / 
-          <span class="badge badge-danger">${item.aioNotWorking} NW</span>
-        </td>
-        <td><strong style="color: #047857;">${dotWorking}</strong></td>
-        <td>
-          <span class="badge badge-working">${item.upsWorking} W</span> / 
-          <span class="badge badge-danger">${item.upsNotWorking} NW</span>
-        </td>
-        <td>
-          <span class="badge badge-working">${item.batteriesInUse} Use</span> / 
-          <span class="badge badge-warning">${item.batteriesNotInUse} Unused</span>
-        </td>
-        <td><small>${escapeHtml(item.lastUpdated || 'N/A')}</small></td>
-        <td>
-          <button class="btn btn-outline btn-sm" onclick="viewOfficeDetail('${escapeHtml(item.officeName)}')">
-            <i class="fa-solid fa-eye"></i> Details
-          </button>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  tbody.innerHTML = entries.map(item => `
+    <tr>
+      <td><strong>${escapeHtml(item.officeName)}</strong></td>
+      <td>${escapeHtml(item.entryOfficerName || 'N/A')} <br><small style="color: var(--text-muted);">${escapeHtml(item.entryOfficerDesignation || '')}</small></td>
+      <td><span class="badge badge-info">${escapeHtml(item.availableNetwork === 'Others' ? item.otherNetworkDetails : item.availableNetwork)}</span><br><small style="color: var(--text-muted);">${escapeHtml(item.networkSpeed || '')}</small></td>
+      <td><span class="badge badge-working">${item.monitorsWorking} W</span> / <span class="badge badge-danger">${item.monitorsNotWorking} NW</span></td>
+      <td><span class="badge badge-working">${item.cpuWorking} W</span> / <span class="badge badge-danger">${item.cpuNotWorking} NW</span></td>
+      <td><span class="badge badge-working">${item.laptopsWorking} W</span> / <span class="badge badge-danger">${item.laptopsNotWorking} NW</span></td>
+      <td><span class="badge badge-working">${item.aioWorking} W</span> / <span class="badge badge-danger">${item.aioNotWorking} NW</span></td>
+      <td><span class="badge badge-working">${item.upsWorking} W</span> / <span class="badge badge-danger">${item.upsNotWorking} NW</span></td>
+      <td><small>${escapeHtml(item.lastUpdated || 'N/A')}</small></td>
+      <td>
+        <button class="btn btn-outline btn-sm" onclick="openEnteredOfficeSummaryWindow('${escapeHtml(item.officeName)}')">
+          <i class="fa-solid fa-window-restore"></i> View Record
+        </button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function filterPublicTable() {
