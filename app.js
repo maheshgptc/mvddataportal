@@ -237,8 +237,12 @@ let isAdminAuthenticated = false;
 let inventoryStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store')) || SEED_DATA;
 let appSettings = JSON.parse(localStorage.getItem('mvd_it_app_settings')) || {
   publicVisible: true,
-  adminPasscode: "admin123"
+  adminPasscode: "A!cell@2026"
 };
+if (appSettings.adminPasscode === 'admin123') {
+  appSettings.adminPasscode = "A!cell@2026";
+  localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
+}
 
 // Filter out old deleted modules from localStorage if present
 let storedModules = JSON.parse(localStorage.getItem('mvd_it_portal_modules')) || DEFAULT_PORTAL_MODULES;
@@ -697,7 +701,7 @@ async function syncWithSupabaseBackend() {
 
     if (!settingsErr && settingsData) {
       appSettings.publicVisible = settingsData.public_visible;
-      appSettings.adminPasscode = settingsData.admin_passcode || 'admin123';
+      appSettings.adminPasscode = settingsData.admin_passcode || 'A!cell@2026';
       
       if (settingsData.google_client_id) {
         currentGoogleClientId = settingsData.google_client_id;
@@ -1668,7 +1672,7 @@ function verifyAdminPasscode(e) {
 
     switchSession('admin');
   } else {
-    showToast('Invalid passcode. Default is admin123', 'error');
+    showToast('Invalid passcode', 'error');
   }
 }
 
@@ -1923,10 +1927,19 @@ function renderAdminDashboard() {
     totalAbove8 += (e.ageAbove8 || 0);
   });
 
-  document.getElementById('kpiOfficesReported').textContent = filterVal === 'ALL' ? `${totalOffices} / ${MVD_OFFICES.length}` : (totalOffices > 0 ? 'Reported ✓' : 'Pending');
-  document.getElementById('kpiTotalSystems').textContent = totalSystems;
-  document.getElementById('kpiNonWorkingHardware').textContent = nonWorkingHardware;
-  document.getElementById('kpiGovNetworkCount').textContent = govNetworkCount;
+  let switchesCount = 0;
+  let serversCount = 0;
+  entries.forEach(e => {
+    if (e.switchesAvailable === 'Yes') switchesCount++;
+    if (e.serversAvailable === 'Yes') serversCount++;
+  });
+
+  if (document.getElementById('kpiOfficesReported')) document.getElementById('kpiOfficesReported').textContent = filterVal === 'ALL' ? `${totalOffices} / ${MVD_OFFICES.length}` : (totalOffices > 0 ? 'Reported ✓' : 'Pending');
+  if (document.getElementById('kpiTotalSystems')) document.getElementById('kpiTotalSystems').textContent = totalSystems;
+  if (document.getElementById('kpiNonWorkingHardware')) document.getElementById('kpiNonWorkingHardware').textContent = nonWorkingHardware;
+  if (document.getElementById('kpiGovNetworkCount')) document.getElementById('kpiGovNetworkCount').textContent = govNetworkCount;
+  if (document.getElementById('kpiSwitchesCount')) document.getElementById('kpiSwitchesCount').textContent = `${switchesCount} Offices`;
+  if (document.getElementById('kpiServersCount')) document.getElementById('kpiServersCount').textContent = `${serversCount} Offices`;
 
   const netGrid = document.getElementById('networkStatsGrid');
   if (netGrid) {
@@ -2133,6 +2146,62 @@ function drillDownDashboard(type) {
         </div>
       </div>
     `;
+  } else if (type === 'switches') {
+    title.innerHTML = `<i class="fa-solid fa-server" style="color: #0284c7;"></i> Network Switches Availability & Details Drill-Down`;
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: var(--text-muted); font-size: 0.88rem;">Switches hardware availability and specification details across MVD offices:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>Switches Available</th>
+                <th>Manufacturer & Port Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td><span class="badge ${e.switchesAvailable === 'Yes' ? 'badge-working' : (e.switchesAvailable === 'No' ? 'badge-danger' : 'badge-info')}">${escapeHtml(e.switchesAvailable || 'Not Sure')}</span></td>
+                  <td>${escapeHtml(e.switchesDetails || 'N/A')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (type === 'servers') {
+    title.innerHTML = `<i class="fa-solid fa-database" style="color: #4f46e5;"></i> Server Infrastructure Status Drill-Down`;
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: var(--text-muted); font-size: 0.88rem;">Server hardware installation and operational status across MVD offices:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>Servers Available</th>
+                <th>Current Status & Details</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td><span class="badge ${e.serversAvailable === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.serversAvailable || 'No')}</span></td>
+                  <td>${escapeHtml(e.serversDetails || 'N/A')}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   }
 
   modal.style.display = 'flex';
@@ -2144,7 +2213,7 @@ function renderAdminDataTable() {
 
   const entries = Object.values(inventoryStore);
   if (entries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="15" style="text-align: center; color: var(--text-muted); padding: 30px;">No entries stored.</td></tr>`;
+    tbody.innerHTML = `<tr><td colspan="17" style="text-align: center; color: var(--text-muted); padding: 30px;">No entries stored.</td></tr>`;
     return;
   }
 
@@ -2182,6 +2251,14 @@ function renderAdminDataTable() {
           </div>
         </td>
         <td><span class="badge badge-info">${escapeHtml(netLabel)}</span><br><small>${escapeHtml(item.networkSpeed || '')}</small></td>
+        <td>
+          <span class="badge ${item.switchesAvailable === 'Yes' ? 'badge-working' : (item.switchesAvailable === 'No' ? 'badge-danger' : 'badge-info')}">${escapeHtml(item.switchesAvailable || 'Not Sure')}</span>
+          ${item.switchesAvailable === 'Yes' && item.switchesDetails ? `<br><small style="color: var(--text-muted);">${escapeHtml(item.switchesDetails)}</small>` : ''}
+        </td>
+        <td>
+          <span class="badge ${item.serversAvailable === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(item.serversAvailable || 'No')}</span>
+          ${item.serversAvailable === 'Yes' && item.serversDetails ? `<br><small style="color: var(--text-muted);">${escapeHtml(item.serversDetails)}</small>` : ''}
+        </td>
         <td><small>${escapeHtml(item.operatingSystem || 'N/A')}</small></td>
         <td>${item.monitorsWorking} W / <span style="color:#b91c1c;">${item.monitorsNotWorking} NW</span></td>
         <td>${item.cpuWorking} W / <span style="color:#b91c1c;">${item.cpuNotWorking} NW</span></td>

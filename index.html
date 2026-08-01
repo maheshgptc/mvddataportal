@@ -701,7 +701,7 @@
             </div>
 
             <!-- KPI Cards Grid with Interactive Drill-Down -->
-            <div class="dashboard-grid-4">
+            <div class="dashboard-grid-4" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
               <div class="metric-card emerald" onclick="drillDownDashboard('offices')" style="cursor: pointer;" title="Click to view Reported vs Pending Offices Breakdown">
                 <div class="metric-icon"><i class="fa-solid fa-building-circle-check"></i></div>
                 <div class="metric-content">
@@ -735,6 +735,24 @@
                   <h4>KSWAN / KFONE Offices <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-purple);"></i></h4>
                   <div class="metric-value" id="kpiGovNetworkCount">0</div>
                   <div class="metric-sub">Click for Network Provider List</div>
+                </div>
+              </div>
+
+              <div class="metric-card cyan" onclick="drillDownDashboard('switches')" style="cursor: pointer;" title="Click to view Network Switches Available Offices">
+                <div class="metric-icon"><i class="fa-solid fa-server"></i></div>
+                <div class="metric-content">
+                  <h4>Switches Available <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #0284c7;"></i></h4>
+                  <div class="metric-value" id="kpiSwitchesCount">0</div>
+                  <div class="metric-sub">Click for Switches List</div>
+                </div>
+              </div>
+
+              <div class="metric-card indigo" onclick="drillDownDashboard('servers')" style="cursor: pointer;" title="Click to view Servers Installed Offices">
+                <div class="metric-icon"><i class="fa-solid fa-database"></i></div>
+                <div class="metric-content">
+                  <h4>Servers Installed <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #4f46e5;"></i></h4>
+                  <div class="metric-value" id="kpiServersCount">0</div>
+                  <div class="metric-sub">Click for Server Details</div>
                 </div>
               </div>
             </div>
@@ -812,6 +830,8 @@
                       <th>Entered Officer & Email ID</th>
                       <th>Updated Officer & Email ID</th>
                       <th>Network & Speed</th>
+                      <th>Switches Available</th>
+                      <th>Servers Installed</th>
                       <th>OS Details</th>
                       <th>Monitors (W/NW)</th>
                       <th>CPUs (W/NW)</th>
