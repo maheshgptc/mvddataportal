@@ -482,10 +482,16 @@
                     </select>
                   </div>
 
-                  <!-- Number of UPS Units (Short Answer - Response validation: Number) -->
+                  <!-- No. of UPS Units Working -->
                   <div class="form-group">
-                    <label for="upsUnitsCount"><i class="fa-solid fa-calculator"></i> Number of UPS Units *</label>
-                    <input type="number" id="upsUnitsCount" class="form-control" min="0" value="0" placeholder="e.g. 1, 2, 5" required>
+                    <label for="upsWorking"><i class="fa-solid fa-circle-check" style="color: #059669;"></i> No. of UPS Units Working *</label>
+                    <input type="number" id="upsWorking" class="form-control input-working" min="0" value="0" placeholder="e.g. 1, 2, 5" required>
+                  </div>
+
+                  <!-- No. of UPS Units Not Working -->
+                  <div class="form-group">
+                    <label for="upsNotWorking"><i class="fa-solid fa-circle-xmark" style="color: #dc2626;"></i> No. of UPS Units Not Working *</label>
+                    <input type="number" id="upsNotWorking" class="form-control input-not-working" min="0" value="0" placeholder="e.g. 0, 1" required>
                   </div>
 
                   <!-- UPS Capacity (kVA Rating) Dropdown -->
@@ -503,9 +509,9 @@
                     </select>
                   </div>
 
-                  <!-- Condition of UPS Multiple Choice -->
+                  <!-- Condition of Working UPS Multiple Choice -->
                   <div class="form-group">
-                    <label for="upsConditionSelect"><i class="fa-solid fa-square-poll-vertical"></i> Condition of UPS *</label>
+                    <label for="upsConditionSelect"><i class="fa-solid fa-square-poll-vertical"></i> Condition of Working UPS *</label>
                     <select id="upsConditionSelect" class="form-control" required>
                       <option value="">-- Select Condition --</option>
                       <option value="Good">Good</option>

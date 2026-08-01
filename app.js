@@ -1479,9 +1479,10 @@ function openEnteredOfficeSummaryWindow(officeName) {
         <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 0.85rem;">
           <div>
             <strong>• UPS Available:</strong> <span class="badge ${data.upsAvailable === 'No' ? 'badge-danger' : 'badge-working'}">${escapeHtml(data.upsAvailable || 'Yes')}</span><br>
-            <strong>• Number of UPS Units:</strong> ${data.upsUnitsCount || 0}<br>
+            <strong>• No. of UPS Units Working:</strong> <span style="color:#047857; font-weight:700;">${data.upsWorking ?? 0}</span><br>
+            <strong>• No. of UPS Units Not Working:</strong> <span style="color:#b91c1c; font-weight:700;">${data.upsNotWorking ?? 0}</span><br>
             <strong>• UPS Capacity:</strong> ${escapeHtml(data.upsCapacity === 'Other' ? data.upsCapacityOther : (data.upsCapacity || 'N/A'))}<br>
-            <strong>• Condition of UPS:</strong> <span style="font-weight: 700;">${escapeHtml(data.upsCondition || 'N/A')}</span>
+            <strong>• Condition of Working UPS:</strong> <span style="font-weight: 700;">${escapeHtml(data.upsCondition || 'N/A')}</span>
           </div>
           <div>
             <strong>• Battery Make / Type:</strong> ${escapeHtml(data.batteryMake || 'N/A')}<br>
@@ -1613,9 +1614,10 @@ function openStandalonePrintWindow() {
       <div class="box" style="margin-top: 20px;">
         <h3>5. Power & Battery Infrastructure Audit</h3>
         <strong>UPS Available:</strong> ${data.upsAvailable || 'Yes'}<br>
-        <strong>Number of UPS Units:</strong> ${data.upsUnitsCount || 0}<br>
+        <strong>No. of UPS Units Working:</strong> ${data.upsWorking ?? 0}<br>
+        <strong>No. of UPS Units Not Working:</strong> ${data.upsNotWorking ?? 0}<br>
         <strong>UPS Capacity (kVA):</strong> ${data.upsCapacity === 'Other' ? data.upsCapacityOther : (data.upsCapacity || 'N/A')}<br>
-        <strong>Condition of UPS:</strong> ${data.upsCondition || 'N/A'}<br>
+        <strong>Condition of Working UPS:</strong> ${data.upsCondition || 'N/A'}<br>
         <strong>Battery Make / Type:</strong> ${data.batteryMake || 'N/A'}<br>
         <strong>Battery AH Rating:</strong> ${data.batteryAh ? data.batteryAh + ' AH' : 'N/A'}<br>
         <strong>Min Batteries Required:</strong> ${data.minBatteriesRequired || 0}<br>
