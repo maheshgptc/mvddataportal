@@ -633,6 +633,10 @@ async function syncWithSupabaseBackend() {
           availableNetwork: row.network_provider || '',
           otherNetworkDetails: row.network_provider_other || '',
           networkSpeed: row.network_speed || '',
+          switchesAvailable: row.switches_available || 'Not Sure',
+          switchesDetails: row.switches_details || '',
+          serversAvailable: row.servers_available || 'No',
+          serversDetails: row.servers_details || '',
           operatingSystem: row.os_with_version || '',
           monitorsWorking: row.monitors_working ?? 0,
           monitorsNotWorking: row.monitors_not_working ?? 0,
@@ -730,6 +734,10 @@ async function saveRecordToSupabase(record) {
       network_provider: record.availableNetwork,
       network_provider_other: record.otherNetworkDetails,
       network_speed: record.networkSpeed,
+      switches_available: record.switchesAvailable,
+      switches_details: record.switchesDetails,
+      servers_available: record.serversAvailable,
+      servers_details: record.serversDetails,
       os_with_version: record.operatingSystem,
       entry_officer_name: record.entryOfficerName,
       entry_officer_designation: record.entryOfficerDesignation,
@@ -966,6 +974,19 @@ function populateFormWithData(data) {
 
   document.getElementById('otherNetworkInput').value = data.otherNetworkDetails || '';
   document.getElementById('networkSpeedInput').value = data.networkSpeed || '';
+
+  if (document.getElementById('switchesAvailableSelect')) {
+    document.getElementById('switchesAvailableSelect').value = data.switchesAvailable || '';
+    handleSwitchesAvailabilityChange(data.switchesAvailable || '');
+  }
+  if (document.getElementById('switchesDetailsInput')) document.getElementById('switchesDetailsInput').value = data.switchesDetails || '';
+
+  if (document.getElementById('serversAvailableSelect')) {
+    document.getElementById('serversAvailableSelect').value = data.serversAvailable || '';
+    handleServersAvailabilityChange(data.serversAvailable || '');
+  }
+  if (document.getElementById('serversDetailsInput')) document.getElementById('serversDetailsInput').value = data.serversDetails || '';
+
   document.getElementById('operatingSystemInput').value = data.operatingSystem || '';
 
   if (document.getElementById('entryOfficerName')) document.getElementById('entryOfficerName').value = data.entryOfficerName || '';
@@ -1041,6 +1062,19 @@ function resetPublicFormFieldsOnly() {
   handleNetworkChange('');
   document.getElementById('otherNetworkInput').value = '';
   document.getElementById('networkSpeedInput').value = '';
+
+  if (document.getElementById('switchesAvailableSelect')) {
+    document.getElementById('switchesAvailableSelect').value = '';
+    handleSwitchesAvailabilityChange('');
+  }
+  if (document.getElementById('switchesDetailsInput')) document.getElementById('switchesDetailsInput').value = '';
+
+  if (document.getElementById('serversAvailableSelect')) {
+    document.getElementById('serversAvailableSelect').value = '';
+    handleServersAvailabilityChange('');
+  }
+  if (document.getElementById('serversDetailsInput')) document.getElementById('serversDetailsInput').value = '';
+
   document.getElementById('operatingSystemInput').value = '';
 
   if (document.getElementById('entryOfficerName')) document.getElementById('entryOfficerName').value = '';
@@ -1102,6 +1136,20 @@ function handleNetworkChange(value) {
   const otherGroup = document.getElementById('otherNetworkGroup');
   if (otherGroup) {
     otherGroup.style.display = (value === 'Others') ? 'block' : 'none';
+  }
+}
+
+function handleSwitchesAvailabilityChange(val) {
+  const group = document.getElementById('switchesDetailsGroup');
+  if (group) {
+    group.style.display = (val === 'Yes') ? 'block' : 'none';
+  }
+}
+
+function handleServersAvailabilityChange(val) {
+  const group = document.getElementById('serversDetailsGroup');
+  if (group) {
+    group.style.display = (val === 'Yes') ? 'block' : 'none';
   }
 }
 
@@ -1220,6 +1268,10 @@ async function handleFormSubmit(e) {
       availableNetwork: networkVal,
       otherNetworkDetails: getStr('otherNetworkInput'),
       networkSpeed: getStr('networkSpeedInput'),
+      switchesAvailable: getStr('switchesAvailableSelect') || 'Not Sure',
+      switchesDetails: getStr('switchesDetailsInput'),
+      serversAvailable: getStr('serversAvailableSelect') || 'No',
+      serversDetails: getStr('serversDetailsInput'),
       operatingSystem: getStr('operatingSystemInput'),
       entryOfficerName: getStr('entryOfficerName'),
       entryOfficerDesignation: getStr('entryOfficerDesignation'),
@@ -1365,10 +1417,12 @@ function openEnteredOfficeSummaryWindow(officeName) {
         </div>
 
         <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
-          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-network-wired"></i> Connectivity & OS Profile</h4>
+          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-network-wired"></i> Connectivity, Network & OS Profile</h4>
           <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-color);">
             <strong>Network:</strong> <span class="badge badge-info">${escapeHtml(data.availableNetwork === 'Others' ? data.otherNetworkDetails : data.availableNetwork || 'N/A')}</span><br>
             <strong>Speed:</strong> ${escapeHtml(data.networkSpeed || 'N/A')}<br>
+            <strong>Switches Available:</strong> ${escapeHtml(data.switchesAvailable || 'Not Sure')} ${data.switchesAvailable === 'Yes' && data.switchesDetails ? `(${escapeHtml(data.switchesDetails)})` : ''}<br>
+            <strong>Servers Available:</strong> ${escapeHtml(data.serversAvailable || 'No')} ${data.serversAvailable === 'Yes' && data.serversDetails ? `(${escapeHtml(data.serversDetails)})` : ''}<br>
             <strong>OS:</strong> ${escapeHtml(data.operatingSystem || 'N/A')}
           </div>
         </div>
@@ -1527,6 +1581,8 @@ function openStandalonePrintWindow() {
           <h3>Network & OS Infrastructure</h3>
           <strong>Available Network:</strong> ${data.availableNetwork === 'Others' ? data.otherNetworkDetails : (data.availableNetwork || 'N/A')}<br>
           <strong>Speed:</strong> ${data.networkSpeed || 'N/A'}<br>
+          <strong>Switches Available:</strong> ${data.switchesAvailable || 'Not Sure'} ${data.switchesAvailable === 'Yes' && data.switchesDetails ? `(${data.switchesDetails})` : ''}<br>
+          <strong>Servers Available:</strong> ${data.serversAvailable || 'No'} ${data.serversAvailable === 'Yes' && data.serversDetails ? `(${data.serversDetails})` : ''}<br>
           <strong>Operating System:</strong> ${data.operatingSystem || 'N/A'}
         </div>
       </div>

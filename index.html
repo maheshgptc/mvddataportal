@@ -60,7 +60,7 @@
         </div>
 
         <div class="auth-footer" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-          <span><i class="fa-solid fa-shield-halved"></i> 256-bit Encrypted Government Authentication Layer</span>
+          <span><i class="fa-solid fa-shield-halved"></i> 256-bit Encrypted Authentication Layer</span>
         </div>
       </div>
     </div>
@@ -243,6 +243,41 @@
                 <div id="otherNetworkGroup" class="form-group" style="margin-top: 16px; display: none;">
                   <label for="otherNetworkInput"><i class="fa-solid fa-pen-to-square"></i> Details for Other Network *</label>
                   <input type="text" id="otherNetworkInput" class="form-control" placeholder="Specify ISP, provider name, or leased line details...">
+                </div>
+
+                <div class="form-grid-2" style="margin-top: 16px;">
+                  <!-- Are switches available -->
+                  <div class="form-group">
+                    <label for="switchesAvailableSelect"><i class="fa-solid fa-server"></i> Are switches available in the office? *</label>
+                    <select id="switchesAvailableSelect" class="form-control" required onchange="handleSwitchesAvailabilityChange(this.value)">
+                      <option value="">-- Select Option --</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                      <option value="Not Sure">Not Sure</option>
+                    </select>
+                  </div>
+
+                  <!-- Are servers available -->
+                  <div class="form-group">
+                    <label for="serversAvailableSelect"><i class="fa-solid fa-database"></i> Are Servers available in the office? *</label>
+                    <select id="serversAvailableSelect" class="form-control" required onchange="handleServersAvailabilityChange(this.value)">
+                      <option value="">-- Select Option --</option>
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                    </select>
+                  </div>
+                </div>
+
+                <!-- Conditional Switches Details -->
+                <div id="switchesDetailsGroup" class="form-group" style="margin-top: 16px; display: none;">
+                  <label for="switchesDetailsInput"><i class="fa-solid fa-circle-info"></i> If Yes, Enter Details such as Manufacturer, No of ports etc</label>
+                  <input type="text" id="switchesDetailsInput" class="form-control" placeholder="e.g. Cisco 24-port Gigabit Switch, D-Link 16-port Switch">
+                </div>
+
+                <!-- Conditional Servers Details -->
+                <div id="serversDetailsGroup" class="form-group" style="margin-top: 16px; display: none;">
+                  <label for="serversDetailsInput"><i class="fa-solid fa-circle-info"></i> If Yes, Enter Details such as Current status of server</label>
+                  <input type="text" id="serversDetailsInput" class="form-control" placeholder="e.g. HP ProLiant Rack Server - Operational / Active for Local DB">
                 </div>
 
                 <div class="form-group" style="margin-top: 16px;">
