@@ -941,11 +941,7 @@ function handleOfficeSelectChange(officeName) {
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem;">
               <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.15rem;"></i>
-              <strong>Entry for this office already done with "${escapeHtml(ownerEmail)}". Please Contact the helpdesk</strong>
-            </div>
-            <div style="font-size: 0.83rem; color: #7f1d1d; margin-left: 26px;">
-              • Submitter Account Email: <strong>${escapeHtml(ownerEmail)}</strong><br>
-              • IT Helpdesk Contact: <strong>mvdaicell@gmail.com</strong> | <strong>0471-2333317</strong>
+              <strong>Entry for this office already done with "${escapeHtml(ownerEmail)}". Please Login with this account to view and update data</strong>
             </div>
           </div>
         `;
@@ -954,7 +950,7 @@ function handleOfficeSelectChange(officeName) {
       if (btnWindow) {
         btnWindow.style.display = 'none';
       }
-      showToast(`Entry for this office already done with "${ownerEmail}". Please Contact the helpdesk`, 'error');
+      showToast(`Entry for this office already done with "${ownerEmail}". Please Login with this account to view and update data`, 'error');
     }
   } else {
     // Fresh Office Selection
