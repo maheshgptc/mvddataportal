@@ -929,8 +929,8 @@ function handleOfficeSelectChange(officeName) {
       }
       showToast(`Loaded saved entry for ${officeName}`, 'info');
     } else {
-      // Office submitted by DIFFERENT Google Email ID -> Block & Show Mandatory Helpdesk Alert
-      populateFormWithData(existingData);
+      // Office submitted by DIFFERENT Google Email ID -> Block form, clear fields, and show helpdesk alert
+      resetPublicFormFieldsOnly();
       toggleFormFieldsDisabled(true);
 
       if (alertBox && alertText) {
@@ -952,8 +952,7 @@ function handleOfficeSelectChange(officeName) {
         alertBox.style.display = 'flex';
       }
       if (btnWindow) {
-        btnWindow.style.display = 'inline-flex';
-        btnWindow.innerHTML = `<i class="fa-solid fa-window-restore"></i> View Record Summary`;
+        btnWindow.style.display = 'none';
       }
       showToast(`Entry for this office already done with "${ownerEmail}". Please Contact the helpdesk`, 'error');
     }
