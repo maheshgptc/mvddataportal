@@ -941,11 +941,11 @@ function handleOfficeSelectChange(officeName) {
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem;">
               <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.15rem;"></i>
-              <strong>Entry for this office already done with other officer. Please Contact the helpdesk</strong>
+              <strong>Entry for this office already done with "${escapeHtml(ownerEmail)}". Please Contact the helpdesk</strong>
             </div>
             <div style="font-size: 0.83rem; color: #7f1d1d; margin-left: 26px;">
-              • Submitted By Officer: <strong>${escapeHtml(ownerEmail)}</strong><br>
-              • Helpdesk Contact: <strong>mvdaicell@gmail.com</strong> | <strong>0471-2333317</strong>
+              • Submitter Account Email: <strong>${escapeHtml(ownerEmail)}</strong><br>
+              • IT Helpdesk Contact: <strong>mvdaicell@gmail.com</strong> | <strong>0471-2333317</strong>
             </div>
           </div>
         `;
@@ -955,7 +955,7 @@ function handleOfficeSelectChange(officeName) {
         btnWindow.style.display = 'inline-flex';
         btnWindow.innerHTML = `<i class="fa-solid fa-window-restore"></i> View Record Summary`;
       }
-      showToast('Entry for this office already done with other officer. Please Contact the helpdesk', 'error');
+      showToast(`Entry for this office already done with "${ownerEmail}". Please Contact the helpdesk`, 'error');
     }
   } else {
     // Fresh Office Selection
