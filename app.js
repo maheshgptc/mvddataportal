@@ -2000,7 +2000,10 @@ function renderAdminDashboard() {
 }
 
 // --- DASHBOARD INTERACTIVE DRILL-DOWN ENGINE ---
+let currentDrillDownType = 'offices';
+
 function drillDownDashboard(type) {
+  currentDrillDownType = type;
   const modal = document.getElementById('officeDetailModal');
   const title = document.getElementById('modalOfficeTitle');
   const body = document.getElementById('modalOfficeBody');
@@ -2204,9 +2207,112 @@ function drillDownDashboard(type) {
         </div>
       </div>
     `;
+  } else if (type === 'age') {
+    title.innerHTML = `<i class="fa-solid fa-chart-column" style="color: #3b82f6;"></i> System Age Profile Breakdown Drill-Down`;
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: var(--text-muted); font-size: 0.88rem;">System age profile breakdown (&lt; 3 yrs, 3–5 yrs, 5–8 yrs, &gt; 8 yrs priority) by MVD Office:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>&lt; 3 Years</th>
+                <th>3–5 Years</th>
+                <th>5–8 Years</th>
+                <th>&gt; 8 Years (High Priority)</th>
+                <th>Total Age-Profiled Systems</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td>${e.ageUnder3 || 0}</td>
+                  <td>${e.age3To5 || 0}</td>
+                  <td>${e.age5To8 || 0}</td>
+                  <td><span class="badge ${(e.ageAbove8 || 0) > 0 ? 'badge-danger' : 'badge-working'}">${e.ageAbove8 || 0}</span></td>
+                  <td><strong>${(e.ageUnder3 || 0) + (e.age3To5 || 0) + (e.age5To8 || 0) + (e.ageAbove8 || 0)}</strong></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   }
 
   modal.style.display = 'flex';
+}
+
+function exportDrillDownToCSV() {
+  const filterVal = document.getElementById('dashboardOfficeFilter')?.value || 'ALL';
+  let entries = Object.values(inventoryStore);
+  if (filterVal !== 'ALL') {
+    entries = inventoryStore[filterVal] ? [inventoryStore[filterVal]] : [];
+  }
+
+  let csvContent = "";
+  let filename = `mvd_drilldown_${currentDrillDownType}_${Date.now()}.csv`;
+
+  if (currentDrillDownType === 'offices') {
+    csvContent += "Office Name,Status,Reporting Officer,Designation,Mobile,Last Updated\n";
+    entries.forEach(e => {
+      csvContent += `"${e.officeName.replace(/"/g, '""')}","Reported","${(e.entryOfficerName || '').replace(/"/g, '""')}","${(e.entryOfficerDesignation || '').replace(/"/g, '""')}","${e.entryOfficerMobile || ''}","${e.lastUpdated || ''}"\n`;
+    });
+    const pendingNames = MVD_OFFICES.filter(off => !inventoryStore[off]);
+    pendingNames.forEach(p => {
+      csvContent += `"${p.replace(/"/g, '""')}","Pending","N/A","N/A","N/A","N/A"\n`;
+    });
+  } else if (currentDrillDownType === 'systems') {
+    csvContent += "Office Name,Monitors Working,Monitors Defective,CPU Working,CPU Defective,Laptops Working,Laptops Defective,AIO Working,AIO Defective,Total Systems\n";
+    entries.forEach(e => {
+      const tot = (e.monitorsWorking + e.monitorsNotWorking + e.cpuWorking + e.cpuNotWorking + e.laptopsWorking + e.laptopsNotWorking + e.aioWorking + e.aioNotWorking);
+      csvContent += `"${e.officeName.replace(/"/g, '""')}",${e.monitorsWorking},${e.monitorsNotWorking},${e.cpuWorking},${e.cpuNotWorking},${e.laptopsWorking},${e.laptopsNotWorking},${e.aioWorking},${e.aioNotWorking},${tot}\n`;
+    });
+  } else if (currentDrillDownType === 'defective') {
+    csvContent += "Office Name,Defective Monitors,Defective CPUs,Defective Laptops & AIO,Defective UPS,Remarks\n";
+    const defectiveEntries = entries.filter(e => (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking + e.upsNotWorking) > 0);
+    defectiveEntries.forEach(e => {
+      csvContent += `"${e.officeName.replace(/"/g, '""')}",${e.monitorsNotWorking},${e.cpuNotWorking},${e.laptopsNotWorking + e.aioNotWorking},${e.upsNotWorking},"${(e.remarks || '').replace(/"/g, '""')}"\n`;
+    });
+  } else if (currentDrillDownType === 'network') {
+    csvContent += "Office Name,Available Network,Speed,Operating System\n";
+    entries.forEach(e => {
+      const net = e.availableNetwork === 'Others' ? e.otherNetworkDetails : e.availableNetwork;
+      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(net || '').replace(/"/g, '""')}","${(e.networkSpeed || '').replace(/"/g, '""')}","${(e.operatingSystem || '').replace(/"/g, '""')}"\n`;
+    });
+  } else if (currentDrillDownType === 'switches') {
+    csvContent += "Office Name,Switches Available,Manufacturer and Port Details\n";
+    entries.forEach(e => {
+      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.switchesAvailable || '').replace(/"/g, '""')}","${(e.switchesDetails || '').replace(/"/g, '""')}"\n`;
+    });
+  } else if (currentDrillDownType === 'servers') {
+    csvContent += "Office Name,Servers Available,Current Status and Details\n";
+    entries.forEach(e => {
+      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.serversAvailable || '').replace(/"/g, '""')}","${(e.serversDetails || '').replace(/"/g, '""')}"\n`;
+    });
+  } else if (currentDrillDownType === 'age') {
+    csvContent += "Office Name,Under 3 Years,3 to 5 Years,5 to 8 Years,Above 8 Years (High Priority),Total Systems\n";
+    entries.forEach(e => {
+      const u3 = e.ageUnder3 || 0;
+      const u5 = e.age3To5 || 0;
+      const u8 = e.age5To8 || 0;
+      const a8 = e.ageAbove8 || 0;
+      csvContent += `"${e.officeName.replace(/"/g, '""')}",${u3},${u5},${u8},${a8},${u3 + u5 + u8 + a8}\n`;
+    });
+  }
+
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const link = document.createElement("a");
+  const url = URL.createObjectURL(blob);
+  link.setAttribute("href", url);
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast(`Exported ${currentDrillDownType} drill-down data to CSV`, 'success');
 }
 
 function renderAdminDataTable() {

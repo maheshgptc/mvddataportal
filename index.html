@@ -517,6 +517,8 @@
                       <option value="Good">Good</option>
                       <option value="Working with Minor Issues">Working with Minor Issues</option>
                       <option value="Requires Repair">Requires Repair</option>
+                      <option value="Not Working">Not Working</option>
+                      <option value="Not Available">Not Available</option>
                     </select>
                   </div>
                 </div>
@@ -774,9 +776,10 @@
               </div>
 
               <!-- Chart 2: System Age Distribution -->
-              <div class="chart-card">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+              <div class="chart-card" onclick="drillDownDashboard('age')" style="cursor: pointer;" title="Click to view System Age Profile Breakdown Drill-Down">
+                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
                   <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-column"></i> System Age Profile Across Offices</h3>
+                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
                 </div>
                 <div class="chart-container">
                   <canvas id="chartAgeDistribution"></canvas>
@@ -963,7 +966,10 @@
       <div id="modalOfficeBody" style="max-height: 70vh; overflow-y: auto; font-size: 0.9rem;">
         <!-- Dynamically rendered -->
       </div>
-      <div style="margin-top: 20px; display: flex; justify-content: flex-end;">
+      <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
+        <button class="btn btn-outline btn-sm" onclick="exportDrillDownToCSV()">
+          <i class="fa-solid fa-file-excel"></i> Download CSV
+        </button>
         <button class="btn btn-secondary" onclick="closeOfficeDetailModal()">Close Window</button>
       </div>
     </div>
