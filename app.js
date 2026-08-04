@@ -489,6 +489,8 @@ function applyGoogleAuthSession(userObj) {
   if (officerNameInput && !officerNameInput.value.trim()) {
     officerNameInput.value = userObj.name || '';
   }
+
+  updateViewEnteredDataButtonVisibility();
 }
 
 function logoutGoogleUser() {
@@ -906,6 +908,7 @@ function handleOfficeSelectChange(officeName) {
     if (alertBox) alertBox.style.display = 'none';
     toggleFormFieldsDisabled(false);
     resetPublicFormFieldsOnly();
+    updateViewEnteredDataButtonVisibility();
     return;
   }
 
@@ -962,15 +965,75 @@ function handleOfficeSelectChange(officeName) {
     if (alertBox) alertBox.style.display = 'none';
     showToast(`Fresh entry for ${officeName}`, 'info');
   }
+
+  updateViewEnteredDataButtonVisibility();
+}
+
+function updateViewEnteredDataButtonVisibility() {
+  const btnViewData = document.getElementById('btnViewEnteredData');
+  if (!btnViewData) return;
+
+  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
+  const selectedOffice = document.getElementById('officeSelect')?.value;
+
+  if (!currentEmail) {
+    btnViewData.style.display = 'none';
+    return;
+  }
+
+  if (selectedOffice && inventoryStore[selectedOffice]) {
+    const rec = inventoryStore[selectedOffice];
+    const oEmail = (rec.createdOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || rec.entryOfficerEmail || '').toLowerCase().trim();
+    if (oEmail === currentEmail) {
+      btnViewData.style.display = 'inline-flex';
+      return;
+    }
+  }
+
+  const userHasRecord = Object.values(inventoryStore).some(r => {
+    const oEmail = (r.createdOfficerEmail || r.submittedByEmail || r.updatedOfficerEmail || r.entryOfficerEmail || '').toLowerCase().trim();
+    return oEmail === currentEmail;
+  });
+
+  btnViewData.style.display = userHasRecord ? 'inline-flex' : 'none';
+}
+
+function openCurrentUserRecordSummary() {
+  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
+  const selectedOffice = document.getElementById('officeSelect')?.value;
+
+  if (selectedOffice && inventoryStore[selectedOffice]) {
+    const rec = inventoryStore[selectedOffice];
+    const oEmail = (rec.createdOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || rec.entryOfficerEmail || '').toLowerCase().trim();
+    if (oEmail === currentEmail) {
+      openEnteredOfficeSummaryWindow(selectedOffice);
+      return;
+    }
+  }
+
+  if (currentEmail) {
+    const userOffice = Object.values(inventoryStore).find(r => {
+      const oEmail = (r.createdOfficerEmail || r.submittedByEmail || r.updatedOfficerEmail || r.entryOfficerEmail || '').toLowerCase().trim();
+      return oEmail === currentEmail;
+    });
+    if (userOffice) {
+      openEnteredOfficeSummaryWindow(userOffice.officeName);
+      return;
+    }
+  }
+
+  showToast('No submitted office record found for your logged-in Google account.', 'warning');
 }
 
 function populateFormWithData(data) {
-  document.getElementById('officeSelect').value = data.officeName || '';
-  document.getElementById('availableNetworkSelect').value = data.availableNetwork || '';
+  if (!data) return;
+
+  if (document.getElementById('officeSelect')) document.getElementById('officeSelect').value = data.officeName || '';
+  if (document.getElementById('availableNetworkSelect')) document.getElementById('availableNetworkSelect').value = data.availableNetwork || '';
   handleNetworkChange(data.availableNetwork || '');
 
-  document.getElementById('otherNetworkInput').value = data.otherNetworkDetails || '';
-  document.getElementById('networkSpeedInput').value = data.networkSpeed || '';
+  if (document.getElementById('otherNetworkInput')) document.getElementById('otherNetworkInput').value = data.otherNetworkDetails || '';
+  if (document.getElementById('networkSpeedInput')) document.getElementById('networkSpeedInput').value = data.networkSpeed || '';
 
   if (document.getElementById('switchesAvailableSelect')) {
     document.getElementById('switchesAvailableSelect').value = data.switchesAvailable || '';
@@ -984,42 +1047,45 @@ function populateFormWithData(data) {
   }
   if (document.getElementById('serversDetailsInput')) document.getElementById('serversDetailsInput').value = data.serversDetails || '';
 
-  document.getElementById('operatingSystemInput').value = data.operatingSystem || '';
+  if (document.getElementById('operatingSystemInput')) document.getElementById('operatingSystemInput').value = data.operatingSystem || '';
 
   if (document.getElementById('entryOfficerName')) document.getElementById('entryOfficerName').value = data.entryOfficerName || '';
   if (document.getElementById('entryOfficerDesignation')) document.getElementById('entryOfficerDesignation').value = data.entryOfficerDesignation || '';
   if (document.getElementById('entryOfficerMobile')) document.getElementById('entryOfficerMobile').value = data.entryOfficerMobile || '';
 
-  document.getElementById('monitorsWorking').value = data.monitorsWorking ?? 0;
-  document.getElementById('monitorsNotWorking').value = data.monitorsNotWorking ?? 0;
-  document.getElementById('cpuWorking').value = data.cpuWorking ?? 0;
-  document.getElementById('cpuNotWorking').value = data.cpuNotWorking ?? 0;
-  document.getElementById('laptopsWorking').value = data.laptopsWorking ?? 0;
-  document.getElementById('laptopsNotWorking').value = data.laptopsNotWorking ?? 0;
-  document.getElementById('aioWorking').value = data.aioWorking ?? 0;
-  document.getElementById('aioNotWorking').value = data.aioNotWorking ?? 0;
+  // Core IT Hardware Equipment Status (Section 3)
+  if (document.getElementById('monitorsWorking')) document.getElementById('monitorsWorking').value = data.monitorsWorking ?? 0;
+  if (document.getElementById('monitorsNotWorking')) document.getElementById('monitorsNotWorking').value = data.monitorsNotWorking ?? 0;
+  if (document.getElementById('cpuWorking')) document.getElementById('cpuWorking').value = data.cpuWorking ?? 0;
+  if (document.getElementById('cpuNotWorking')) document.getElementById('cpuNotWorking').value = data.cpuNotWorking ?? 0;
+  if (document.getElementById('laptopsWorking')) document.getElementById('laptopsWorking').value = data.laptopsWorking ?? 0;
+  if (document.getElementById('laptopsNotWorking')) document.getElementById('laptopsNotWorking').value = data.laptopsNotWorking ?? 0;
+  if (document.getElementById('aioWorking')) document.getElementById('aioWorking').value = data.aioWorking ?? 0;
+  if (document.getElementById('aioNotWorking')) document.getElementById('aioNotWorking').value = data.aioNotWorking ?? 0;
 
+  // Printers Section (Section 4)
   const p = data.printers || {};
-  document.getElementById('printerDotMatrixWorking').value = p.dotMatrix?.working ?? 0;
-  document.getElementById('printerDotMatrixNotWorking').value = p.dotMatrix?.notWorking ?? 0;
-  document.getElementById('printerDotMatrixMulti').checked = !!p.dotMatrix?.multipurpose;
+  if (document.getElementById('printerDotMatrixWorking')) document.getElementById('printerDotMatrixWorking').value = p.dotMatrix?.working ?? 0;
+  if (document.getElementById('printerDotMatrixNotWorking')) document.getElementById('printerDotMatrixNotWorking').value = p.dotMatrix?.notWorking ?? 0;
+  if (document.getElementById('printerDotMatrixMulti')) document.getElementById('printerDotMatrixMulti').checked = !!p.dotMatrix?.multipurpose;
 
-  document.getElementById('printerInkjetWorking').value = p.inkjet?.working ?? 0;
-  document.getElementById('printerInkjetNotWorking').value = p.inkjet?.notWorking ?? 0;
-  document.getElementById('printerInkjetMulti').checked = !!p.inkjet?.multipurpose;
+  if (document.getElementById('printerInkjetWorking')) document.getElementById('printerInkjetWorking').value = p.inkjet?.working ?? 0;
+  if (document.getElementById('printerInkjetNotWorking')) document.getElementById('printerInkjetNotWorking').value = p.inkjet?.notWorking ?? 0;
+  if (document.getElementById('printerInkjetMulti')) document.getElementById('printerInkjetMulti').checked = !!p.inkjet?.multipurpose;
 
-  document.getElementById('printerLaserWorking').value = p.laser?.working ?? 0;
-  document.getElementById('printerLaserNotWorking').value = p.laser?.notWorking ?? 0;
-  document.getElementById('printerLaserMulti').checked = !!p.laser?.multipurpose;
+  if (document.getElementById('printerLaserWorking')) document.getElementById('printerLaserWorking').value = p.laser?.working ?? 0;
+  if (document.getElementById('printerLaserNotWorking')) document.getElementById('printerLaserNotWorking').value = p.laser?.notWorking ?? 0;
+  if (document.getElementById('printerLaserMulti')) document.getElementById('printerLaserMulti').checked = !!p.laser?.multipurpose;
 
-  document.getElementById('printerXeroxWorking').value = p.xerox?.working ?? 0;
-  document.getElementById('printerXeroxNotWorking').value = p.xerox?.notWorking ?? 0;
-  document.getElementById('printerXeroxMulti').checked = !!p.xerox?.multipurpose;
+  if (document.getElementById('printerXeroxWorking')) document.getElementById('printerXeroxWorking').value = p.xerox?.working ?? 0;
+  if (document.getElementById('printerXeroxNotWorking')) document.getElementById('printerXeroxNotWorking').value = p.xerox?.notWorking ?? 0;
+  if (document.getElementById('printerXeroxMulti')) document.getElementById('printerXeroxMulti').checked = !!p.xerox?.multipurpose;
 
-  document.getElementById('printerOthersWorking').value = p.others?.working ?? 0;
-  document.getElementById('printerOthersNotWorking').value = p.others?.notWorking ?? 0;
-  document.getElementById('printerOthersMulti').checked = !!p.others?.multipurpose;
+  if (document.getElementById('printerOthersWorking')) document.getElementById('printerOthersWorking').value = p.others?.working ?? 0;
+  if (document.getElementById('printerOthersNotWorking')) document.getElementById('printerOthersNotWorking').value = p.others?.notWorking ?? 0;
+  if (document.getElementById('printerOthersMulti')) document.getElementById('printerOthersMulti').checked = !!p.others?.multipurpose;
 
+  // Power & Battery Infrastructure (Section 5)
   if (document.getElementById('upsAvailableSelect')) document.getElementById('upsAvailableSelect').value = data.upsAvailable || '';
   if (document.getElementById('upsUnitsCount')) document.getElementById('upsUnitsCount').value = data.upsUnitsCount ?? (data.upsWorking ? (data.upsWorking + (data.upsNotWorking || 0)) : 0);
   if (document.getElementById('upsCapacitySelect')) {
@@ -1039,19 +1105,22 @@ function populateFormWithData(data) {
   if (document.getElementById('powerRemarksInput')) document.getElementById('powerRemarksInput').value = data.powerRemarks || '';
   if (document.getElementById('certificationCheckbox')) document.getElementById('certificationCheckbox').checked = !!data.certified;
 
-  document.getElementById('upsWorking').value = data.upsWorking ?? (data.upsCondition === 'Good' || data.upsCondition === 'Working with Minor Issues' ? (data.upsUnitsCount || 1) : 0);
-  document.getElementById('upsNotWorking').value = data.upsNotWorking ?? (data.upsCondition === 'Not Working' || data.upsCondition === 'Requires Repair' ? (data.upsUnitsCount || 1) : 0);
-  document.getElementById('batteriesInUse').value = data.batteriesInUse ?? (data.minBatteriesRequired || 0);
-  document.getElementById('batteriesNotInUse').value = data.batteriesNotInUse ?? 0;
+  if (document.getElementById('upsWorking')) document.getElementById('upsWorking').value = data.upsWorking ?? (data.upsCondition === 'Good' || data.upsCondition === 'Working with Minor Issues' ? (data.upsUnitsCount || 1) : 0);
+  if (document.getElementById('upsNotWorking')) document.getElementById('upsNotWorking').value = data.upsNotWorking ?? (data.upsCondition === 'Not Working' || data.upsCondition === 'Requires Repair' ? (data.upsUnitsCount || 1) : 0);
+  if (document.getElementById('batteriesInUse')) document.getElementById('batteriesInUse').value = data.batteriesInUse ?? (data.minBatteriesRequired || 0);
+  if (document.getElementById('batteriesNotInUse')) document.getElementById('batteriesNotInUse').value = data.batteriesNotInUse ?? 0;
 
-  document.getElementById('ageUnder3').value = data.ageUnder3 ?? 0;
-  document.getElementById('age3To5').value = data.age3To5 ?? 0;
-  document.getElementById('age5To8').value = data.age5To8 ?? 0;
-  document.getElementById('ageAbove8').value = data.ageAbove8 ?? 0;
+  // System Age Distribution (Section 6)
+  if (document.getElementById('ageUnder3')) document.getElementById('ageUnder3').value = data.ageUnder3 ?? 0;
+  if (document.getElementById('age3To5')) document.getElementById('age3To5').value = data.age3To5 ?? 0;
+  if (document.getElementById('age5To8')) document.getElementById('age5To8').value = data.age5To8 ?? 0;
+  if (document.getElementById('ageAbove8')) document.getElementById('ageAbove8').value = data.ageAbove8 ?? 0;
 
   const desktopSumEl = document.getElementById('desktopNotWorkingSummary');
   if (desktopSumEl) desktopSumEl.value = data.desktopNotWorkingSummary ?? (data.cpuNotWorking ?? 0);
-  document.getElementById('remarksInput').value = data.remarks || '';
+
+  // Specific Condition Remarks (Section 7)
+  if (document.getElementById('remarksInput')) document.getElementById('remarksInput').value = data.remarks || '';
 }
 
 function resetPublicFormFieldsOnly() {
