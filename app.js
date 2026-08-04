@@ -895,11 +895,15 @@ function toggleFormFieldsDisabled(disabled) {
 function handleOfficeSelectChange(officeName) {
   const alertBox = document.getElementById('reflectionAlert');
   const alertText = document.getElementById('reflectionAlertText');
-  const btnWindow = document.getElementById('btnOpenSelectedOfficeWindow');
+  const btnWindow = document.getElementById('btnPublicOpenWindow') || document.getElementById('btnOpenSelectedOfficeWindow');
+
+  // Explicitly hide "Open in New Window" button from the web page IRRESPECTIVE of accounts
+  if (btnWindow) {
+    btnWindow.style.display = 'none';
+  }
 
   if (!officeName) {
     if (alertBox) alertBox.style.display = 'none';
-    if (btnWindow) btnWindow.style.display = 'none';
     toggleFormFieldsDisabled(false);
     resetPublicFormFieldsOnly();
     return;
@@ -909,9 +913,9 @@ function handleOfficeSelectChange(officeName) {
   const existingData = inventoryStore[officeName];
 
   if (existingData) {
-    const ownerEmail = (existingData.submittedByEmail || existingData.entryOfficerEmail || '').toLowerCase().trim();
+    const ownerEmail = (existingData.createdOfficerEmail || existingData.submittedByEmail || existingData.updatedOfficerEmail || existingData.entryOfficerEmail || '').toLowerCase().trim();
 
-    if (!ownerEmail || !currentEmail || ownerEmail === currentEmail) {
+    if (ownerEmail && currentEmail && ownerEmail === currentEmail) {
       // Office submitted by SAME Google Email ID -> Allow View & Update
       toggleFormFieldsDisabled(false);
       populateFormWithData(existingData);
@@ -920,18 +924,16 @@ function handleOfficeSelectChange(officeName) {
         alertBox.style.background = '#f0fdf4';
         alertBox.style.borderColor = '#a7f3d0';
         alertBox.style.color = '#064e3b';
-        alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#047857; font-size:1.1rem;"></i> <span>Existing entry found for <strong>"${escapeHtml(officeName)}"</strong> submitted by your Google ID (${escapeHtml(currentEmail || 'You')}). Auto-filled below for view and update.</span></div>`;
+        alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#047857; font-size:1.1rem;"></i> <span>Existing entry found for <strong>"${escapeHtml(officeName)}"</strong> submitted by your Google ID (${escapeHtml(currentEmail)}). Auto-filled below for view and update.</span></div>`;
         alertBox.style.display = 'flex';
-      }
-      if (btnWindow) {
-        btnWindow.style.display = 'inline-flex';
-        btnWindow.innerHTML = `<i class="fa-solid fa-window-restore"></i> View "${escapeHtml(officeName)}" in New Window`;
       }
       showToast(`Loaded saved entry for ${officeName}`, 'info');
     } else {
-      // Office submitted by DIFFERENT Google Email ID -> Block form, clear fields, and show helpdesk alert
+      // Office submitted by DIFFERENT Google Email ID -> Block form, DO NOT show data in entry fields, and show security message
       resetPublicFormFieldsOnly();
       toggleFormFieldsDisabled(true);
+
+      const displayOwner = ownerEmail || 'another Google Account';
 
       if (alertBox && alertText) {
         alertBox.style.background = '#fef2f2';
@@ -941,19 +943,16 @@ function handleOfficeSelectChange(officeName) {
           <div style="display: flex; flex-direction: column; gap: 4px;">
             <div style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem;">
               <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.15rem;"></i>
-              <strong>Entry for this office already done with "${escapeHtml(ownerEmail)}". Please Login with this account to view and update data</strong>
+              <strong>Entry for this office already done with "${escapeHtml(displayOwner)}". Please Login with this account to view and update data</strong>
             </div>
           </div>
         `;
         alertBox.style.display = 'flex';
       }
-      if (btnWindow) {
-        btnWindow.style.display = 'none';
-      }
-      showToast(`Entry for this office already done with "${ownerEmail}". Please Login with this account to view and update data`, 'error');
+      showToast(`Entry for this office already done with "${displayOwner}". Please Login with this account to view and update data`, 'error');
     }
   } else {
-    // Fresh Office Selection
+    // Fresh Office Selection (Not yet submitted)
     toggleFormFieldsDisabled(false);
     resetPublicFormFieldsOnly();
     if (googleAuthUser && googleAuthUser.name) {
@@ -961,7 +960,6 @@ function handleOfficeSelectChange(officeName) {
       if (nameEl) nameEl.value = googleAuthUser.name;
     }
     if (alertBox) alertBox.style.display = 'none';
-    if (btnWindow) btnWindow.style.display = 'none';
     showToast(`Fresh entry for ${officeName}`, 'info');
   }
 }
