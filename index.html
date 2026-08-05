@@ -764,6 +764,24 @@
                   <div class="metric-sub">Click for Server Details</div>
                 </div>
               </div>
+
+              <div class="metric-card emerald" onclick="drillDownDashboard('ups')" style="cursor: pointer;" title="Click to view Power & Battery Infrastructure Drill-Down">
+                <div class="metric-icon"><i class="fa-solid fa-bolt"></i></div>
+                <div class="metric-content">
+                  <h4>Working UPS Units <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #059669;"></i></h4>
+                  <div class="metric-value" id="kpiUpsWorkingCount">0</div>
+                  <div class="metric-sub">Click for Power Audit List</div>
+                </div>
+              </div>
+
+              <div class="metric-card amber" onclick="drillDownDashboard('service_reports')" style="cursor: pointer;" title="Click to view TCO Service Reports Sent Offices">
+                <div class="metric-icon"><i class="fa-solid fa-paper-plane"></i></div>
+                <div class="metric-content">
+                  <h4>TCO Service Reports <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #d97706;"></i></h4>
+                  <div class="metric-value" id="kpiServiceReportCount">0</div>
+                  <div class="metric-sub">Click for TCO Reports Status</div>
+                </div>
+              </div>
             </div>
 
             <!-- Charts Row -->
@@ -797,6 +815,17 @@
               </div>
               <div id="networkStatsGrid" class="form-grid-4">
                 <!-- Dynamic network pills -->
+              </div>
+            </div>
+
+            <!-- Power & Battery Infrastructure Breakdown Card -->
+            <div class="card-section" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Power & Battery Audit Drill-Down">
+              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="section-title"><i class="fa-solid fa-car-battery"></i> Power & Battery Infrastructure Distribution across MVD Offices</h3>
+                <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+              </div>
+              <div id="powerStatsGrid" class="form-grid-4">
+                <!-- Dynamic power & battery pills -->
               </div>
             </div>
           </div>

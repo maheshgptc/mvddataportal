@@ -1993,9 +1993,20 @@ function renderAdminDashboard() {
 
   let switchesCount = 0;
   let serversCount = 0;
+  let upsWorkingCount = 0;
+  let upsNotWorkingCount = 0;
+  let serviceReportsSentCount = 0;
+  let totalBatteriesInUse = 0;
+  let totalMinBatteries = 0;
+
   entries.forEach(e => {
     if (e.switchesAvailable === 'Yes') switchesCount++;
     if (e.serversAvailable === 'Yes') serversCount++;
+    upsWorkingCount += (e.upsWorking || 0);
+    upsNotWorkingCount += (e.upsNotWorking || 0);
+    if (e.serviceReportSent === 'Yes') serviceReportsSentCount++;
+    totalBatteriesInUse += (e.batteriesInUse || 0);
+    totalMinBatteries += (e.minBatteriesRequired || 0);
   });
 
   if (document.getElementById('kpiOfficesReported')) document.getElementById('kpiOfficesReported').textContent = filterVal === 'ALL' ? `${totalOffices} / ${MVD_OFFICES.length}` : (totalOffices > 0 ? 'Reported ✓' : 'Pending');
@@ -2004,6 +2015,8 @@ function renderAdminDashboard() {
   if (document.getElementById('kpiGovNetworkCount')) document.getElementById('kpiGovNetworkCount').textContent = govNetworkCount;
   if (document.getElementById('kpiSwitchesCount')) document.getElementById('kpiSwitchesCount').textContent = `${switchesCount} Offices`;
   if (document.getElementById('kpiServersCount')) document.getElementById('kpiServersCount').textContent = `${serversCount} Offices`;
+  if (document.getElementById('kpiUpsWorkingCount')) document.getElementById('kpiUpsWorkingCount').textContent = `${upsWorkingCount} Units`;
+  if (document.getElementById('kpiServiceReportCount')) document.getElementById('kpiServiceReportCount').textContent = `${serviceReportsSentCount} Offices`;
 
   const netGrid = document.getElementById('networkStatsGrid');
   if (netGrid) {
@@ -2013,6 +2026,28 @@ function renderAdminDashboard() {
         <div style="font-size: 1.4rem; font-weight: 800; color: var(--primary-900);">${count} Offices</div>
       </div>
     `).join('');
+  }
+
+  const pwrGrid = document.getElementById('powerStatsGrid');
+  if (pwrGrid) {
+    pwrGrid.innerHTML = `
+      <div style="background: #f0fdf4; padding: 14px; border-radius: var(--radius-md); border: 1px solid #a7f3d0; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #047857;">Working UPS Units</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: #064e3b;">${upsWorkingCount} Units</div>
+      </div>
+      <div style="background: #fef2f2; padding: 14px; border-radius: var(--radius-md); border: 1px solid #fecdd3; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #b91c1c;">Defective / Non-Working UPS</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: #991b1b;">${upsNotWorkingCount} Units</div>
+      </div>
+      <div style="background: #eff6ff; padding: 14px; border-radius: var(--radius-md); border: 1px solid #bfdbfe; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #1d4ed8;">Batteries In Use / Min Required</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: #1e40af;">${totalBatteriesInUse} / ${totalMinBatteries}</div>
+      </div>
+      <div style="background: #fffbe6; padding: 14px; border-radius: var(--radius-md); border: 1px solid #ffe58f; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #d97706;">TCO Service Reports Sent</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: #b45309;">${serviceReportsSentCount} Offices</div>
+      </div>
+    `;
   }
 
   const ctxHealth = document.getElementById('chartHardwareHealth')?.getContext('2d');
@@ -2303,6 +2338,78 @@ function drillDownDashboard(type) {
         </div>
       </div>
     `;
+  } else if (type === 'ups' || type === 'power') {
+    title.innerHTML = `<i class="fa-solid fa-car-battery" style="color: #059669;"></i> Power & Battery Infrastructure Audit Drill-Down`;
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: var(--text-muted); font-size: 0.88rem;">UPS availability, condition, battery specifications, and TCO service report status by office:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>UPS Available</th>
+                <th>Working / Defective UPS</th>
+                <th>UPS Capacity</th>
+                <th>Working UPS Condition</th>
+                <th>Battery Make & AH</th>
+                <th>Batteries (In Use / Min Req)</th>
+                <th>TCO Report Sent</th>
+                <th>Power Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td><span class="badge ${e.upsAvailable === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.upsAvailable || 'Yes')}</span></td>
+                  <td><span style="color:#047857; font-weight:700;">${e.upsWorking || 0} W</span> / <span style="color:#b91c1c; font-weight:700;">${e.upsNotWorking || 0} NW</span></td>
+                  <td><span class="badge badge-info">${escapeHtml(e.upsCapacity === 'Other' ? e.upsCapacityOther : (e.upsCapacity || 'N/A'))}</span></td>
+                  <td><small>${escapeHtml(e.upsCondition || 'N/A')}</small></td>
+                  <td><small>${escapeHtml(e.batteryMake || 'N/A')} (${e.batteryAh || 0} AH)</small></td>
+                  <td>${e.batteriesInUse || 0} / ${e.minBatteriesRequired || 0}</td>
+                  <td><span class="badge ${e.serviceReportSent === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.serviceReportSent || 'No')} ${e.serviceReportDate ? `(${e.serviceReportDate})` : ''}</span></td>
+                  <td><small>${escapeHtml(e.powerRemarks || 'None')}</small></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
+  } else if (type === 'service_reports') {
+    title.innerHTML = `<i class="fa-solid fa-paper-plane" style="color: #d97706;"></i> TCO Service Reports Status Drill-Down`;
+
+    body.innerHTML = `
+      <div style="display: flex; flex-direction: column; gap: 16px;">
+        <p style="color: var(--text-muted); font-size: 0.88rem;">Detailed status of UPS & Power Infrastructure Service Reports sent to TCO:</p>
+        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Office Name</th>
+                <th>Service Report Sent to TCO</th>
+                <th>Date of Sending Report</th>
+                <th>Reporting Officer</th>
+                <th>Power Remarks</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${entries.map(e => `
+                <tr>
+                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
+                  <td><span class="badge ${e.serviceReportSent === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.serviceReportSent || 'No')}</span></td>
+                  <td>${escapeHtml(e.serviceReportDate || 'N/A')}</td>
+                  <td>${escapeHtml(e.entryOfficerName || 'N/A')} (${escapeHtml(e.entryOfficerMobile || 'N/A')})</td>
+                  <td><small>${escapeHtml(e.powerRemarks || 'None')}</small></td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    `;
   }
 
   modal.style.display = 'flex';
@@ -2363,6 +2470,17 @@ function exportDrillDownToCSV() {
       const u8 = e.age5To8 || 0;
       const a8 = e.ageAbove8 || 0;
       csvContent += `"${e.officeName.replace(/"/g, '""')}",${u3},${u5},${u8},${a8},${u3 + u5 + u8 + a8}\n`;
+    });
+  } else if (currentDrillDownType === 'ups' || currentDrillDownType === 'power') {
+    csvContent += "Office Name,UPS Available,Working UPS Units,Defective UPS Units,UPS Capacity,Working UPS Condition,Battery Make,Battery AH Rating,Batteries In Use,Min Batteries Required,TCO Service Report Sent,Report Date,Power Remarks\n";
+    entries.forEach(e => {
+      const cap = e.upsCapacity === 'Other' ? e.upsCapacityOther : e.upsCapacity;
+      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.upsAvailable || '').replace(/"/g, '""')}",${e.upsWorking || 0},${e.upsNotWorking || 0},"${(cap || '').replace(/"/g, '""')}","${(e.upsCondition || '').replace(/"/g, '""')}","${(e.batteryMake || '').replace(/"/g, '""')}",${e.batteryAh || 0},${e.batteriesInUse || 0},${e.minBatteriesRequired || 0},"${(e.serviceReportSent || '').replace(/"/g, '""')}","${(e.serviceReportDate || '').replace(/"/g, '""')}","${(e.powerRemarks || '').replace(/"/g, '""')}"\n`;
+    });
+  } else if (currentDrillDownType === 'service_reports') {
+    csvContent += "Office Name,Service Report Sent to TCO,Date of Sending Report,Reporting Officer,Mobile,Power Remarks\n";
+    entries.forEach(e => {
+      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.serviceReportSent || '').replace(/"/g, '""')}","${(e.serviceReportDate || '').replace(/"/g, '""')}","${(e.entryOfficerName || '').replace(/"/g, '""')}","${e.entryOfficerMobile || ''}","${(e.powerRemarks || '').replace(/"/g, '""')}"\n`;
     });
   }
 
