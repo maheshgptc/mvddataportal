@@ -914,25 +914,33 @@ function handleOfficeSelectChange(officeName) {
 
   const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
   const existingData = inventoryStore[officeName];
+  const isAdmin = (activeSession === 'admin');
 
   if (existingData) {
     const ownerEmail = (existingData.createdOfficerEmail || existingData.submittedByEmail || existingData.updatedOfficerEmail || existingData.entryOfficerEmail || '').toLowerCase().trim();
 
-    if (ownerEmail && currentEmail && ownerEmail === currentEmail) {
-      // Office submitted by SAME Google Email ID -> Allow View & Update
+    if (isAdmin || (ownerEmail && currentEmail && ownerEmail === currentEmail)) {
+      // Admin session OR Office submitted by SAME Google Email ID -> Allow View & Update
       toggleFormFieldsDisabled(false);
       populateFormWithData(existingData);
 
       if (alertBox && alertText) {
-        alertBox.style.background = '#f0fdf4';
-        alertBox.style.borderColor = '#a7f3d0';
-        alertBox.style.color = '#064e3b';
-        alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#047857; font-size:1.1rem;"></i> <span>Existing entry found for <strong>"${escapeHtml(officeName)}"</strong> submitted by your Google ID (${escapeHtml(currentEmail)}). Auto-filled below for view and update.</span></div>`;
+        if (isAdmin) {
+          alertBox.style.background = '#eff6ff';
+          alertBox.style.borderColor = '#bfdbfe';
+          alertBox.style.color = '#1e40af';
+          alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-user-shield" style="color:#1d4ed8; font-size:1.1rem;"></i> <span><strong>Admin Direct Entry Mode:</strong> Viewing and editing saved data for <strong>"${escapeHtml(officeName)}"</strong> (Submitted by ${escapeHtml(ownerEmail || 'Officer')}).</span></div>`;
+        } else {
+          alertBox.style.background = '#f0fdf4';
+          alertBox.style.borderColor = '#a7f3d0';
+          alertBox.style.color = '#064e3b';
+          alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#047857; font-size:1.1rem;"></i> <span>Existing entry found for <strong>"${escapeHtml(officeName)}"</strong> submitted by your Google ID (${escapeHtml(currentEmail)}). Auto-filled below for view and update.</span></div>`;
+        }
         alertBox.style.display = 'flex';
       }
       showToast(`Loaded saved entry for ${officeName}`, 'info');
     } else {
-      // Office submitted by DIFFERENT Google Email ID -> Block form, DO NOT show data in entry fields, and show security message
+      // Office submitted by DIFFERENT Google Email ID (Non-Admin) -> Block form, DO NOT show data in entry fields, and show security message
       resetPublicFormFieldsOnly();
       toggleFormFieldsDisabled(true);
 
@@ -2672,6 +2680,10 @@ function switchAdminSubView(view) {
   if (view === 'entry') {
     const formSec = document.getElementById('publicEntrySection');
     document.getElementById('adminFormContainer').appendChild(formSec);
+    const selOffice = document.getElementById('officeSelect')?.value;
+    if (selOffice) {
+      handleOfficeSelectChange(selOffice);
+    }
   } else {
     const formSec = document.getElementById('publicEntrySection');
     const pubCont = document.getElementById('publicContainer');
