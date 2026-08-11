@@ -3024,10 +3024,10 @@ function printComprehensiveAdminReport() {
         <div>
           <strong>Report Verification Statement:</strong><br>
           Certified that the above comprehensive IT equipment inventory, network infrastructure, and power/battery status data<br>
-          has been compiled from official office submissions verified via Google OAuth 2.0 authentication.
+          has been compiled from official office submissions.
         </div>
         <div class="signature-box">
-          <strong>Nodal Officer / Transport Commissionerate</strong><br>
+          <strong>Data AI Foundry - IT Wing MVD</strong><br>
           <small>Signature & Official Seal</small>
         </div>
       </div>
