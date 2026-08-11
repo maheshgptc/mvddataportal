@@ -3023,8 +3023,7 @@ function printComprehensiveAdminReport() {
       <div class="footer-cert">
         <div>
           <strong>Report Verification Statement:</strong><br>
-          Certified that the above comprehensive IT equipment inventory, network infrastructure, and power/battery status data<br>
-          has been compiled from official office submissions.
+          Certified that the above comprehensive IT equipment inventory, network infrastructure, and power/battery status data has been compiled from official office submissions.
         </div>
         <div class="signature-box">
           <strong>Data AI Foundry - IT Wing MVD</strong><br>
