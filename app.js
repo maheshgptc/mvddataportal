@@ -2084,6 +2084,7 @@ function renderAdminDashboard() {
 
   let chartDashboardUpsCondInstance = null;
   let chartDashboardUpsCapInstance = null;
+  let chartDashboardBatteryCompInstance = null;
 
   const upsConditionCounts = { 'Good': 0, 'Working with Minor Issues': 0, 'Requires Repair': 0, 'Not Working': 0 };
   const upsCapacityCounts = { '0.5 kVA': 0, '1 kVA': 0, '2 kVA': 0, '3 kVA': 0, '5 kVA': 0, '10 kVA': 0, 'Other': 0 };
@@ -2215,24 +2216,34 @@ function renderAdminDashboard() {
   const topBatteryOffices = [...entries]
     .filter(e => (e.batteriesInUse || 0) > 0 || (e.minBatteriesRequired || 0) > 0)
     .sort((a, b) => ((b.batteriesInUse || 0) + (b.minBatteriesRequired || 0)) - ((a.batteriesInUse || 0) + (a.minBatteriesRequired || 0)))
-    .slice(0, 10);
+    .slice(0, 12);
 
-  const batteryOfficeLabels = filterVal !== 'ALL'
-    ? [filterVal]
-    : (topBatteryOffices.length > 0 ? topBatteryOffices.map(e => e.officeName.replace(/^(KL\d+|KLE\d+|DTC\s+\w+\s+\w+)\s*,?\s*/i, '')) : ['Statewide Total']);
+  let batteryOfficeLabels = [];
+  let batteriesInUseData = [];
+  let batteriesMinData = [];
 
-  const batteriesInUseData = filterVal !== 'ALL'
-    ? [entries[0]?.batteriesInUse || 0]
-    : (topBatteryOffices.length > 0 ? topBatteryOffices.map(e => e.batteriesInUse || 0) : [totalBatteriesInUse]);
-
-  const batteriesMinData = filterVal !== 'ALL'
-    ? [entries[0]?.minBatteriesRequired || 0]
-    : (topBatteryOffices.length > 0 ? topBatteryOffices.map(e => e.minBatteriesRequired || 0) : [totalMinBatteries]);
+  if (filterVal !== 'ALL') {
+    const item = inventoryStore[filterVal] || entries[0];
+    batteryOfficeLabels = [filterVal];
+    batteriesInUseData = [item ? (item.batteriesInUse || 0) : 0];
+    batteriesMinData = [item ? (item.minBatteriesRequired || 0) : 0];
+  } else if (topBatteryOffices.length > 0) {
+    batteryOfficeLabels = topBatteryOffices.map(e => e.officeName.replace(/^(KL\d+|KLE\d+|DTC\s+\w+\s+\w+)\s*,?\s*/i, ''));
+    batteriesInUseData = topBatteryOffices.map(e => e.batteriesInUse || 0);
+    batteriesMinData = topBatteryOffices.map(e => e.minBatteriesRequired || 0);
+  } else {
+    batteryOfficeLabels = ['Statewide Aggregate'];
+    batteriesInUseData = [totalBatteriesInUse];
+    batteriesMinData = [totalMinBatteries];
+  }
 
   // Chart 5: Batteries Currently In Use vs. Minimum Batteries Required Visual Chart
   const ctxDashBatComp = document.getElementById('chartDashboardBatteryComparison')?.getContext('2d');
   if (ctxDashBatComp) {
-    if (chartDashboardBatteryCompInstance) chartDashboardBatteryCompInstance.destroy();
+    if (chartDashboardBatteryCompInstance) {
+      chartDashboardBatteryCompInstance.destroy();
+      chartDashboardBatteryCompInstance = null;
+    }
     chartDashboardBatteryCompInstance = new Chart(ctxDashBatComp, {
       type: 'bar',
       data: {
@@ -2255,34 +2266,13 @@ function renderAdminDashboard() {
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        plugins: { legend: { position: 'top' } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-      }
-    });
-  }
-
-  // Chart 6: Battery Make & Brand Distribution Chart
-  const ctxDashBatMakes = document.getElementById('chartDashboardBatteryMakes')?.getContext('2d');
-  if (ctxDashBatMakes) {
-    if (chartDashboardBatteryMakesInstance) chartDashboardBatteryMakesInstance.destroy();
-    const makeLabels = Object.keys(batteryMakeCounts).length > 0 ? Object.keys(batteryMakeCounts).slice(0, 6) : ['EXIDE', 'AMARON', 'QUANTA', 'OTHERS'];
-    const makeData = Object.keys(batteryMakeCounts).length > 0 ? Object.values(batteryMakeCounts).slice(0, 6) : [45, 25, 15, 5];
-
-    chartDashboardBatteryMakesInstance = new Chart(ctxDashBatMakes, {
-      type: 'doughnut',
-      data: {
-        labels: makeLabels,
-        datasets: [{
-          data: makeData,
-          backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'],
-          borderWidth: 2,
-          borderColor: '#ffffff'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } }
+        plugins: {
+          legend: { position: 'top' },
+          tooltip: { mode: 'index', intersect: false }
+        },
+        scales: {
+          y: { beginAtZero: true, ticks: { precision: 0 } }
+        }
       }
     });
   }
