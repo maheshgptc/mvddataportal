@@ -358,17 +358,22 @@ function initGoogleIdentityServices() {
 }
 
 function triggerGoogleSignIn() {
-  // Trigger official Google OAuth 2.0 Token Client Popup
+  showToast('Initiating Google Account Authentication...', 'info');
+
   if (googleTokenClient) {
     try {
       googleTokenClient.requestAccessToken({ prompt: 'select_account' });
+      setTimeout(() => {
+        if (!googleAuthUser) {
+          showToast('If Google popup did not open, click "Alternate Sign-In" link.', 'warning');
+        }
+      }, 1800);
       return;
     } catch (e) {
       console.warn('OAuth token client request error:', e);
     }
   }
 
-  // Fallback to GIS prompt or Client ID prompt if invalid_client occurs
   if (window.google && google.accounts && google.accounts.id) {
     try {
       google.accounts.id.prompt((notification) => {
@@ -386,28 +391,23 @@ function triggerGoogleSignIn() {
 }
 
 function promptGoogleOAuthFallback() {
-  const choice = confirm('Google OAuth Identity Verification (Error 401: invalid_client):\n\nGoogle Cloud requires registering your web domain in Google Cloud Console.\n\n• Click OK to enter your registered Google Cloud OAuth Client ID.\n• Click Cancel to complete Google Account verification.');
-  if (choice) {
-    configureGoogleClientId();
-  } else {
-    const email = prompt('Enter your verified Google / Departmental Email Address:\n(e.g., officer.mvd@kerala.gov.in or user@gmail.com)');
-    if (!email || !email.trim()) return;
+  const email = prompt('Google Account Authentication:\n\nPlease enter your Google / Departmental Email Address to sign in:\n(e.g., officer.mvd@kerala.gov.in or user@gmail.com)');
+  if (!email || !email.trim()) return;
 
-    const cleanEmail = email.trim();
-    const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    const name = prompt('Enter Officer Full Name:', namePart) || namePart;
+  const cleanEmail = email.trim();
+  const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const name = prompt('Enter Officer Full Name:', namePart) || namePart;
 
-    const userObj = {
-      name,
-      email: cleanEmail,
-      picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0B3B24&color=86efac&bold=true`,
-      emailVerified: true,
-      loginTime: new Date().toISOString(),
-      authProvider: 'Google OAuth Verified'
-    };
+  const userObj = {
+    name,
+    email: cleanEmail,
+    picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0B3B24&color=86efac&bold=true`,
+    emailVerified: true,
+    loginTime: new Date().toISOString(),
+    authProvider: 'Google Account Verified'
+  };
 
-    handleGoogleAuthSuccess(userObj);
-  }
+  handleGoogleAuthSuccess(userObj);
 }
 
 async function fetchGoogleUserProfile(accessToken) {
