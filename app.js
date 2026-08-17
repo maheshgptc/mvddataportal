@@ -1951,6 +1951,10 @@ function populateDashboardOfficeFilter() {
   });
 }
 
+let chartHealthInstance = null;
+let chartAgeInstance = null;
+let chartUpsBatteryInstance = null;
+
 function renderAdminDashboard() {
   populateDashboardOfficeFilter();
 
@@ -2099,6 +2103,28 @@ function renderAdminDashboard() {
         maintainAspectRatio: false,
         plugins: { legend: { display: false } },
         scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  const ctxUps = document.getElementById('chartUpsBatteryStatus')?.getContext('2d');
+  if (ctxUps) {
+    if (chartUpsBatteryInstance) chartUpsBatteryInstance.destroy();
+    chartUpsBatteryInstance = new Chart(ctxUps, {
+      type: 'doughnut',
+      data: {
+        labels: ['Working UPS', 'Defective UPS', 'Batteries In Use', 'Min Batteries Req'],
+        datasets: [{
+          data: [upsWorkingCount || 0, upsNotWorkingCount || 0, totalBatteriesInUse || 0, totalMinBatteries || 0],
+          backgroundColor: ['#10b981', '#ef4444', '#3b82f6', '#f59e0b'],
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
       }
     });
   }
@@ -2532,20 +2558,6 @@ function renderAdminDataTable() {
         <td>
           <strong style="color: var(--primary-900); font-size: 0.92rem;">${escapeHtml(item.officeName)}</strong>
         </td>
-        <td>
-          <div style="font-size: 0.84rem; line-height: 1.45;">
-            <strong>${escapeHtml(createdName)}</strong> <small style="color: var(--text-muted);">(${escapeHtml(createdDesig)})</small><br>
-            <span style="color: #0369a1; font-weight: 600; font-size: 0.78rem;"><i class="fa-solid fa-envelope"></i> ${escapeHtml(createdEmail)}</span><br>
-            <small style="color: #64748b;"><i class="fa-regular fa-calendar-check"></i> ${escapeHtml(createdTime)}</small>
-          </div>
-        </td>
-        <td>
-          <div style="font-size: 0.84rem; line-height: 1.45;">
-            <strong>${escapeHtml(updatedName)}</strong> <small style="color: var(--text-muted);">(${escapeHtml(updatedDesig)})</small><br>
-            <span style="color: #047857; font-weight: 600; font-size: 0.78rem;"><i class="fa-solid fa-envelope"></i> ${escapeHtml(updatedEmail)}</span><br>
-            <small style="color: #047857;"><i class="fa-regular fa-clock"></i> ${escapeHtml(updatedTime)}</small>
-          </div>
-        </td>
         <td><span class="badge badge-info">${escapeHtml(netLabel)}</span><br><small>${escapeHtml(item.networkSpeed || '')}</small></td>
         <td>
           <span class="badge ${item.switchesAvailable === 'Yes' ? 'badge-working' : (item.switchesAvailable === 'No' ? 'badge-danger' : 'badge-info')}">${escapeHtml(item.switchesAvailable || 'Not Sure')}</span>
@@ -2930,9 +2942,11 @@ function openComprehensiveReportModal() {
   // Extract Chart Base64 Images if available
   let healthChartImg = '';
   let ageChartImg = '';
+  let upsChartImg = '';
   try {
     if (typeof chartHealthInstance !== 'undefined' && chartHealthInstance) healthChartImg = chartHealthInstance.toBase64Image();
     if (typeof chartAgeInstance !== 'undefined' && chartAgeInstance) ageChartImg = chartAgeInstance.toBase64Image();
+    if (typeof chartUpsBatteryInstance !== 'undefined' && chartUpsBatteryInstance) upsChartImg = chartUpsBatteryInstance.toBase64Image();
   } catch (err) {
     console.warn('Chart image capture notice:', err);
   }
@@ -2991,10 +3005,10 @@ function openComprehensiveReportModal() {
     </div>
 
     <!-- EMBEDDED DASHBOARD VISUAL CHARTS -->
-    ${(healthChartImg || ageChartImg) ? `
+    ${(healthChartImg || ageChartImg || upsChartImg) ? `
     <div class="report-card-section" style="margin-bottom: 24px;">
       <h3 style="font-size: 1rem; color: #0B3B24; margin-bottom: 12px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;"><i class="fa-solid fa-chart-pie"></i> Visual Dashboard Analytics</h3>
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 16px; align-items: center;">
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 16px; align-items: center;">
         ${healthChartImg ? `
         <div style="border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; text-align: center; background: #ffffff;">
           <div style="font-weight: 700; font-size: 0.85rem; color: #1e293b; margin-bottom: 8px;">Hardware Health Distribution</div>
@@ -3004,6 +3018,11 @@ function openComprehensiveReportModal() {
         <div style="border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; text-align: center; background: #ffffff;">
           <div style="font-weight: 700; font-size: 0.85rem; color: #1e293b; margin-bottom: 8px;">System Age Profile Breakdown</div>
           <img src="${ageChartImg}" style="max-height: 200px; width: auto; object-fit: contain; margin: 0 auto;">
+        </div>` : ''}
+        ${upsChartImg ? `
+        <div style="border: 1px solid #e2e8f0; padding: 12px; border-radius: 8px; text-align: center; background: #ffffff;">
+          <div style="font-weight: 700; font-size: 0.85rem; color: #1e293b; margin-bottom: 8px;">UPS & Battery Infrastructure Status</div>
+          <img src="${upsChartImg}" style="max-height: 200px; width: auto; object-fit: contain; margin: 0 auto;">
         </div>` : ''}
       </div>
     </div>` : ''}
@@ -3163,37 +3182,6 @@ function openComprehensiveReportModal() {
               </tr>
             `;
           }).join('')}
-        </tbody>
-      </table>
-    </div>
-
-    <!-- SECTION F: AUDIT TRAIL & OFFICER SUBMISSION DETAILS TABLE -->
-    <div class="report-card-section" style="margin-bottom: 24px;">
-      <h3 style="font-size: 0.98rem; color: #0B3B24; margin-bottom: 10px; border-bottom: 2px solid #e2e8f0; padding-bottom: 6px;"><i class="fa-solid fa-user-shield"></i> Section F: Office Submission Audit Trail & Officer Details</h3>
-      <table class="data-table">
-        <thead>
-          <tr>
-            <th>Office Name</th>
-            <th>Entered / Submitting Officer</th>
-            <th>Submitter Gmail Account ID</th>
-            <th>First Submitted Date</th>
-            <th>Last Updated Officer</th>
-            <th>Updated Officer Email ID</th>
-            <th>Last Updated Timestamp</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${entries.map(e => `
-            <tr>
-              <td><strong>${escapeHtml(e.officeName)}</strong></td>
-              <td>${escapeHtml(e.createdOfficerName || e.entryOfficerName || 'N/A')} (${escapeHtml(e.createdOfficerDesignation || 'Officer')})</td>
-              <td><small>${escapeHtml(e.createdOfficerEmail || e.submittedByEmail || 'N/A')}</small></td>
-              <td><small>${escapeHtml(e.createdDate || e.lastUpdated || 'N/A')}</small></td>
-              <td>${escapeHtml(e.updatedOfficerName || e.entryOfficerName || 'N/A')} (${escapeHtml(e.updatedOfficerDesignation || 'Officer')})</td>
-              <td><small>${escapeHtml(e.updatedOfficerEmail || e.submittedByEmail || 'N/A')}</small></td>
-              <td><small>${escapeHtml(e.lastUpdated || 'N/A')}</small></td>
-            </tr>
-          `).join('')}
         </tbody>
       </table>
     </div>
