@@ -844,6 +844,31 @@
               </div>
             </div>
 
+            <!-- Charts Row 3: Visual Representation for Comparing Batteries Currently Using vs. Required -->
+            <div class="charts-grid-2" style="margin-top: 20px;">
+              <!-- Chart 5: Batteries Currently In Use vs. Minimum Batteries Required Comparison -->
+              <div class="chart-card" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Power & Battery Audit Drill-Down">
+                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-battery-three-quarters" style="color: #059669;"></i> Visual Comparison: Batteries Currently Using vs. Required</h3>
+                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chartDashboardBatteryComparison"></canvas>
+                </div>
+              </div>
+
+              <!-- Chart 6: Battery Make & Manufacturer Distribution -->
+              <div class="chart-card" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Power & Battery Audit Drill-Down">
+                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-layer-group" style="color: #6366f1;"></i> Battery Make & Manufacturer Distribution</h3>
+                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chartDashboardBatteryMakes"></canvas>
+                </div>
+              </div>
+            </div>
+
             <!-- Network Provider Breakdown Card -->
             <div class="card-section">
               <div class="section-header">
@@ -854,14 +879,25 @@
               </div>
             </div>
 
-            <!-- Power & Battery Infrastructure Breakdown Card -->
+            <!-- Power Infrastructure Breakdown Card -->
             <div class="card-section" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Power & Battery Audit Drill-Down">
               <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 class="section-title"><i class="fa-solid fa-car-battery"></i> Power & Battery Infrastructure Distribution across MVD Offices</h3>
+                <h3 class="section-title"><i class="fa-solid fa-bolt"></i> Power & UPS Infrastructure Status across MVD Offices</h3>
                 <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
               </div>
               <div id="powerStatsGrid" class="form-grid-4">
-                <!-- Dynamic power & battery pills -->
+                <!-- Dynamic power pills -->
+              </div>
+            </div>
+
+            <!-- Dedicated Battery Infrastructure Audit & Capacity Title Card -->
+            <div class="card-section" onclick="drillDownDashboard('power')" style="cursor: pointer; background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%); border-left: 6px solid #10b981;" title="Click for Power & Battery Audit Drill-Down">
+              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
+                <h3 class="section-title"><i class="fa-solid fa-car-battery" style="color: #059669;"></i> Battery Infrastructure Audit & Provisioning Title Card</h3>
+                <span style="font-size: 0.78rem; color: #047857; font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+              </div>
+              <div id="batteryDetailsGrid" class="form-grid-4">
+                <!-- Dynamic battery details pills -->
               </div>
             </div>
           </div>

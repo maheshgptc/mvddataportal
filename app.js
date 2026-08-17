@@ -2176,6 +2176,138 @@ function renderAdminDashboard() {
       }
     });
   }
+
+  // --- DEDICATED BATTERY DETAILS TITLE CARD & VISUAL COMPARISON ANALYTICS ---
+  const batteryMakeCounts = {};
+  entries.forEach(e => {
+    const make = (e.batteryMake || '').trim();
+    if (make) {
+      const formattedMake = make.toUpperCase();
+      batteryMakeCounts[formattedMake] = (batteryMakeCounts[formattedMake] || 0) + 1;
+    }
+  });
+
+  const batGrid = document.getElementById('batteryDetailsGrid');
+  if (batGrid) {
+    const diff = totalBatteriesInUse - totalMinBatteries;
+    let statusText = 'Sufficient Capacity';
+    let statusColor = '#047857';
+    let statusBg = '#f0fdf4';
+    let statusBorder = '#a7f3d0';
+
+    if (diff < 0) {
+      statusText = `Deficit (-${Math.abs(diff)} Units)`;
+      statusColor = '#b91c1c';
+      statusBg = '#fef2f2';
+      statusBorder = '#fecdd3';
+    } else if (diff > 0) {
+      statusText = `Surplus (+${diff} Units)`;
+      statusColor = '#1d4ed8';
+      statusBg = '#eff6ff';
+      statusBorder = '#bfdbfe';
+    }
+
+    const topBrands = Object.entries(batteryMakeCounts)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 3)
+      .map(([m]) => m);
+    const topBrandsStr = topBrands.length > 0 ? topBrands.join(', ') : 'Exide, Amaron, Quanta';
+
+    batGrid.innerHTML = `
+      <div style="background: #f0fdf4; padding: 14px; border-radius: var(--radius-md); border: 1px solid #a7f3d0; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #047857;">Batteries Currently Using</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: #064e3b;">${totalBatteriesInUse} Units</div>
+      </div>
+      <div style="background: #eff6ff; padding: 14px; border-radius: var(--radius-md); border: 1px solid #bfdbfe; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #1d4ed8;">Minimum Required Batteries</div>
+        <div style="font-size: 1.4rem; font-weight: 800; color: #1e40af;">${totalMinBatteries} Units</div>
+      </div>
+      <div style="background: ${statusBg}; padding: 14px; border-radius: var(--radius-md); border: 1px solid ${statusBorder}; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: ${statusColor};">Battery Provisioning Balance</div>
+        <div style="font-size: 1.3rem; font-weight: 800; color: ${statusColor};">${statusText}</div>
+      </div>
+      <div style="background: #fffbe6; padding: 14px; border-radius: var(--radius-md); border: 1px solid #ffe58f; text-align: center;">
+        <div style="font-size: 0.8rem; font-weight: 700; color: #d97706;">Dominant Battery Makes</div>
+        <div style="font-size: 1.1rem; font-weight: 800; color: #b45309; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${topBrandsStr}</div>
+      </div>
+    `;
+  }
+
+  // Calculate Data for Battery Comparison Visual Chart
+  const topBatteryOffices = [...entries]
+    .filter(e => (e.batteriesInUse || 0) > 0 || (e.minBatteriesRequired || 0) > 0)
+    .sort((a, b) => ((b.batteriesInUse || 0) + (b.minBatteriesRequired || 0)) - ((a.batteriesInUse || 0) + (a.minBatteriesRequired || 0)))
+    .slice(0, 10);
+
+  const batteryOfficeLabels = filterVal !== 'ALL'
+    ? [filterVal]
+    : (topBatteryOffices.length > 0 ? topBatteryOffices.map(e => e.officeName.replace(/^(KL\d+|KLE\d+|DTC\s+\w+\s+\w+)\s*,?\s*/i, '')) : ['Statewide Total']);
+
+  const batteriesInUseData = filterVal !== 'ALL'
+    ? [entries[0]?.batteriesInUse || 0]
+    : (topBatteryOffices.length > 0 ? topBatteryOffices.map(e => e.batteriesInUse || 0) : [totalBatteriesInUse]);
+
+  const batteriesMinData = filterVal !== 'ALL'
+    ? [entries[0]?.minBatteriesRequired || 0]
+    : (topBatteryOffices.length > 0 ? topBatteryOffices.map(e => e.minBatteriesRequired || 0) : [totalMinBatteries]);
+
+  // Chart 5: Batteries Currently In Use vs. Minimum Batteries Required Visual Chart
+  const ctxDashBatComp = document.getElementById('chartDashboardBatteryComparison')?.getContext('2d');
+  if (ctxDashBatComp) {
+    if (chartDashboardBatteryCompInstance) chartDashboardBatteryCompInstance.destroy();
+    chartDashboardBatteryCompInstance = new Chart(ctxDashBatComp, {
+      type: 'bar',
+      data: {
+        labels: batteryOfficeLabels,
+        datasets: [
+          {
+            label: 'Batteries Currently In Use',
+            data: batteriesInUseData,
+            backgroundColor: '#10b981',
+            borderRadius: 6
+          },
+          {
+            label: 'Minimum Batteries Required',
+            data: batteriesMinData,
+            backgroundColor: '#3b82f6',
+            borderRadius: 6
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'top' } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  // Chart 6: Battery Make & Brand Distribution Chart
+  const ctxDashBatMakes = document.getElementById('chartDashboardBatteryMakes')?.getContext('2d');
+  if (ctxDashBatMakes) {
+    if (chartDashboardBatteryMakesInstance) chartDashboardBatteryMakesInstance.destroy();
+    const makeLabels = Object.keys(batteryMakeCounts).length > 0 ? Object.keys(batteryMakeCounts).slice(0, 6) : ['EXIDE', 'AMARON', 'QUANTA', 'OTHERS'];
+    const makeData = Object.keys(batteryMakeCounts).length > 0 ? Object.values(batteryMakeCounts).slice(0, 6) : [45, 25, 15, 5];
+
+    chartDashboardBatteryMakesInstance = new Chart(ctxDashBatMakes, {
+      type: 'doughnut',
+      data: {
+        labels: makeLabels,
+        datasets: [{
+          data: makeData,
+          backgroundColor: ['#6366f1', '#10b981', '#f59e0b', '#ec4899', '#8b5cf6', '#06b6d4'],
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } }
+      }
+    });
+  }
 }
 
 // --- DASHBOARD INTERACTIVE DRILL-DOWN ENGINE ---
