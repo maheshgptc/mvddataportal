@@ -299,6 +299,9 @@ function configureGoogleClientId() {
 }
 
 function initGoogleIdentityServices() {
+  const customBtn = document.getElementById('googleCustomSigninBtn');
+  if (customBtn) customBtn.style.display = 'flex';
+
   if (window.google && google.accounts) {
     try {
       // 1. Initialize GIS ID Client with configured Client ID
@@ -310,7 +313,6 @@ function initGoogleIdentityServices() {
 
       // Render official authentic Google Sign-In button
       const btnDiv = document.getElementById('googleSignInButtonDiv');
-      const customBtn = document.getElementById('googleCustomSigninBtn');
       if (btnDiv) {
         btnDiv.innerHTML = ''; // Clear previous button rendering
         google.accounts.id.renderButton(btnDiv, {
@@ -322,9 +324,11 @@ function initGoogleIdentityServices() {
           logo_alignment: 'left',
           width: 320
         });
-        if (customBtn) customBtn.style.display = 'none';
-      } else if (customBtn) {
-        customBtn.style.display = 'flex';
+        setTimeout(() => {
+          if (btnDiv.children.length > 0 && customBtn) {
+            customBtn.style.display = 'none';
+          }
+        }, 400);
       }
 
       // 2. Initialize OAuth 2.0 Token Client for OAuth Popup
