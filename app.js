@@ -2189,24 +2189,6 @@ function renderAdminDashboard() {
 
   const batGrid = document.getElementById('batteryDetailsGrid');
   if (batGrid) {
-    const diff = totalBatteriesInUse - totalMinBatteries;
-    let statusText = 'Sufficient Capacity';
-    let statusColor = '#047857';
-    let statusBg = '#f0fdf4';
-    let statusBorder = '#a7f3d0';
-
-    if (diff < 0) {
-      statusText = `Deficit (-${Math.abs(diff)} Units)`;
-      statusColor = '#b91c1c';
-      statusBg = '#fef2f2';
-      statusBorder = '#fecdd3';
-    } else if (diff > 0) {
-      statusText = `Surplus (+${diff} Units)`;
-      statusColor = '#1d4ed8';
-      statusBg = '#eff6ff';
-      statusBorder = '#bfdbfe';
-    }
-
     const topBrands = Object.entries(batteryMakeCounts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
@@ -2221,10 +2203,6 @@ function renderAdminDashboard() {
       <div style="background: #eff6ff; padding: 14px; border-radius: var(--radius-md); border: 1px solid #bfdbfe; text-align: center;">
         <div style="font-size: 0.8rem; font-weight: 700; color: #1d4ed8;">Minimum Required Batteries</div>
         <div style="font-size: 1.4rem; font-weight: 800; color: #1e40af;">${totalMinBatteries} Units</div>
-      </div>
-      <div style="background: ${statusBg}; padding: 14px; border-radius: var(--radius-md); border: 1px solid ${statusBorder}; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: ${statusColor};">Battery Provisioning Balance</div>
-        <div style="font-size: 1.3rem; font-weight: 800; color: ${statusColor};">${statusText}</div>
       </div>
       <div style="background: #fffbe6; padding: 14px; border-radius: var(--radius-md); border: 1px solid #ffe58f; text-align: center;">
         <div style="font-size: 0.8rem; font-weight: 700; color: #d97706;">Dominant Battery Makes</div>
