@@ -1125,89 +1125,69 @@ input:checked + .slider:before {
   }
 }
 
-/* --- COMPREHENSIVE REPORT PRINT MEDIA STYLES --- */
+/* Print Media Styles for Comprehensive Report */
 @media print {
   body {
     background: #ffffff !important;
     color: #000000 !important;
-    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
-    margin: 0 !important;
-    padding: 0 !important;
+    font-size: 11pt !important;
   }
-
-  /* Hide web interface elements during print */
-  .portal-sidebar,
-  .top-gov-bar,
-  #publicContainer,
-  #adminDashboardSubView,
-  #adminEntrySubView,
-  #adminViewSubView,
-  #adminMenusSubView,
-  .toast-container,
-  .modal-overlay:not(#comprehensiveReportModal),
-  #comprehensiveReportModal .modal-header,
-  #comprehensiveReportModal .modal-card > div:nth-child(2),
-  #comprehensiveReportModal .modal-card > div:last-child {
+  body * {
+    visibility: hidden;
+  }
+  .print-hide, .portal-sidebar, .top-gov-bar, .modal-header.print-hide, .btn, nav, header {
     display: none !important;
   }
-
-  /* Expand Report Modal to full width for printer canvas */
+  #comprehensiveReportModal, #comprehensiveReportModal * {
+    visibility: visible;
+  }
   #comprehensiveReportModal {
     position: absolute !important;
-    top: 0 !important;
     left: 0 !important;
-    display: block !important;
-    background: #ffffff !important;
-    padding: 0 !important;
-    margin: 0 !important;
+    top: 0 !important;
     width: 100% !important;
-    height: auto !important;
-    overflow: visible !important;
-    z-index: 999999 !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    display: block !important;
+    box-shadow: none !important;
   }
-
-  #comprehensiveReportModal .modal-card {
+  .printable-report-card {
     max-width: 100% !important;
     width: 100% !important;
-    box-shadow: none !important;
     border: none !important;
+    box-shadow: none !important;
     padding: 0 !important;
     margin: 0 !important;
-    max-height: none !important;
   }
-
-  #comprehensiveReportBody {
-    border: none !important;
-    padding: 0 !important;
-    overflow: visible !important;
+  .printable-report-area {
+    padding: 10px !important;
   }
-
-  .report-card-section {
-    page-break-inside: avoid !important;
-    break-inside: avoid !important;
-    margin-bottom: 20px !important;
-    border: 1px solid #cbd5e1 !important;
-  }
-
-  .report-page-break {
-    page-break-before: always !important;
-    break-before: page !important;
-  }
-
-  table.data-table {
+  .data-table {
     width: 100% !important;
     border-collapse: collapse !important;
-    font-size: 10px !important;
+    page-break-inside: auto !important;
   }
-
-  table.data-table th, table.data-table td {
-    border: 1px solid #94a3b8 !important;
-    padding: 5px 6px !important;
-    color: #000000 !important;
+  .data-table th, .data-table td {
+    border: 1px solid #cbd5e1 !important;
+    padding: 6px 8px !important;
+    font-size: 9pt !important;
   }
-
-  table.data-table th {
-    background: #e2e8f0 !important;
-    font-weight: 700 !important;
+  .data-table tr {
+    page-break-inside: avoid !important;
+    page-break-after: auto !important;
+  }
+  .comp-chart-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 16px !important;
+    page-break-inside: avoid !important;
+  }
+  .comp-chart-box {
+    border: 1px solid #cbd5e1 !important;
+    padding: 10px !important;
+    border-radius: 6px !important;
+    page-break-inside: avoid !important;
   }
 }
