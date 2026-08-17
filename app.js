@@ -2007,6 +2007,14 @@ function renderAdminDashboard() {
   let totalBatteriesInUse = 0;
   let totalMinBatteries = 0;
 
+  let totalMonitorsW = 0, totalMonitorsNW = 0;
+  let totalCpuW = 0, totalCpuNW = 0;
+  let totalLaptopsW = 0, totalLaptopsNW = 0;
+  let totalAioW = 0, totalAioNW = 0;
+  let totalPrintersW = 0, totalPrintersNW = 0;
+
+  const capacityCounts = { '1 kVA': 0, '2 kVA': 0, '3 kVA': 0, '5 kVA': 0, '10 kVA+': 0 };
+
   entries.forEach(e => {
     if (e.switchesAvailable === 'Yes') switchesCount++;
     if (e.serversAvailable === 'Yes') serversCount++;
@@ -2015,6 +2023,25 @@ function renderAdminDashboard() {
     if (e.serviceReportSent === 'Yes') serviceReportsSentCount++;
     totalBatteriesInUse += (e.batteriesInUse || 0);
     totalMinBatteries += (e.minBatteriesRequired || 0);
+
+    totalMonitorsW += (e.monitorsWorking || 0);
+    totalMonitorsNW += (e.monitorsNotWorking || 0);
+    totalCpuW += (e.cpuWorking || 0);
+    totalCpuNW += (e.cpuNotWorking || 0);
+    totalLaptopsW += (e.laptopsWorking || 0);
+    totalLaptopsNW += (e.laptopsNotWorking || 0);
+    totalAioW += (e.aioWorking || 0);
+    totalAioNW += (e.aioNotWorking || 0);
+
+    const p = e.printers || {};
+    totalPrintersW += (p.dotMatrix?.working || 0) + (p.inkjet?.working || 0) + (p.laser?.working || 0) + (p.xerox?.working || 0) + (p.others?.working || 0);
+    totalPrintersNW += (p.dotMatrix?.notWorking || 0) + (p.inkjet?.notWorking || 0) + (p.laser?.notWorking || 0) + (p.xerox?.notWorking || 0) + (p.others?.notWorking || 0);
+
+    const cap = e.upsCapacity;
+    if (cap === '1 kVA') capacityCounts['1 kVA']++;
+    else if (cap === '2 kVA' || cap === '3 kVA') capacityCounts['2 kVA']++;
+    else if (cap === '5 kVA') capacityCounts['5 kVA']++;
+    else if (cap === '10 kVA') capacityCounts['10 kVA+']++;
   });
 
   if (document.getElementById('kpiOfficesReported')) document.getElementById('kpiOfficesReported').textContent = filterVal === 'ALL' ? `${totalOffices} / ${MVD_OFFICES.length}` : (totalOffices > 0 ? 'Reported ✓' : 'Pending');
@@ -2058,6 +2085,32 @@ function renderAdminDashboard() {
     `;
   }
 
+  // 1. STACKED COLUMN CHART: Working vs. Defective Systems
+  const ctxStacked = document.getElementById('chartStackedSystems')?.getContext('2d');
+  if (ctxStacked) {
+    if (chartStackedInstance) chartStackedInstance.destroy();
+    chartStackedInstance = new Chart(ctxStacked, {
+      type: 'bar',
+      data: {
+        labels: ['Monitors', 'CPUs', 'Laptops', 'AIO PCs', 'Printers', 'UPS Units'],
+        datasets: [
+          { label: 'Working Units', data: [totalMonitorsW, totalCpuW, totalLaptopsW, totalAioW, totalPrintersW, totalUpsW], backgroundColor: '#10b981', borderRadius: 4 },
+          { label: 'Defective Units', data: [totalMonitorsNW, totalCpuNW, totalLaptopsNW, totalAioNW, totalPrintersNW, totalUpsNW], backgroundColor: '#ef4444', borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom' } },
+        scales: {
+          x: { stacked: true },
+          y: { stacked: true, beginAtZero: true, ticks: { precision: 0 } }
+        }
+      }
+    });
+  }
+
+  // 2. HARDWARE HEALTH OVERVIEW DOUGHNUT
   const ctxHealth = document.getElementById('chartHardwareHealth')?.getContext('2d');
   if (ctxHealth) {
     if (chartHealthInstance) chartHealthInstance.destroy();
@@ -2080,6 +2133,7 @@ function renderAdminDashboard() {
     });
   }
 
+  // 3. SYSTEM AGE DISTRIBUTION BAR CHART
   const ctxAge = document.getElementById('chartAgeDistribution')?.getContext('2d');
   if (ctxAge) {
     if (chartAgeInstance) chartAgeInstance.destroy();
@@ -2102,6 +2156,55 @@ function renderAdminDashboard() {
       }
     });
   }
+
+  // 4. UPS STATUS & CAPACITY DISTRIBUTION CHART
+  const ctxUps = document.getElementById('chartUpsDistribution')?.getContext('2d');
+  if (ctxUps) {
+    if (chartUpsInstance) chartUpsInstance.destroy();
+    chartUpsInstance = new Chart(ctxUps, {
+      type: 'bar',
+      data: {
+        labels: ['Working UPS', 'Defective UPS', '1 kVA', '2–3 kVA', '5 kVA', '10 kVA+'],
+        datasets: [{
+          label: 'UPS Units Count',
+          data: [upsWorkingCount, upsNotWorkingCount, capacityCounts['1 kVA'], capacityCounts['2 kVA'], capacityCounts['5 kVA'], capacityCounts['10 kVA+']],
+          backgroundColor: ['#10b981', '#ef4444', '#3b82f6', '#8b5cf6', '#f59e0b', '#06b6d4'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+
+  // 5. BATTERY INFRASTRUCTURE STATUS CHART
+  const ctxBattery = document.getElementById('chartBatteryStatus')?.getContext('2d');
+  if (ctxBattery) {
+    if (chartBatteryInstance) chartBatteryInstance.destroy();
+    chartBatteryInstance = new Chart(ctxBattery, {
+      type: 'bar',
+      data: {
+        labels: ['Batteries In Use', 'Min Required Batteries'],
+        datasets: [{
+          label: 'Battery Units Count',
+          data: [totalBatteriesInUse, totalMinBatteries],
+          backgroundColor: ['#0284c7', '#d97706'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+}
 }
 
 // --- DASHBOARD INTERACTIVE DRILL-DOWN ENGINE ---
@@ -2552,14 +2655,27 @@ function printComprehensiveAdminReport() {
   const totalWorkingHW = totalMonitorsW + totalCpuW + totalLaptopsW + totalAioW;
   const totalDefectiveHW = totalMonitorsNW + totalCpuNW + totalLaptopsNW + totalAioNW + totalUpsNW;
 
+  let stackedChartImg = '';
   let healthChartImg = '';
   let ageChartImg = '';
+  let upsChartImg = '';
+  let batteryChartImg = '';
+
   try {
+    if (chartStackedInstance && typeof chartStackedInstance.toBase64Image === 'function') {
+      stackedChartImg = chartStackedInstance.toBase64Image();
+    }
     if (chartHealthInstance && typeof chartHealthInstance.toBase64Image === 'function') {
       healthChartImg = chartHealthInstance.toBase64Image();
     }
     if (chartAgeInstance && typeof chartAgeInstance.toBase64Image === 'function') {
       ageChartImg = chartAgeInstance.toBase64Image();
+    }
+    if (chartUpsInstance && typeof chartUpsInstance.toBase64Image === 'function') {
+      upsChartImg = chartUpsInstance.toBase64Image();
+    }
+    if (chartBatteryInstance && typeof chartBatteryInstance.toBase64Image === 'function') {
+      batteryChartImg = chartBatteryInstance.toBase64Image();
     }
   } catch (err) {
     console.warn('Could not generate chart base64 image:', err);
@@ -2684,21 +2800,21 @@ function printComprehensiveAdminReport() {
 
         .charts-row {
           display: flex;
-          gap: 16px;
-          margin-bottom: 20px;
+          gap: 12px;
+          margin-bottom: 16px;
           page-break-inside: avoid;
         }
         .chart-card-box {
           flex: 1;
           border: 1px solid #cbd5e1;
           border-radius: 6px;
-          padding: 10px;
+          padding: 8px;
           text-align: center;
           background: #ffffff;
         }
         .chart-card-box img {
           max-width: 100%;
-          max-height: 200px;
+          max-height: 190px;
           object-fit: contain;
         }
 
@@ -2815,55 +2931,48 @@ function printComprehensiveAdminReport() {
       </div>
 
       <!-- CHARTS ANALYTICS -->
-      ${(healthChartImg || ageChartImg) ? `
-        <div class="section-title-banner"><i class="fa-solid fa-pie-chart"></i> 2. Executive Visual Analytics & Hardware Health Breakdown</div>
-        <div class="charts-row">
-          ${healthChartImg ? `
-            <div class="chart-card-box">
-              <strong style="font-size: 9.5pt; color: #0f172a;">Hardware Equipment Health (Working vs. Defective)</strong>
-              <br><img src="${healthChartImg}" alt="Hardware Health Chart">
-            </div>
-          ` : ''}
-          ${ageChartImg ? `
-            <div class="chart-card-box">
-              <strong style="font-size: 9.5pt; color: #0f172a;">System Age Distribution Across Offices</strong>
-              <br><img src="${ageChartImg}" alt="System Age Profile Chart">
-            </div>
-          ` : ''}
-        </div>
-      ` : ''}
+      <div class="section-title-banner"><i class="fa-solid fa-pie-chart"></i> 2. Executive Visual Analytics & Infrastructure Status Charts</div>
+      
+      <!-- Charts Row 1: Stacked Comparison & Health Doughnut -->
+      <div class="charts-row">
+        ${stackedChartImg ? `
+          <div class="chart-card-box">
+            <strong style="font-size: 9pt; color: #0f172a;">Working vs. Not Working Systems (Stacked Column)</strong>
+            <br><img src="${stackedChartImg}" alt="Stacked Systems Comparison Chart">
+          </div>
+        ` : ''}
+        ${healthChartImg ? `
+          <div class="chart-card-box">
+            <strong style="font-size: 9pt; color: #0f172a;">Hardware Equipment Health Overview</strong>
+            <br><img src="${healthChartImg}" alt="Hardware Health Chart">
+          </div>
+        ` : ''}
+      </div>
 
-      <!-- TABLE 1: OFFICE IDENTIFICATION & AUDIT TRAIL -->
-      <div class="section-title-banner"><i class="fa-solid fa-building-flag"></i> 3. Office Identification & Submitter Officer Audit Trail</div>
-      <table class="report-table">
-        <thead>
-          <tr>
-            <th>#</th>
-            <th>Office Name</th>
-            <th>Original Entry Officer</th>
-            <th>Submitter Google Account</th>
-            <th>Original Submission Date</th>
-            <th>Latest Updating Officer</th>
-            <th>Last Updated Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          ${entries.map((e, idx) => `
-            <tr>
-              <td>${idx + 1}</td>
-              <td><strong>${escapeHtml(e.officeName)}</strong></td>
-              <td>${escapeHtml(e.createdOfficerName || e.entryOfficerName || 'Officer')} (${escapeHtml(e.createdOfficerDesignation || e.entryOfficerDesignation || 'N/A')})</td>
-              <td>${escapeHtml(e.createdOfficerEmail || e.submittedByEmail || 'N/A')}</td>
-              <td>${escapeHtml(e.createdDate || e.lastUpdated || 'N/A')}</td>
-              <td>${escapeHtml(e.updatedOfficerName || e.entryOfficerName || 'Officer')} (${escapeHtml(e.updatedOfficerDesignation || e.entryOfficerDesignation || 'N/A')})</td>
-              <td>${escapeHtml(e.lastUpdated || 'N/A')}</td>
-            </tr>
-          `).join('')}
-        </tbody>
-      </table>
+      <!-- Charts Row 2: Age Profile, UPS Status & Battery Infrastructure -->
+      <div class="charts-row">
+        ${ageChartImg ? `
+          <div class="chart-card-box">
+            <strong style="font-size: 9pt; color: #0f172a;">System Age Profile Distribution Across Offices</strong>
+            <br><img src="${ageChartImg}" alt="System Age Profile Chart">
+          </div>
+        ` : ''}
+        ${upsChartImg ? `
+          <div class="chart-card-box">
+            <strong style="font-size: 9pt; color: #0f172a;">UPS Status & Capacity Breakdown</strong>
+            <br><img src="${upsChartImg}" alt="UPS Status Chart">
+          </div>
+        ` : ''}
+        ${batteryChartImg ? `
+          <div class="chart-card-box">
+            <strong style="font-size: 9pt; color: #0f172a;">Battery Infrastructure Audit</strong>
+            <br><img src="${batteryChartImg}" alt="Battery Status Chart">
+          </div>
+        ` : ''}
+      </div>
 
-      <!-- TABLE 2: CORE IT HARDWARE EQUIPMENT INVENTORY -->
-      <div class="section-title-banner"><i class="fa-solid fa-desktop"></i> 4. Core IT Hardware Equipment Inventory (Working vs. Defective)</div>
+      <!-- TABLE 1: CORE IT HARDWARE EQUIPMENT INVENTORY -->
+      <div class="section-title-banner"><i class="fa-solid fa-desktop"></i> 3. Core IT Hardware Equipment Inventory (Working vs. Defective)</div>
       <table class="report-table">
         <thead>
           <tr>
@@ -2897,8 +3006,8 @@ function printComprehensiveAdminReport() {
         </tbody>
       </table>
 
-      <!-- TABLE 3: NETWORK & SERVERS INFRASTRUCTURE -->
-      <div class="section-title-banner"><i class="fa-solid fa-network-wired"></i> 5. Network Infrastructure & Operating System Status</div>
+      <!-- TABLE 2: NETWORK & SERVERS INFRASTRUCTURE -->
+      <div class="section-title-banner"><i class="fa-solid fa-network-wired"></i> 4. Network Infrastructure & Operating System Status</div>
       <table class="report-table">
         <thead>
           <tr>
@@ -2930,8 +3039,8 @@ function printComprehensiveAdminReport() {
         </tbody>
       </table>
 
-      <!-- TABLE 4: POWER & BATTERY INFRASTRUCTURE AUDIT -->
-      <div class="section-title-banner"><i class="fa-solid fa-car-battery"></i> 6. Power & Battery Infrastructure Audit</div>
+      <!-- TABLE 3: POWER & BATTERY INFRASTRUCTURE AUDIT -->
+      <div class="section-title-banner"><i class="fa-solid fa-car-battery"></i> 5. Power & Battery Infrastructure Audit</div>
       <table class="report-table">
         <thead>
           <tr>
@@ -2965,8 +3074,8 @@ function printComprehensiveAdminReport() {
         </tbody>
       </table>
 
-      <!-- TABLE 5: SYSTEM AGE PROFILE & SPECIFIC REMARKS -->
-      <div class="section-title-banner"><i class="fa-solid fa-hourglass-half"></i> 7. System Age Distribution & Specific Condition Remarks</div>
+      <!-- TABLE 4: SYSTEM AGE PROFILE & SPECIFIC REMARKS -->
+      <div class="section-title-banner"><i class="fa-solid fa-hourglass-half"></i> 6. System Age Distribution & Specific Condition Remarks</div>
       <table class="report-table">
         <thead>
           <tr>
@@ -2994,9 +3103,9 @@ function printComprehensiveAdminReport() {
         </tbody>
       </table>
 
-      <!-- TABLE 6: PENDING OFFICE SUBMISSIONS -->
+      <!-- TABLE 5: PENDING OFFICE SUBMISSIONS -->
       ${pendingOffices.length > 0 ? `
-        <div class="section-title-banner" style="background: #991b1b;"><i class="fa-solid fa-clock"></i> 8. Pending Data Submission Offices (${pendingOffices.length})</div>
+        <div class="section-title-banner" style="background: #991b1b;"><i class="fa-solid fa-clock"></i> 7. Pending Data Submission Offices (${pendingOffices.length})</div>
         <table class="report-table">
           <thead>
             <tr>
@@ -3023,10 +3132,11 @@ function printComprehensiveAdminReport() {
       <div class="footer-cert">
         <div>
           <strong>Report Verification Statement:</strong><br>
-          Certified that the above comprehensive IT equipment inventory, network infrastructure, and power/battery status data has been compiled from official office submissions.
+          Certified that the above comprehensive IT equipment inventory, network infrastructure, and power/battery status data<br>
+          has been compiled from official office submissions verified via Google OAuth 2.0 authentication.
         </div>
         <div class="signature-box">
-          <strong>Data AI Foundry - IT Wing MVD</strong><br>
+          <strong>Nodal Officer / Transport Commissionerate</strong><br>
           <small>Signature & Official Seal</small>
         </div>
       </div>

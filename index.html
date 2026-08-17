@@ -787,26 +787,61 @@
               </div>
             </div>
 
-            <!-- Charts Row -->
+            <!-- Charts Row 1: Hardware Systems Breakdown & Stacked Comparison -->
             <div class="charts-grid-2">
-              <!-- Chart 1: Hardware Health Breakdown -->
+              <!-- Chart 1: Stacked Column Comparison of Working vs Defective Systems -->
               <div class="chart-card">
                 <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-pie"></i> Hardware Equipment Health (Working vs. Defective)</h3>
+                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-bar"></i> Working vs. Not Working Systems Comparison (Stacked Column)</h3>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chartStackedSystems"></canvas>
+                </div>
+              </div>
+
+              <!-- Chart 2: Hardware Health Breakdown -->
+              <div class="chart-card">
+                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px;">
+                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-pie"></i> Overall Hardware Equipment Health (Working vs. Defective)</h3>
                 </div>
                 <div class="chart-container">
                   <canvas id="chartHardwareHealth"></canvas>
                 </div>
               </div>
+            </div>
 
-              <!-- Chart 2: System Age Distribution -->
+            <!-- Charts Row 2: Age Profile, UPS Status & Battery Infrastructure -->
+            <div class="charts-grid-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 20px;">
+              <!-- Chart 3: System Age Distribution -->
               <div class="chart-card" onclick="drillDownDashboard('age')" style="cursor: pointer;" title="Click to view System Age Profile Breakdown Drill-Down">
                 <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-column"></i> System Age Profile Across Offices</h3>
-                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+                  <h3 class="section-title" style="font-size: 0.95rem;"><i class="fa-solid fa-chart-column"></i> System Age Profile Across Offices</h3>
+                  <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
                 </div>
                 <div class="chart-container">
                   <canvas id="chartAgeDistribution"></canvas>
+                </div>
+              </div>
+
+              <!-- Chart 4: UPS Status & Capacity Distribution -->
+              <div class="chart-card" onclick="drillDownDashboard('ups')" style="cursor: pointer;" title="Click to view Power & Battery Infrastructure Drill-Down">
+                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                  <h3 class="section-title" style="font-size: 0.95rem;"><i class="fa-solid fa-bolt"></i> UPS Status & Capacity Distribution</h3>
+                  <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chartUpsDistribution"></canvas>
+                </div>
+              </div>
+
+              <!-- Chart 5: Battery Infrastructure Audit -->
+              <div class="chart-card" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click to view Battery Infrastructure Drill-Down">
+                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
+                  <h3 class="section-title" style="font-size: 0.95rem;"><i class="fa-solid fa-car-battery"></i> Battery Infrastructure Audit (In Use vs. Min Req)</h3>
+                  <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+                </div>
+                <div class="chart-container">
+                  <canvas id="chartBatteryStatus"></canvas>
                 </div>
               </div>
             </div>
