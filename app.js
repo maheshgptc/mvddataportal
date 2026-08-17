@@ -299,6 +299,12 @@ function configureGoogleClientId() {
 }
 
 function initGoogleIdentityServices() {
+  const btnDiv = document.getElementById('googleSignInButtonDiv');
+  const customBtn = document.getElementById('googleCustomSigninBtn');
+
+  // Guarantee custom Google Sign-In button is visible by default
+  if (customBtn) customBtn.style.display = 'flex';
+
   if (window.google && google.accounts) {
     try {
       // 1. Initialize GIS ID Client with configured Client ID
@@ -309,22 +315,30 @@ function initGoogleIdentityServices() {
       });
 
       // Render official authentic Google Sign-In button
-      const btnDiv = document.getElementById('googleSignInButtonDiv');
-      const customBtn = document.getElementById('googleCustomSigninBtn');
       if (btnDiv) {
         btnDiv.innerHTML = ''; // Clear previous button rendering
-        google.accounts.id.renderButton(btnDiv, {
-          type: 'standard',
-          theme: 'outline',
-          size: 'large',
-          text: 'signin_with',
-          shape: 'rectangular',
-          logo_alignment: 'left',
-          width: 320
-        });
-        if (customBtn) customBtn.style.display = 'none';
-      } else if (customBtn) {
-        customBtn.style.display = 'flex';
+        try {
+          google.accounts.id.renderButton(btnDiv, {
+            type: 'standard',
+            theme: 'outline',
+            size: 'large',
+            text: 'signin_with',
+            shape: 'rectangular',
+            logo_alignment: 'left',
+            width: 320
+          });
+        } catch (e) {
+          console.warn('GSI renderButton notice:', e);
+        }
+
+        // Only hide custom button if GSI SDK rendered a visible iframe inside btnDiv
+        setTimeout(() => {
+          if (btnDiv && btnDiv.children.length > 0 && btnDiv.offsetHeight > 0) {
+            if (customBtn) customBtn.style.display = 'none';
+          } else {
+            if (customBtn) customBtn.style.display = 'flex';
+          }
+        }, 400);
       }
 
       // 2. Initialize OAuth 2.0 Token Client for OAuth Popup
