@@ -1124,3 +1124,90 @@ input:checked + .slider:before {
     grid-template-columns: 1fr;
   }
 }
+
+/* --- COMPREHENSIVE REPORT PRINT MEDIA STYLES --- */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  /* Hide web interface elements during print */
+  .portal-sidebar,
+  .top-gov-bar,
+  #publicContainer,
+  #adminDashboardSubView,
+  #adminEntrySubView,
+  #adminViewSubView,
+  #adminMenusSubView,
+  .toast-container,
+  .modal-overlay:not(#comprehensiveReportModal),
+  #comprehensiveReportModal .modal-header,
+  #comprehensiveReportModal .modal-card > div:nth-child(2),
+  #comprehensiveReportModal .modal-card > div:last-child {
+    display: none !important;
+  }
+
+  /* Expand Report Modal to full width for printer canvas */
+  #comprehensiveReportModal {
+    position: absolute !important;
+    top: 0 !important;
+    left: 0 !important;
+    display: block !important;
+    background: #ffffff !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    z-index: 999999 !important;
+  }
+
+  #comprehensiveReportModal .modal-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-height: none !important;
+  }
+
+  #comprehensiveReportBody {
+    border: none !important;
+    padding: 0 !important;
+    overflow: visible !important;
+  }
+
+  .report-card-section {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-bottom: 20px !important;
+    border: 1px solid #cbd5e1 !important;
+  }
+
+  .report-page-break {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  table.data-table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    font-size: 10px !important;
+  }
+
+  table.data-table th, table.data-table td {
+    border: 1px solid #94a3b8 !important;
+    padding: 5px 6px !important;
+    color: #000000 !important;
+  }
+
+  table.data-table th {
+    background: #e2e8f0 !important;
+    font-weight: 700 !important;
+  }
+}
