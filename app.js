@@ -2503,6 +2503,549 @@ function exportDrillDownToCSV() {
   showToast(`Exported ${currentDrillDownType} drill-down data to CSV`, 'success');
 }
 
+// --- COMPREHENSIVE STATEWIDE IT AUDIT REPORT PRINT ENGINE ---
+function printComprehensiveAdminReport() {
+  renderAdminDashboard();
+
+  const entries = Object.values(inventoryStore);
+  const totalOfficesReported = entries.length;
+  const totalOffices = MVD_OFFICES.length;
+  const pendingOffices = MVD_OFFICES.filter(off => !inventoryStore[off]);
+  const nowStr = new Date().toLocaleString('en-IN', { dateStyle: 'full', timeStyle: 'medium' });
+
+  let totalSystems = 0;
+  let totalMonitorsW = 0, totalMonitorsNW = 0;
+  let totalCpuW = 0, totalCpuNW = 0;
+  let totalLaptopsW = 0, totalLaptopsNW = 0;
+  let totalAioW = 0, totalAioNW = 0;
+  let totalUpsW = 0, totalUpsNW = 0;
+  let totalGovNetwork = 0;
+  let totalSwitches = 0, totalServers = 0;
+  let totalUnder3 = 0, total3To5 = 0, total5To8 = 0, totalAbove8 = 0;
+  let totalServiceReports = 0;
+
+  entries.forEach(e => {
+    totalMonitorsW += (e.monitorsWorking || 0);
+    totalMonitorsNW += (e.monitorsNotWorking || 0);
+    totalCpuW += (e.cpuWorking || 0);
+    totalCpuNW += (e.cpuNotWorking || 0);
+    totalLaptopsW += (e.laptopsWorking || 0);
+    totalLaptopsNW += (e.laptopsNotWorking || 0);
+    totalAioW += (e.aioWorking || 0);
+    totalAioNW += (e.aioNotWorking || 0);
+
+    totalUpsW += (e.upsWorking || 0);
+    totalUpsNW += (e.upsNotWorking || 0);
+
+    if (e.availableNetwork === 'KSWAN' || e.availableNetwork === 'KFONE') totalGovNetwork++;
+    if (e.switchesAvailable === 'Yes') totalSwitches++;
+    if (e.serversAvailable === 'Yes') totalServers++;
+    if (e.serviceReportSent === 'Yes') totalServiceReports++;
+
+    totalUnder3 += (e.ageUnder3 || 0);
+    total3To5 += (e.age3To5 || 0);
+    total5To8 += (e.age5To8 || 0);
+    totalAbove8 += (e.ageAbove8 || 0);
+  });
+
+  totalSystems = totalMonitorsW + totalMonitorsNW + totalCpuW + totalCpuNW + totalLaptopsW + totalLaptopsNW + totalAioW + totalAioNW;
+  const totalWorkingHW = totalMonitorsW + totalCpuW + totalLaptopsW + totalAioW;
+  const totalDefectiveHW = totalMonitorsNW + totalCpuNW + totalLaptopsNW + totalAioNW + totalUpsNW;
+
+  let healthChartImg = '';
+  let ageChartImg = '';
+  try {
+    if (chartHealthInstance && typeof chartHealthInstance.toBase64Image === 'function') {
+      healthChartImg = chartHealthInstance.toBase64Image();
+    }
+    if (chartAgeInstance && typeof chartAgeInstance.toBase64Image === 'function') {
+      ageChartImg = chartAgeInstance.toBase64Image();
+    }
+  } catch (err) {
+    console.warn('Could not generate chart base64 image:', err);
+  }
+
+  const printWin = window.open('', '_blank');
+  if (!printWin) {
+    showToast('Please allow popups in your browser to generate the Comprehensive Report.', 'warning');
+    return;
+  }
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <title>MVD IT Inventory - Comprehensive Statewide Audit Report</title>
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+      <style>
+        @page {
+          size: A4 portrait;
+          margin: 12mm 15mm 15mm 15mm;
+        }
+        * {
+          box-sizing: border-box;
+          -webkit-print-color-adjust: exact !important;
+          print-color-adjust: exact !important;
+        }
+        body {
+          font-family: 'Segoe UI', system-ui, -apple-system, Roboto, sans-serif;
+          color: #0f172a;
+          background: #ffffff;
+          margin: 0;
+          padding: 20px;
+          font-size: 11pt;
+          line-height: 1.4;
+        }
+        .header-container {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          border-bottom: 3px double #0b3b24;
+          padding-bottom: 12px;
+          margin-bottom: 20px;
+        }
+        .header-logo-group {
+          display: flex;
+          align-items: center;
+          gap: 16px;
+        }
+        .header-logo {
+          width: 70px;
+          height: 70px;
+          object-fit: contain;
+        }
+        .header-titles h1 {
+          font-size: 14pt;
+          color: #0b3b24;
+          margin: 0;
+          font-weight: 800;
+          letter-spacing: 0.5px;
+          text-transform: uppercase;
+        }
+        .header-titles h2 {
+          font-size: 11pt;
+          color: #047857;
+          margin: 2px 0 0 0;
+          font-weight: 700;
+        }
+        .header-titles p {
+          font-size: 9pt;
+          color: #475569;
+          margin: 2px 0 0 0;
+        }
+        .meta-badge-box {
+          text-align: right;
+          font-size: 8.5pt;
+          color: #334155;
+          background: #f0fdf4;
+          padding: 8px 12px;
+          border-radius: 6px;
+          border: 1px solid #a7f3d0;
+        }
+
+        .section-title-banner {
+          background: #0b3b24;
+          color: #ffffff;
+          padding: 6px 12px;
+          font-size: 10.5pt;
+          font-weight: 700;
+          border-radius: 4px;
+          margin: 20px 0 10px 0;
+          display: flex;
+          align-items: center;
+          gap: 8px;
+        }
+
+        .kpi-grid {
+          display: grid;
+          grid-template-columns: repeat(4, 1fr);
+          gap: 10px;
+          margin-bottom: 20px;
+        }
+        .kpi-box {
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 10px;
+          background: #f8fafc;
+          text-align: center;
+        }
+        .kpi-box .val {
+          font-size: 13pt;
+          font-weight: 800;
+          color: #0b3b24;
+        }
+        .kpi-box .lbl {
+          font-size: 7.5pt;
+          font-weight: 700;
+          color: #475569;
+          text-transform: uppercase;
+        }
+
+        .charts-row {
+          display: flex;
+          gap: 16px;
+          margin-bottom: 20px;
+          page-break-inside: avoid;
+        }
+        .chart-card-box {
+          flex: 1;
+          border: 1px solid #cbd5e1;
+          border-radius: 6px;
+          padding: 10px;
+          text-align: center;
+          background: #ffffff;
+        }
+        .chart-card-box img {
+          max-width: 100%;
+          max-height: 200px;
+          object-fit: contain;
+        }
+
+        table.report-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 20px;
+          font-size: 8.5pt;
+          page-break-inside: auto;
+        }
+        table.report-table tr {
+          page-break-inside: avoid;
+          page-break-after: auto;
+        }
+        table.report-table th {
+          background: #f1f5f9;
+          color: #0f172a;
+          border: 1px solid #cbd5e1;
+          padding: 6px 8px;
+          text-align: left;
+          font-weight: 700;
+          font-size: 8.5pt;
+        }
+        table.report-table td {
+          border: 1px solid #cbd5e1;
+          padding: 5px 8px;
+          vertical-align: middle;
+        }
+        table.report-table tr:nth-child(even) {
+          background: #f8fafc;
+        }
+
+        .badge-w {
+          color: #047857;
+          font-weight: 700;
+        }
+        .badge-nw {
+          color: #b91c1c;
+          font-weight: 700;
+        }
+
+        .footer-cert {
+          margin-top: 30px;
+          padding-top: 16px;
+          border-top: 2px solid #0b3b24;
+          display: flex;
+          justify-content: space-between;
+          font-size: 9pt;
+          page-break-inside: avoid;
+        }
+        .signature-box {
+          width: 220px;
+          text-align: center;
+          border-top: 1px dashed #64748b;
+          padding-top: 4px;
+          margin-top: 40px;
+        }
+      </style>
+    </head>
+    <body>
+
+      <!-- HEADER -->
+      <div class="header-container">
+        <div class="header-logo-group">
+          <img src="mvd_logo.png" class="header-logo" alt="MVD Emblem">
+          <div class="header-titles">
+            <h1>Motor Vehicles Department • Govt. of Kerala</h1>
+            <h2>Statewide IT Infrastructure & Inventory Comprehensive Audit Report</h2>
+            <p>Transport Commissionerate, Trans Towers, Vazhuthacaud, Thiruvananthapuram</p>
+          </div>
+        </div>
+        <div class="meta-badge-box">
+          <div><strong>Generated Date:</strong> ${nowStr}</div>
+          <div><strong>Submission Status:</strong> ${totalOfficesReported} Reported / ${totalOffices} Total</div>
+          <div><strong>Report Scope:</strong> Statewide MVD Inventory</div>
+        </div>
+      </div>
+
+      <!-- EXECUTIVE SUMMARY KPI GRID -->
+      <div class="section-title-banner"><i class="fa-solid fa-chart-line"></i> 1. Executive Summary & Statewide Key Performance Indicators</div>
+      <div class="kpi-grid">
+        <div class="kpi-box">
+          <div class="val">${totalOfficesReported} / ${totalOffices}</div>
+          <div class="lbl">Reported Offices</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val">${totalSystems}</div>
+          <div class="lbl">Total IT Systems</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val" style="color:#047857;">${totalWorkingHW}</div>
+          <div class="lbl">Working Hardware Units</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val" style="color:#b91c1c;">${totalDefectiveHW}</div>
+          <div class="lbl">Defective / Repair Pending</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val">${totalGovNetwork}</div>
+          <div class="lbl">KSWAN / KFONE Offices</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val">${totalSwitches}</div>
+          <div class="lbl">Network Switches Offices</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val">${totalServers}</div>
+          <div class="lbl">Servers Installed Offices</div>
+        </div>
+        <div class="kpi-box">
+          <div class="val" style="color:#047857;">${totalUpsW}</div>
+          <div class="lbl">Working UPS Units</div>
+        </div>
+      </div>
+
+      <!-- CHARTS ANALYTICS -->
+      ${(healthChartImg || ageChartImg) ? `
+        <div class="section-title-banner"><i class="fa-solid fa-pie-chart"></i> 2. Executive Visual Analytics & Hardware Health Breakdown</div>
+        <div class="charts-row">
+          ${healthChartImg ? `
+            <div class="chart-card-box">
+              <strong style="font-size: 9.5pt; color: #0f172a;">Hardware Equipment Health (Working vs. Defective)</strong>
+              <br><img src="${healthChartImg}" alt="Hardware Health Chart">
+            </div>
+          ` : ''}
+          ${ageChartImg ? `
+            <div class="chart-card-box">
+              <strong style="font-size: 9.5pt; color: #0f172a;">System Age Distribution Across Offices</strong>
+              <br><img src="${ageChartImg}" alt="System Age Profile Chart">
+            </div>
+          ` : ''}
+        </div>
+      ` : ''}
+
+      <!-- TABLE 1: OFFICE IDENTIFICATION & AUDIT TRAIL -->
+      <div class="section-title-banner"><i class="fa-solid fa-building-flag"></i> 3. Office Identification & Submitter Officer Audit Trail</div>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Office Name</th>
+            <th>Original Entry Officer</th>
+            <th>Submitter Google Account</th>
+            <th>Original Submission Date</th>
+            <th>Latest Updating Officer</th>
+            <th>Last Updated Date</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.map((e, idx) => `
+            <tr>
+              <td>${idx + 1}</td>
+              <td><strong>${escapeHtml(e.officeName)}</strong></td>
+              <td>${escapeHtml(e.createdOfficerName || e.entryOfficerName || 'Officer')} (${escapeHtml(e.createdOfficerDesignation || e.entryOfficerDesignation || 'N/A')})</td>
+              <td>${escapeHtml(e.createdOfficerEmail || e.submittedByEmail || 'N/A')}</td>
+              <td>${escapeHtml(e.createdDate || e.lastUpdated || 'N/A')}</td>
+              <td>${escapeHtml(e.updatedOfficerName || e.entryOfficerName || 'Officer')} (${escapeHtml(e.updatedOfficerDesignation || e.entryOfficerDesignation || 'N/A')})</td>
+              <td>${escapeHtml(e.lastUpdated || 'N/A')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <!-- TABLE 2: CORE IT HARDWARE EQUIPMENT INVENTORY -->
+      <div class="section-title-banner"><i class="fa-solid fa-desktop"></i> 4. Core IT Hardware Equipment Inventory (Working vs. Defective)</div>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Office Name</th>
+            <th>Monitors (W / NW)</th>
+            <th>CPUs (W / NW)</th>
+            <th>Laptops (W / NW)</th>
+            <th>All-In-One PCs (W / NW)</th>
+            <th>Dot-Matrix Printers</th>
+            <th>Laser Printers</th>
+            <th>Xerox / MFP</th>
+            <th>Other Printers</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.map((e, idx) => `
+            <tr>
+              <td>${idx + 1}</td>
+              <td><strong>${escapeHtml(e.officeName)}</strong></td>
+              <td><span class="badge-w">${e.monitorsWorking} W</span> / <span class="badge-nw">${e.monitorsNotWorking} NW</span></td>
+              <td><span class="badge-w">${e.cpuWorking} W</span> / <span class="badge-nw">${e.cpuNotWorking} NW</span></td>
+              <td><span class="badge-w">${e.laptopsWorking} W</span> / <span class="badge-nw">${e.laptopsNotWorking} NW</span></td>
+              <td><span class="badge-w">${e.aioWorking} W</span> / <span class="badge-nw">${e.aioNotWorking} NW</span></td>
+              <td>${e.printers?.dotMatrix?.working ?? 0} W / ${e.printers?.dotMatrix?.notWorking ?? 0} NW</td>
+              <td>${e.printers?.laser?.working ?? 0} W / ${e.printers?.laser?.notWorking ?? 0} NW</td>
+              <td>${e.printers?.xerox?.working ?? 0} W / ${e.printers?.xerox?.notWorking ?? 0} NW</td>
+              <td>${e.printers?.others?.working ?? 0} W / ${e.printers?.others?.notWorking ?? 0} NW</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <!-- TABLE 3: NETWORK & SERVERS INFRASTRUCTURE -->
+      <div class="section-title-banner"><i class="fa-solid fa-network-wired"></i> 5. Network Infrastructure & Operating System Status</div>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Office Name</th>
+            <th>Network Provider</th>
+            <th>Bandwidth Speed</th>
+            <th>Switches Available</th>
+            <th>Switch Details</th>
+            <th>Servers Installed</th>
+            <th>Server Status & Details</th>
+            <th>Operating Systems Used</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.map((e, idx) => `
+            <tr>
+              <td>${idx + 1}</td>
+              <td><strong>${escapeHtml(e.officeName)}</strong></td>
+              <td><strong>${escapeHtml(e.availableNetwork === 'Others' ? e.otherNetworkDetails : e.availableNetwork)}</strong></td>
+              <td>${escapeHtml(e.networkSpeed || 'N/A')}</td>
+              <td>${escapeHtml(e.switchesAvailable || 'Not Sure')}</td>
+              <td>${escapeHtml(e.switchesDetails || 'N/A')}</td>
+              <td>${escapeHtml(e.serversAvailable || 'No')}</td>
+              <td>${escapeHtml(e.serversDetails || 'N/A')}</td>
+              <td>${escapeHtml(e.operatingSystem || 'N/A')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <!-- TABLE 4: POWER & BATTERY INFRASTRUCTURE AUDIT -->
+      <div class="section-title-banner"><i class="fa-solid fa-car-battery"></i> 6. Power & Battery Infrastructure Audit</div>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Office Name</th>
+            <th>UPS Available</th>
+            <th>Working / Defective UPS</th>
+            <th>Capacity</th>
+            <th>Condition</th>
+            <th>Battery Make / AH</th>
+            <th>Batteries (In Use / Min Req)</th>
+            <th>TCO Report Sent</th>
+            <th>Power Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.map((e, idx) => `
+            <tr>
+              <td>${idx + 1}</td>
+              <td><strong>${escapeHtml(e.officeName)}</strong></td>
+              <td>${escapeHtml(e.upsAvailable || 'Yes')}</td>
+              <td><span class="badge-w">${e.upsWorking || 0} W</span> / <span class="badge-nw">${e.upsNotWorking || 0} NW</span></td>
+              <td>${escapeHtml(e.upsCapacity === 'Other' ? e.upsCapacityOther : (e.upsCapacity || 'N/A'))}</td>
+              <td>${escapeHtml(e.upsCondition || 'N/A')}</td>
+              <td>${escapeHtml(e.batteryMake || 'N/A')} (${e.batteryAh || 0} AH)</td>
+              <td>${e.batteriesInUse || 0} / ${e.minBatteriesRequired || 0}</td>
+              <td>${escapeHtml(e.serviceReportSent || 'No')} ${e.serviceReportDate ? `(${e.serviceReportDate})` : ''}</td>
+              <td>${escapeHtml(e.powerRemarks || 'None')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <!-- TABLE 5: SYSTEM AGE PROFILE & SPECIFIC REMARKS -->
+      <div class="section-title-banner"><i class="fa-solid fa-hourglass-half"></i> 7. System Age Distribution & Specific Condition Remarks</div>
+      <table class="report-table">
+        <thead>
+          <tr>
+            <th>#</th>
+            <th>Office Name</th>
+            <th>&lt; 3 Years</th>
+            <th>3–5 Years</th>
+            <th>5–8 Years</th>
+            <th>&gt; 8 Years (High Priority)</th>
+            <th>Specific Condition Remarks</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${entries.map((e, idx) => `
+            <tr>
+              <td>${idx + 1}</td>
+              <td><strong>${escapeHtml(e.officeName)}</strong></td>
+              <td>${e.ageUnder3 || 0}</td>
+              <td>${e.age3To5 || 0}</td>
+              <td>${e.age5To8 || 0}</td>
+              <td><span class="badge-nw">${e.ageAbove8 || 0}</span></td>
+              <td>${escapeHtml(e.remarks || 'None')}</td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+
+      <!-- TABLE 6: PENDING OFFICE SUBMISSIONS -->
+      ${pendingOffices.length > 0 ? `
+        <div class="section-title-banner" style="background: #991b1b;"><i class="fa-solid fa-clock"></i> 8. Pending Data Submission Offices (${pendingOffices.length})</div>
+        <table class="report-table">
+          <thead>
+            <tr>
+              <th>#</th>
+              <th>Office Name</th>
+              <th>Status</th>
+              <th>Department Scope</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${pendingOffices.map((off, idx) => `
+              <tr>
+                <td>${idx + 1}</td>
+                <td><strong style="color: #991b1b;">${escapeHtml(off)}</strong></td>
+                <td><span class="badge-nw">Pending Submission</span></td>
+                <td>Motor Vehicles Department, Kerala</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      ` : ''}
+
+      <!-- FOOTER & CERTIFICATION -->
+      <div class="footer-cert">
+        <div>
+          <strong>Report Verification Statement:</strong><br>
+          Certified that the above comprehensive IT equipment inventory, network infrastructure, and power/battery status data has been compiled from official office submissions.
+        </div>
+        <div class="signature-box">
+          <strong>Data AI Foundry - IT Wing MVD</strong><br>
+          <small>Signature & Official Seal</small>
+        </div>
+      </div>
+
+      <script>
+        window.onload = function() {
+          setTimeout(function() {
+            window.print();
+          }, 600);
+        };
+      </script>
+    </body>
+    </html>
+  `);
+
+  printWin.document.close();
+  showToast('Opened Comprehensive Report Print Window', 'success');
+}
+
 function renderAdminDataTable() {
   const tbody = document.getElementById('adminTableBody');
   if (!tbody) return;
@@ -2928,387 +3471,4 @@ function toggleMobileSidebar(forceState) {
     const isOpen = sidebar.classList.toggle('mobile-open');
     if (overlay) overlay.classList.toggle('active', isOpen);
   }
-}
-
-// --- 22. COMPREHENSIVE AUDIT REPORT GENERATION ENGINE ---
-let chartCompHealthInstance = null;
-let chartCompAgeInstance = null;
-let chartCompUpsConditionInstance = null;
-let chartCompUpsCapacityInstance = null;
-
-function generateComprehensiveReport() {
-  const modal = document.getElementById('comprehensiveReportModal');
-  const reportBody = document.getElementById('compReportContent');
-  if (!modal || !reportBody) return;
-
-  const filterVal = document.getElementById('dashboardOfficeFilter')?.value || 'ALL';
-  let entries = Object.values(inventoryStore);
-  if (filterVal !== 'ALL') {
-    entries = inventoryStore[filterVal] ? [inventoryStore[filterVal]] : [];
-  }
-
-  const totalOffices = filterVal === 'ALL' ? entries.length : (entries.length > 0 ? 1 : 0);
-  const pendingOffices = MVD_OFFICES.filter(off => !inventoryStore[off]);
-
-  let totalSystems = 0;
-  let totalWorkingHW = 0;
-  let totalNotWorkingHW = 0;
-  let govNetworkCount = 0;
-  let switchesCount = 0;
-  let serversCount = 0;
-  let upsWorkingCount = 0;
-  let upsNotWorkingCount = 0;
-  let serviceReportsSentCount = 0;
-  let totalBatteriesInUse = 0;
-  let totalMinBatteries = 0;
-
-  let totalUnder3 = 0, total3To5 = 0, total5To8 = 0, totalAbove8 = 0;
-
-  const upsConditionCounts = { 'Good': 0, 'Working with Minor Issues': 0, 'Requires Repair': 0, 'Not Working': 0 };
-  const upsCapacityCounts = { '0.5 kVA': 0, '1 kVA': 0, '2 kVA': 0, '3 kVA': 0, '5 kVA': 0, '10 kVA': 0, 'Other': 0 };
-
-  entries.forEach(e => {
-    const sys = (e.monitorsWorking + e.monitorsNotWorking + e.cpuWorking + e.cpuNotWorking + e.laptopsWorking + e.laptopsNotWorking + e.aioWorking + e.aioNotWorking);
-    totalSystems += sys;
-
-    totalWorkingHW += (e.monitorsWorking + e.cpuWorking + e.laptopsWorking + e.aioWorking);
-    totalNotWorkingHW += (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking);
-
-    if (e.availableNetwork === 'KSWAN' || e.availableNetwork === 'KFONE') govNetworkCount++;
-    if (e.switchesAvailable === 'Yes') switchesCount++;
-    if (e.serversAvailable === 'Yes') serversCount++;
-
-    upsWorkingCount += (e.upsWorking || 0);
-    upsNotWorkingCount += (e.upsNotWorking || 0);
-    if (e.serviceReportSent === 'Yes') serviceReportsSentCount++;
-
-    totalBatteriesInUse += (e.batteriesInUse || 0);
-    totalMinBatteries += (e.minBatteriesRequired || 0);
-
-    totalUnder3 += (e.ageUnder3 || 0);
-    total3To5 += (e.age3To5 || 0);
-    total5To8 += (e.age5To8 || 0);
-    totalAbove8 += (e.ageAbove8 || 0);
-
-    if (e.upsCondition && upsConditionCounts[e.upsCondition] !== undefined) {
-      upsConditionCounts[e.upsCondition]++;
-    } else if (e.upsCondition) {
-      upsConditionCounts['Working with Minor Issues']++;
-    }
-
-    if (e.upsCapacity && upsCapacityCounts[e.upsCapacity] !== undefined) {
-      upsCapacityCounts[e.upsCapacity]++;
-    } else if (e.upsCapacity) {
-      upsCapacityCounts['Other']++;
-    }
-  });
-
-  const now = new Date();
-  const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-  reportBody.innerHTML = `
-    <!-- Report Top Official Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0B3B24; padding-bottom: 16px; margin-bottom: 20px;">
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <img src="mvd_logo.png" alt="MVD Emblem" style="height: 64px; width: auto;">
-        <div>
-          <h2 style="font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Kerala</h2>
-          <h4 style="font-size: 1.05rem; color: #047857; margin: 3px 0 0 0; font-weight: 700;">STATEWIDE IT & POWER INFRASTRUCTURE COMPREHENSIVE AUDIT REPORT</h4>
-          <span style="font-size: 0.8rem; color: #64748b;">Transport Commissionerate, Thiruvananthapuram • IT Audit Division</span>
-        </div>
-      </div>
-      <div style="text-align: right; font-size: 0.82rem; color: #334155; line-height: 1.45; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
-        <div><strong>Generated On:</strong> ${formattedDate}</div>
-        <div><strong>Filter Scope:</strong> ${filterVal === 'ALL' ? 'Statewide Aggregate' : filterVal}</div>
-        <div><strong>Reported Offices:</strong> ${totalOffices} / ${MVD_OFFICES.length}</div>
-        <div><strong>Backend Sync:</strong> Live Supabase Verified</div>
-      </div>
-    </div>
-
-    <!-- Executive KPI Audit Block -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
-      <div style="background: #f0fdf4; border: 1px solid #a7f3d0; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #047857;">OFFICES REPORTED</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #064e3b; margin-top: 2px;">${totalOffices} / ${MVD_OFFICES.length}</div>
-      </div>
-      <div style="background: #fffbe6; border: 1px solid #ffe58f; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #b45309;">TOTAL IT HARDWARE</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #78350f; margin-top: 2px;">${totalSystems} Units</div>
-      </div>
-      <div style="background: #fef2f2; border: 1px solid #fecdd3; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #b91c1c;">DEFECTIVE HARDWARE</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #991b1b; margin-top: 2px;">${totalNotWorkingHW} Units</div>
-      </div>
-      <div style="background: #ecfeff; border: 1px solid #a5f3fc; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #0891b2;">KSWAN / KFONE COVERAGE</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #164e63; margin-top: 2px;">${govNetworkCount} Offices</div>
-      </div>
-      <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #1d4ed8;">SWITCHES / SERVERS</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #1e40af; margin-top: 2px;">${switchesCount} / ${serversCount}</div>
-      </div>
-      <div style="background: #f0fdf4; border: 1px solid #a7f3d0; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #047857;">WORKING UPS UNITS</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #064e3b; margin-top: 2px;">${upsWorkingCount} Units</div>
-      </div>
-      <div style="background: #fef2f2; border: 1px solid #fecdd3; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #b91c1c;">DEFECTIVE UPS UNITS</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #991b1b; margin-top: 2px;">${upsNotWorkingCount} Units</div>
-      </div>
-      <div style="background: #fcf6e6; border: 1px solid #fde68a; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #d97706;">TCO REPORTS SENT</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #92400e; margin-top: 2px;">${serviceReportsSentCount} Offices</div>
-      </div>
-    </div>
-
-    <!-- CHARTS & VISUAL AUDIT SECTION -->
-    <div style="margin-bottom: 28px; page-break-inside: avoid;">
-      <h3 style="font-size: 1.05rem; color: #0B3B24; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 16px;">
-        <i class="fa-solid fa-chart-pie"></i> Visual Audits & Distribution Charts
-      </h3>
-
-      <div class="comp-chart-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
-        <!-- Chart 1: Hardware Equipment Health -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-desktop"></i> Hardware Equipment Health (Working vs Defective)
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompHardwareHealth"></canvas>
-          </div>
-        </div>
-
-        <!-- Chart 2: System Age Profile Distribution -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-hourglass-half"></i> System Age Profile Distribution
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompAge"></canvas>
-          </div>
-        </div>
-
-        <!-- Chart 3: UPS & Power Equipment Working Condition Status -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-bolt"></i> UPS Working Condition & Defect Status
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompUpsCondition"></canvas>
-          </div>
-        </div>
-
-        <!-- Chart 4: UPS Capacity & TCO Service Reports Status -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-car-battery"></i> UPS Capacity Ratings Distribution (kVA)
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompUpsCapacity"></canvas>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- MASTER DATA TABLES SECTION -->
-    <div style="margin-bottom: 28px;">
-      <h3 style="font-size: 1.05rem; color: #0B3B24; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 16px;">
-        <i class="fa-solid fa-table"></i> 1. Master IT Hardware & Office Audit Records (${entries.length} Offices)
-      </h3>
-      <div style="overflow-x: auto; margin-bottom: 20px;">
-        <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-          <thead>
-            <tr style="background: #0B3B24; color: #ffffff;">
-              <th style="padding: 8px;">Office Name</th>
-              <th style="padding: 8px;">Submitted / Updated Email</th>
-              <th style="padding: 8px;">Network & Speed</th>
-              <th style="padding: 8px;">Switches / Servers</th>
-              <th style="padding: 8px;">Monitors (W/NW)</th>
-              <th style="padding: 8px;">CPUs (W/NW)</th>
-              <th style="padding: 8px;">Laptops (W/NW)</th>
-              <th style="padding: 8px;">AIO (W/NW)</th>
-              <th style="padding: 8px;">Dot Matrix</th>
-              <th style="padding: 8px;">Age >8 Yrs</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${entries.map(item => `
-              <tr>
-                <td><strong>${escapeHtml(item.officeName)}</strong></td>
-                <td><small>${escapeHtml(item.updatedOfficerEmail || item.createdOfficerEmail || item.submittedByEmail || 'N/A')}</small></td>
-                <td>${escapeHtml(item.availableNetwork === 'Others' ? item.otherNetworkDetails : item.availableNetwork)} <small>(${escapeHtml(item.networkSpeed || '')})</small></td>
-                <td>${escapeHtml(item.switchesAvailable || 'No')} / ${escapeHtml(item.serversAvailable || 'No')}</td>
-                <td>${item.monitorsWorking} W / <span style="color:#b91c1c;">${item.monitorsNotWorking} NW</span></td>
-                <td>${item.cpuWorking} W / <span style="color:#b91c1c;">${item.cpuNotWorking} NW</span></td>
-                <td>${item.laptopsWorking} W / <span style="color:#b91c1c;">${item.laptopsNotWorking} NW</span></td>
-                <td>${item.aioWorking} W / <span style="color:#b91c1c;">${item.aioNotWorking} NW</span></td>
-                <td>${item.printers?.dotMatrix?.working ?? 0}</td>
-                <td><strong style="${(item.ageAbove8 || 0) > 0 ? 'color:#b91c1c;' : ''}">${item.ageAbove8 || 0}</strong></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <h3 style="font-size: 1.05rem; color: #0B3B24; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 16px;">
-        <i class="fa-solid fa-car-battery"></i> 2. Master Power & Battery Infrastructure Audit Records
-      </h3>
-      <div style="overflow-x: auto; margin-bottom: 20px;">
-        <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-          <thead>
-            <tr style="background: #064e3b; color: #ffffff;">
-              <th style="padding: 8px;">Office Name</th>
-              <th style="padding: 8px;">UPS Available</th>
-              <th style="padding: 8px;">Working / Defective UPS</th>
-              <th style="padding: 8px;">UPS Capacity</th>
-              <th style="padding: 8px;">Working Condition</th>
-              <th style="padding: 8px;">Battery Make & AH</th>
-              <th style="padding: 8px;">Batteries (In Use / Min)</th>
-              <th style="padding: 8px;">TCO Report Sent</th>
-              <th style="padding: 8px;">Power Remarks</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${entries.map(item => `
-              <tr>
-                <td><strong>${escapeHtml(item.officeName)}</strong></td>
-                <td>${escapeHtml(item.upsAvailable || 'Yes')}</td>
-                <td><span style="color:#047857; font-weight:700;">${item.upsWorking || 0} W</span> / <span style="color:#b91c1c; font-weight:700;">${item.upsNotWorking || 0} NW</span></td>
-                <td>${escapeHtml(item.upsCapacity === 'Other' ? item.upsCapacityOther : (item.upsCapacity || 'N/A'))}</td>
-                <td><small>${escapeHtml(item.upsCondition || 'N/A')}</small></td>
-                <td><small>${escapeHtml(item.batteryMake || 'N/A')} (${item.batteryAh || 0} AH)</small></td>
-                <td>${item.batteriesInUse || 0} / ${item.minBatteriesRequired || 0}</td>
-                <td>${escapeHtml(item.serviceReportSent || 'No')} ${item.serviceReportDate ? `(${item.serviceReportDate})` : ''}</td>
-                <td><small>${escapeHtml(item.powerRemarks || 'None')}</small></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      ${pendingOffices.length > 0 ? `
-        <h3 style="font-size: 1.05rem; color: #b91c1c; border-bottom: 2px solid #fecdd3; padding-bottom: 6px; margin-bottom: 12px;">
-          <i class="fa-solid fa-clock"></i> 3. Pending Offices Submission Audit List (${pendingOffices.length} Pending)
-        </h3>
-        <div style="background: #fef2f2; border: 1px solid #fecdd3; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 0.8rem; color: #991b1b;">
-            ${pendingOffices.map(off => `<div><i class="fa-regular fa-square"></i> ${escapeHtml(off)}</div>`).join('')}
-          </div>
-        </div>
-      ` : ''}
-    </div>
-
-    <!-- Official Verification & Certification Statement -->
-    <div style="margin-top: 24px; padding: 16px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; page-break-inside: avoid;">
-      <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-certificate" style="color: #047857;"></i> AUDIT VERIFICATION & CERTIFICATION STATEMENT</div>
-      <p style="margin: 0 0 16px 0; color: #334155;">
-        This comprehensive audit report compiles real-time IT equipment inventory, network availability, hardware system age profiles, and power & battery infrastructure audit records across Motor Vehicles Department offices in Kerala. Verified against live Supabase Cloud records.
-      </p>
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 36px;">
-        <div>
-          <div style="border-top: 1px dashed #64748b; width: 220px; margin-bottom: 4px;"></div>
-          <strong>IT Cell Nodal Officer</strong><br>
-          <span style="font-size: 0.78rem; color: #64748b;">Motor Vehicles Department, Kerala</span>
-        </div>
-        <div style="text-align: right;">
-          <div style="border-top: 1px dashed #64748b; width: 240px; margin-bottom: 4px; margin-left: auto;"></div>
-          <strong>Transport Commissionerate Approval</strong><br>
-          <span style="font-size: 0.78rem; color: #64748b;">Government of Kerala</span>
-        </div>
-      </div>
-    </div>
-  `;
-
-  modal.style.display = 'flex';
-
-  // Initialize the 4 Visual Charts
-  setTimeout(() => {
-    // 1. Hardware Equipment Health Chart
-    const ctxHealth = document.getElementById('chartCompHardwareHealth')?.getContext('2d');
-    if (ctxHealth) {
-      if (chartCompHealthInstance) chartCompHealthInstance.destroy();
-      chartCompHealthInstance = new Chart(ctxHealth, {
-        type: 'doughnut',
-        data: {
-          labels: ['Working Systems', 'Defective Systems'],
-          datasets: [{
-            data: [totalWorkingHW || (totalNotWorkingHW === 0 ? 1 : 0), totalNotWorkingHW || 0],
-            backgroundColor: ['#10b981', '#ef4444'],
-            borderWidth: 1
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-      });
-    }
-
-    // 2. System Age Profile Chart
-    const ctxAge = document.getElementById('chartCompAge')?.getContext('2d');
-    if (ctxAge) {
-      if (chartCompAgeInstance) chartCompAgeInstance.destroy();
-      chartCompAgeInstance = new Chart(ctxAge, {
-        type: 'bar',
-        data: {
-          labels: ['< 3 Yrs', '3–5 Yrs', '5–8 Yrs', '> 8 Yrs'],
-          datasets: [{
-            label: 'Systems',
-            data: [totalUnder3, total3To5, total5To8, totalAbove8],
-            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
-            borderRadius: 4
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-      });
-    }
-
-    // 3. UPS Working Condition Chart
-    const ctxUpsCond = document.getElementById('chartCompUpsCondition')?.getContext('2d');
-    if (ctxUpsCond) {
-      if (chartCompUpsConditionInstance) chartCompUpsConditionInstance.destroy();
-      chartCompUpsConditionInstance = new Chart(ctxUpsCond, {
-        type: 'pie',
-        data: {
-          labels: ['Good / Working', 'Minor Issues', 'Requires Repair', 'Not Working / Defective'],
-          datasets: [{
-            data: [
-              upsConditionCounts['Good'] || upsWorkingCount,
-              upsConditionCounts['Working with Minor Issues'],
-              upsConditionCounts['Requires Repair'],
-              upsConditionCounts['Not Working'] || upsNotWorkingCount
-            ],
-            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'],
-            borderWidth: 1
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-      });
-    }
-
-    // 4. UPS Capacity Distribution Chart
-    const ctxUpsCap = document.getElementById('chartCompUpsCapacity')?.getContext('2d');
-    if (ctxUpsCap) {
-      if (chartCompUpsCapacityInstance) chartCompUpsCapacityInstance.destroy();
-      chartCompUpsCapacityInstance = new Chart(ctxUpsCap, {
-        type: 'bar',
-        data: {
-          labels: ['0.5 kVA', '1 kVA', '2 kVA', '3 kVA', '5 kVA', '10 kVA', 'Other'],
-          datasets: [{
-            label: 'Offices Count',
-            data: Object.values(upsCapacityCounts),
-            backgroundColor: '#0891b2',
-            borderRadius: 4
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-      });
-    }
-  }, 100);
-}
-
-function closeComprehensiveReportModal() {
-  const modal = document.getElementById('comprehensiveReportModal');
-  if (modal) modal.style.display = 'none';
-}
-
-function triggerReportPrint() {
-  window.print();
 }

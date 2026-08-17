@@ -684,6 +684,9 @@
               <button class="btn btn-outline" id="btnAdminNavMenus" onclick="switchAdminSubView('menus')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-sliders"></i> Menu & Module Manager
               </button>
+              <button class="btn btn-primary" onclick="printComprehensiveAdminReport()" style="background: #10b981; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
+                <i class="fa-solid fa-file-pdf"></i> Print Comprehensive Report
+              </button>
             </div>
           </div>
 
@@ -703,13 +706,8 @@
                     <!-- Populated dynamically via JS -->
                   </select>
                 </div>
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-primary btn-sm" onclick="generateComprehensiveReport()" style="background: var(--primary-800); border-color: var(--primary-900); font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-file-invoice"></i> Print Comprehensive Report
-                  </button>
-                  <div style="font-size: 0.82rem; color: var(--text-muted);">
-                    <i class="fa-solid fa-arrow-pointer"></i> <strong>Drill-Down:</strong> Click KPI cards.
-                  </div>
+                <div style="font-size: 0.82rem; color: var(--text-muted);">
+                  <i class="fa-solid fa-arrow-pointer"></i> <strong>Interactive Drill-Down:</strong> Click any KPI card to view detailed breakdown.
                 </div>
               </div>
             </div>
@@ -850,8 +848,8 @@
               <div class="section-header">
                 <h3 class="section-title"><i class="fa-solid fa-database"></i> Master IT Inventory Database</h3>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-primary btn-sm" onclick="generateComprehensiveReport()" style="background: var(--primary-800); border-color: var(--primary-900); font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-file-invoice"></i> Print Comprehensive Report
+                  <button class="btn btn-primary btn-sm" onclick="printComprehensiveAdminReport()" style="background: #047857; border: none; font-weight: 700;">
+                    <i class="fa-solid fa-file-pdf"></i> Print Comprehensive Report
                   </button>
                   <button class="btn btn-outline btn-sm" onclick="exportDataToCSV()">
                     <i class="fa-solid fa-file-excel"></i> Export CSV
@@ -1035,39 +1033,6 @@
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-outline btn-sm" onclick="openStandalonePrintWindow()"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Standalone Print Window</button>
           <button class="btn btn-primary btn-sm" onclick="closePublicOfficeSummaryModal()"><i class="fa-solid fa-check"></i> Close Window</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- COMPREHENSIVE STATEWIDE IT & POWER INFRASTRUCTURE REPORT MODAL -->
-  <div id="comprehensiveReportModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card printable-report-card" style="max-width: 1050px; width: 96%; max-height: 92vh; overflow-y: auto;">
-      <div class="modal-header print-hide" style="background: linear-gradient(135deg, #0B3B24 0%, #062C1A 100%); color: white; margin: -24px -24px 20px -24px; padding: 20px 24px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #a7f3d0;"><i class="fa-solid fa-file-invoice"></i> Admin Executive Portal</span>
-          <h3 style="font-size: 1.2rem; margin-top: 4px; color: #ffffff;"><i class="fa-solid fa-print"></i> Comprehensive Statewide IT & Power Audit Report</h3>
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-primary btn-sm" onclick="triggerReportPrint()" style="background: #10b981; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-print"></i> Print Report Now
-          </button>
-          <button class="btn btn-outline btn-sm" onclick="closeComprehensiveReportModal()" style="color: white; border-color: rgba(255,255,255,0.3);"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-      </div>
-
-      <!-- PRINTABLE REPORT CONTENT CONTAINER -->
-      <div id="compReportContent" class="printable-report-area">
-        <!-- Dynamically rendered Header, KPIs, Charts, Tables, and Verification Statement -->
-      </div>
-
-      <div class="print-hide" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-building-flag"></i> Motor Vehicles Department • Government of Kerala</span>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-primary btn-sm" onclick="triggerReportPrint()" style="background: #10b981; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-print"></i> Print Report
-          </button>
-          <button class="btn btn-secondary btn-sm" onclick="closeComprehensiveReportModal()">Close Window</button>
         </div>
       </div>
     </div>
