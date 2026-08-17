@@ -48,7 +48,7 @@
         <!-- SINGLE OFFICIAL GOOGLE SIGN-IN BUTTON CONTAINER -->
         <div id="googleSignInContainer" style="width: 100%; display: flex; flex-direction: column; align-items: center; margin: 10px 0 16px 0;">
           <div id="googleSignInButtonDiv" style="display: flex; justify-content: center; width: 100%;"></div>
-          <button type="button" id="googleCustomSigninBtn" class="google-signin-btn" onclick="triggerGoogleSignIn()" style="display: flex;">
+          <button type="button" id="googleCustomSigninBtn" class="google-signin-btn" onclick="triggerGoogleSignIn()" style="display: none;">
             <svg class="google-icon" viewBox="0 0 24 24" width="22" height="22">
               <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
               <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
@@ -57,10 +57,6 @@
             </svg>
             <span>Sign in with Google Account</span>
           </button>
-          
-          <div id="googleSignInFallbackLink" style="margin-top: 12px; font-size: 0.82rem; color: #2563eb; cursor: pointer; text-decoration: underline; font-weight: 600;" onclick="promptGoogleOAuthFallback()">
-            <i class="fa-solid fa-key"></i> Alternate Sign-In / Enter Google Email Directly
-          </div>
         </div>
 
         <div class="auth-footer" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
@@ -791,61 +787,26 @@
               </div>
             </div>
 
-            <!-- Charts Row 1: Hardware Systems Breakdown & Stacked Comparison -->
+            <!-- Charts Row -->
             <div class="charts-grid-2">
-              <!-- Chart 1: Stacked Column Comparison of Working vs Defective Systems -->
+              <!-- Chart 1: Hardware Health Breakdown -->
               <div class="chart-card">
                 <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-bar"></i> Working vs. Not Working Systems Comparison (Stacked Column)</h3>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartStackedSystems"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 2: Hardware Health Breakdown -->
-              <div class="chart-card">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-pie"></i> Overall Hardware Equipment Health (Working vs. Defective)</h3>
+                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-pie"></i> Hardware Equipment Health (Working vs. Defective)</h3>
                 </div>
                 <div class="chart-container">
                   <canvas id="chartHardwareHealth"></canvas>
                 </div>
               </div>
-            </div>
 
-            <!-- Charts Row 2: Age Profile, UPS Status & Battery Infrastructure -->
-            <div class="charts-grid-3" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px; margin-top: 20px;">
-              <!-- Chart 3: System Age Distribution -->
+              <!-- Chart 2: System Age Distribution -->
               <div class="chart-card" onclick="drillDownDashboard('age')" style="cursor: pointer;" title="Click to view System Age Profile Breakdown Drill-Down">
                 <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="font-size: 0.95rem;"><i class="fa-solid fa-chart-column"></i> System Age Profile Across Offices</h3>
-                  <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
+                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-column"></i> System Age Profile Across Offices</h3>
+                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
                 </div>
                 <div class="chart-container">
                   <canvas id="chartAgeDistribution"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 4: UPS Status & Capacity Distribution -->
-              <div class="chart-card" onclick="drillDownDashboard('ups')" style="cursor: pointer;" title="Click to view Power & Battery Infrastructure Drill-Down">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="font-size: 0.95rem;"><i class="fa-solid fa-bolt"></i> UPS Status & Capacity Distribution</h3>
-                  <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartUpsDistribution"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 5: Battery Infrastructure Audit -->
-              <div class="chart-card" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click to view Battery Infrastructure Drill-Down">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="font-size: 0.95rem;"><i class="fa-solid fa-car-battery"></i> Battery Infrastructure Audit (In Use vs. Min Req)</h3>
-                  <span style="font-size: 0.75rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartBatteryStatus"></canvas>
                 </div>
               </div>
             </div>
