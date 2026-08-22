@@ -3130,7 +3130,7 @@ function generateComprehensiveReport() {
         <div><strong>Generated On:</strong> ${formattedDate}</div>
         <div><strong>Filter Scope:</strong> ${filterVal === 'ALL' ? 'Statewide Aggregate' : filterVal}</div>
         <div><strong>Reported Offices:</strong> ${totalOffices} / ${MVD_OFFICES.length}</div>
-        <div><strong>Backend Sync:</strong> Live Supabase Verified</div>
+        <div><strong>Backend Sync:</strong> Verified</div>
       </div>
     </div>
 
@@ -3316,13 +3316,8 @@ function generateComprehensiveReport() {
       <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 36px;">
         <div>
           <div style="border-top: 1px dashed #64748b; width: 220px; margin-bottom: 4px;"></div>
-          <strong>IT Cell Nodal Officer</strong><br>
+          <strong>Data AI Foundry</strong><br>
           <span style="font-size: 0.78rem; color: #64748b;">Motor Vehicles Department, Kerala</span>
-        </div>
-        <div style="text-align: right;">
-          <div style="border-top: 1px dashed #64748b; width: 240px; margin-bottom: 4px; margin-left: auto;"></div>
-          <strong>Transport Commissionerate Approval</strong><br>
-          <span style="font-size: 0.78rem; color: #64748b;">Government of Kerala</span>
         </div>
       </div>
     </div>
