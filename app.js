@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Kerala Motor Vehicles Department - IT Equipment Portal
+   Keralam Motor Vehicles Department - IT Equipment Portal
    Production Application Engine with Supabase Cloud, Menu Bar & Modular Menu Provision
    ========================================================================== */
 
@@ -386,7 +386,7 @@ function promptGoogleOAuthFallback() {
   if (choice) {
     configureGoogleClientId();
   } else {
-    const email = prompt('Enter your verified Google / Departmental Email Address:\n(e.g., officer.mvd@kerala.gov.in or user@gmail.com)');
+    const email = prompt('Enter your verified Google / Departmental Email Address:\n(e.g., officer.mvd@keralam.gov.in or user@gmail.com)');
     if (!email || !email.trim()) return;
 
     const cleanEmail = email.trim();
@@ -1037,8 +1037,7 @@ function populateFormWithData(data) {
   if (!data) return;
 
   if (document.getElementById('officeSelect')) document.getElementById('officeSelect').value = data.officeName || '';
-  if (document.getElementById('availableNetworkSelect')) document.getElementById('availableNetworkSelect').value = data.availableNetwork || '';
-  handleNetworkChange(data.availableNetwork || '');
+  setSelectedNetworks(data.availableNetwork || '');
 
   if (document.getElementById('otherNetworkInput')) document.getElementById('otherNetworkInput').value = data.otherNetworkDetails || '';
   if (document.getElementById('networkSpeedInput')) document.getElementById('networkSpeedInput').value = data.networkSpeed || '';
@@ -1133,8 +1132,7 @@ function populateFormWithData(data) {
 }
 
 function resetPublicFormFieldsOnly() {
-  document.getElementById('availableNetworkSelect').value = '';
-  handleNetworkChange('');
+  setSelectedNetworks('');
   document.getElementById('otherNetworkInput').value = '';
   document.getElementById('networkSpeedInput').value = '';
 
@@ -1208,11 +1206,79 @@ function resetPublicForm() {
   showToast('Form reset', 'info');
 }
 
-function handleNetworkChange(value) {
+function handleNetworkSelectionChange() {
+  const checkboxes = document.querySelectorAll('input[name="networkOption"]');
+  const selected = [];
+  checkboxes.forEach(cb => {
+    const parent = cb.closest('.network-chk-pill');
+    if (cb.checked) {
+      selected.push(cb.value);
+      if (parent) parent.classList.add('active');
+    } else {
+      if (parent) parent.classList.remove('active');
+    }
+  });
+
+  const hiddenInput = document.getElementById('availableNetworkSelect');
+  if (hiddenInput) {
+    hiddenInput.value = selected.join(', ');
+  }
+
+  const badgeCount = document.getElementById('selectedNetworksBadgeCount');
+  if (badgeCount) {
+    badgeCount.textContent = `${selected.length} selected`;
+    badgeCount.style.background = selected.length > 0 ? 'var(--primary-100)' : '#f1f5f9';
+    badgeCount.style.color = selected.length > 0 ? 'var(--primary-800)' : '#64748b';
+  }
+
   const otherGroup = document.getElementById('otherNetworkGroup');
   if (otherGroup) {
-    otherGroup.style.display = (value === 'Others') ? 'block' : 'none';
+    otherGroup.style.display = selected.includes('Others') ? 'block' : 'none';
   }
+}
+
+function getSelectedNetworks() {
+  const checkboxes = document.querySelectorAll('input[name="networkOption"]:checked');
+  const selected = [];
+  checkboxes.forEach(cb => selected.push(cb.value));
+  return selected;
+}
+
+function setSelectedNetworks(val) {
+  const values = Array.isArray(val) ? val : (val || '').split(',').map(s => s.trim()).filter(Boolean);
+  const normalized = values.map(v => v === 'Kerala Vision' ? 'Keralam Vision' : v);
+
+  const checkboxes = document.querySelectorAll('input[name="networkOption"]');
+  checkboxes.forEach(cb => {
+    cb.checked = normalized.includes(cb.value);
+    const parent = cb.closest('.network-chk-pill');
+    if (cb.checked) {
+      if (parent) parent.classList.add('active');
+    } else {
+      if (parent) parent.classList.remove('active');
+    }
+  });
+
+  const hiddenInput = document.getElementById('availableNetworkSelect');
+  if (hiddenInput) {
+    hiddenInput.value = normalized.join(', ');
+  }
+
+  const badgeCount = document.getElementById('selectedNetworksBadgeCount');
+  if (badgeCount) {
+    badgeCount.textContent = `${normalized.length} selected`;
+    badgeCount.style.background = normalized.length > 0 ? 'var(--primary-100)' : '#f1f5f9';
+    badgeCount.style.color = normalized.length > 0 ? 'var(--primary-800)' : '#64748b';
+  }
+
+  const otherGroup = document.getElementById('otherNetworkGroup');
+  if (otherGroup) {
+    otherGroup.style.display = normalized.includes('Others') ? 'block' : 'none';
+  }
+}
+
+function handleNetworkChange(value) {
+  setSelectedNetworks(value);
 }
 
 function handleSwitchesAvailabilityChange(val) {
@@ -1278,10 +1344,14 @@ async function handleFormSubmit(e) {
       return;
     }
 
-    const netSelect = document.getElementById('availableNetworkSelect');
-    const networkVal = netSelect ? netSelect.value : '';
+    const selectedNetworks = getSelectedNetworks();
+    if (selectedNetworks.length === 0) {
+      showToast('Please select at least one Available Network', 'warning');
+      return;
+    }
+    const networkVal = selectedNetworks.join(', ');
     const otherNetInput = document.getElementById('otherNetworkInput');
-    if (networkVal === 'Others' && otherNetInput && !otherNetInput.value.trim()) {
+    if (selectedNetworks.includes('Others') && otherNetInput && !otherNetInput.value.trim()) {
       showToast('Please specify details for Other Network', 'warning');
       return;
     }
@@ -1474,7 +1544,7 @@ function openEnteredOfficeSummaryWindow(officeName) {
       <!-- Top Banner Bar -->
       <div style="background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase; color: #047857; font-weight: 700;">Kerala MVD Official Office Profile</div>
+          <div style="font-size: 0.75rem; text-transform: uppercase; color: #047857; font-weight: 700;">Keralam MVD Official Office Profile</div>
           <div style="font-size: 1.25rem; font-weight: 800; color: #064e3b;"><i class="fa-solid fa-building"></i> ${escapeHtml(data.officeName)}</div>
           <div style="font-size: 0.82rem; color: #047857;"><i class="fa-regular fa-clock"></i> Record Timestamp: ${escapeHtml(data.lastUpdated || 'Saved')}</div>
         </div>
@@ -1615,7 +1685,7 @@ function openStandalonePrintWindow() {
     <!DOCTYPE html>
     <html>
     <head>
-      <title>Kerala MVD - Entered Office Record - ${officeName}</title>
+      <title>Keralam MVD - Entered Office Record - ${officeName}</title>
       <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
       <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
       <style>
@@ -1637,7 +1707,7 @@ function openStandalonePrintWindow() {
     <body>
       <div class="header">
         <div class="title-group">
-          <h1>Kerala Motor Vehicles Department</h1>
+          <h1>Keralam Motor Vehicles Department</h1>
           <p>Data AI Foundry • IT Infrastructure & Equipment Record</p>
         </div>
         <span class="badge"><i class="fa-solid fa-check-circle"></i> VERIFIED RECORD</span>
@@ -1706,7 +1776,7 @@ function openStandalonePrintWindow() {
       </div>
 
       <div class="footer">
-        <span>Generated from Kerala MVD IT Portal (Data AI Foundry)</span>
+        <span>Generated from Keralam MVD IT Portal (Data AI Foundry)</span>
         <span>Date: ${new Date().toLocaleString()}</span>
       </div>
 
@@ -1973,7 +2043,7 @@ function renderAdminDashboard() {
 
   let totalUnder3 = 0, total3To5 = 0, total5To8 = 0, totalAbove8 = 0;
 
-  const networkCounts = { KSWAN: 0, KFONE: 0, BSNL: 0, JIO: 0, "Kerala Vision": 0, Asianet: 0, Others: 0 };
+  const networkCounts = { KSWAN: 0, KFONE: 0, BSNL: 0, JIO: 0, "Keralam Vision": 0, Asianet: 0, Others: 0 };
 
   entries.forEach(e => {
     const sys = (e.monitorsWorking + e.monitorsNotWorking + e.cpuWorking + e.cpuNotWorking + e.laptopsWorking + e.laptopsNotWorking + e.aioWorking + e.aioNotWorking);
@@ -1985,14 +2055,21 @@ function renderAdminDashboard() {
     totalWorkingHW += (e.monitorsWorking + e.cpuWorking + e.laptopsWorking + e.aioWorking);
     totalNotWorkingHW += (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking);
 
-    if (e.availableNetwork === 'KSWAN' || e.availableNetwork === 'KFONE') {
+    const netList = (e.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision')).filter(Boolean);
+    if (netList.some(n => n === 'KSWAN' || n === 'KFONE')) {
       govNetworkCount++;
     }
 
-    if (networkCounts[e.availableNetwork] !== undefined) {
-      networkCounts[e.availableNetwork]++;
-    } else {
+    if (netList.length === 0) {
       networkCounts.Others++;
+    } else {
+      netList.forEach(net => {
+        if (networkCounts[net] !== undefined) {
+          networkCounts[net]++;
+        } else {
+          networkCounts.Others++;
+        }
+      });
     }
 
     totalUnder3 += (e.ageUnder3 || 0);
@@ -2764,26 +2841,31 @@ function switchAdminSubView(view) {
   adminSubView = view;
 
   const btnDash = document.getElementById('btnAdminNavDashboard');
+  const btnSumm = document.getElementById('btnAdminNavSummary');
   const btnEnt = document.getElementById('btnAdminNavEntry');
   const btnVw = document.getElementById('btnAdminNavView');
   const btnMn = document.getElementById('btnAdminNavMenus');
 
   const dashSec = document.getElementById('adminDashboardSubView');
+  const summSec = document.getElementById('adminSummarySubView');
   const entSec = document.getElementById('adminEntrySubView');
   const vwSec = document.getElementById('adminViewSubView');
   const mnSec = document.getElementById('adminMenusSubView');
 
-  btnDash.style.background = (view === 'dashboard') ? 'var(--primary-600)' : 'transparent';
-  btnEnt.style.background = (view === 'entry') ? 'var(--primary-600)' : 'transparent';
-  btnVw.style.background = (view === 'view') ? 'var(--primary-600)' : 'transparent';
+  if (btnDash) btnDash.style.background = (view === 'dashboard') ? 'var(--primary-600)' : 'transparent';
+  if (btnSumm) btnSumm.style.background = (view === 'summary') ? 'var(--primary-600)' : 'transparent';
+  if (btnEnt) btnEnt.style.background = (view === 'entry') ? 'var(--primary-600)' : 'transparent';
+  if (btnVw) btnVw.style.background = (view === 'view') ? 'var(--primary-600)' : 'transparent';
   if (btnMn) btnMn.style.background = (view === 'menus') ? 'var(--primary-600)' : 'transparent';
 
-  dashSec.style.display = (view === 'dashboard') ? 'block' : 'none';
-  entSec.style.display = (view === 'entry') ? 'block' : 'none';
-  vwSec.style.display = (view === 'view') ? 'block' : 'none';
+  if (dashSec) dashSec.style.display = (view === 'dashboard') ? 'block' : 'none';
+  if (summSec) summSec.style.display = (view === 'summary') ? 'block' : 'none';
+  if (entSec) entSec.style.display = (view === 'entry') ? 'block' : 'none';
+  if (vwSec) vwSec.style.display = (view === 'view') ? 'block' : 'none';
   if (mnSec) mnSec.style.display = (view === 'menus') ? 'block' : 'none';
 
   if (view === 'dashboard') renderAdminDashboard();
+  if (view === 'summary') renderAdminSummaryReport();
   if (view === 'view') renderAdminDataTable();
   if (view === 'menus') renderMenuManagerUI();
   if (view === 'entry') {
@@ -2800,6 +2882,372 @@ function switchAdminSubView(view) {
       pubCont.insertBefore(formSec, document.getElementById('publicViewSection'));
     }
   }
+}
+
+// --- 15B. ADMIN SUMMARY REPORT ENGINE ---
+function renderAdminSummaryReport() {
+  const tbody = document.getElementById('adminSummaryTableBody');
+  const tfoot = document.getElementById('adminSummaryTableFoot');
+  const statsStrip = document.getElementById('summaryQuickStatsStrip');
+  if (!tbody || !tfoot) return;
+
+  const searchTerm = (document.getElementById('summarySearchInput')?.value || '').toLowerCase().trim();
+  const networkFilter = document.getElementById('summaryNetworkFilter')?.value || 'ALL';
+  const ageFilter = document.getElementById('summaryAgeFilter')?.value || 'ALL';
+
+  const rows = [];
+
+  let totWorkingMonitors = 0;
+  let totWorkingCPUs = 0;
+  let totWorkingLaptops = 0;
+  let totAgeUnder8 = 0;
+  let totAgeOver8 = 0;
+  let totUpsWorking = 0;
+  let totUpsDefective = 0;
+  let totBatteriesInUse = 0;
+  let totMinBatteriesRequired = 0;
+  let totOfficesReported = 0;
+
+  MVD_OFFICES.forEach(officeName => {
+    const rec = inventoryStore[officeName];
+    const isReported = !!rec;
+
+    if (searchTerm) {
+      const hay = (
+        officeName + ' ' +
+        (rec?.availableNetwork || '') + ' ' +
+        (rec?.operatingSystem || '') + ' ' +
+        (rec?.networkSpeed || '') + ' ' +
+        (rec?.entryOfficerName || '')
+      ).toLowerCase();
+      if (!hay.includes(searchTerm)) return;
+    }
+
+    if (networkFilter !== 'ALL') {
+      const nets = (rec?.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision'));
+      if (networkFilter === 'Others') {
+        if (!nets.includes('Others') && !nets.some(n => !['KSWAN', 'KFONE', 'BSNL', 'JIO', 'Keralam Vision', 'Asianet'].includes(n))) {
+          return;
+        }
+      } else {
+        if (!nets.includes(networkFilter)) return;
+      }
+    }
+
+    const ageUnder8 = isReported ? ((rec.ageUnder3 || 0) + (rec.age3To5 || 0) + (rec.age5To8 || 0)) : 0;
+    const ageOver8 = isReported ? (rec.ageAbove8 || 0) : 0;
+
+    if (ageFilter === 'OVER8') {
+      if (ageOver8 <= 0) return;
+    } else if (ageFilter === 'UNDER8_ONLY') {
+      if (ageOver8 > 0 || !isReported) return;
+    }
+
+    if (isReported) {
+      totOfficesReported++;
+      totWorkingMonitors += (rec.monitorsWorking || 0);
+      totWorkingCPUs += (rec.cpuWorking || 0);
+      totWorkingLaptops += (rec.laptopsWorking || 0);
+      totAgeUnder8 += ageUnder8;
+      totAgeOver8 += ageOver8;
+      totUpsWorking += (rec.upsWorking || 0);
+      totUpsDefective += (rec.upsNotWorking || 0);
+      totBatteriesInUse += (rec.batteriesInUse || 0);
+      totMinBatteriesRequired += (rec.minBatteriesRequired || 0);
+    }
+
+    rows.push({
+      officeName,
+      isReported,
+      rec: rec || {},
+      ageUnder8,
+      ageOver8
+    });
+  });
+
+  if (statsStrip) {
+    statsStrip.innerHTML = `
+      <div><strong>Reported Offices:</strong> <span style="color:#047857; font-weight:800;">${totOfficesReported}</span> / ${MVD_OFFICES.length}</div>
+      <div><strong>Working Hardware:</strong> Monitors: <strong>${totWorkingMonitors}</strong> | CPUs: <strong>${totWorkingCPUs}</strong> | Laptops: <strong>${totWorkingLaptops}</strong></div>
+      <div><strong>Lifecycle Health:</strong> &lt;8 Yrs: <span style="color:#047857; font-weight:700;">${totAgeUnder8}</span> | &gt;8 Yrs: <span style="color:#b91c1c; font-weight:700;">${totAgeOver8}</span></div>
+      <div><strong>Power &amp; Batteries:</strong> UPS Working: <strong>${totUpsWorking}</strong> | Batteries: <strong>${totBatteriesInUse} / ${totMinBatteriesRequired}</strong></div>
+    `;
+  }
+
+  if (rows.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; padding: 32px; color: var(--text-muted);">
+          <i class="fa-solid fa-filter-circle-xmark" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 10px; display: block;"></i>
+          No offices matched the current summary filters. Try changing or clearing the filters above.
+        </td>
+      </tr>
+    `;
+    tfoot.innerHTML = '';
+    return;
+  }
+
+  tbody.innerHTML = rows.map((item, idx) => {
+    const { officeName, isReported, rec, ageUnder8, ageOver8 } = item;
+
+    if (!isReported) {
+      return `
+        <tr style="opacity: 0.65; background: #fffcfc;">
+          <td style="text-align: center; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
+          <td>
+            <strong>${escapeHtml(officeName)}</strong>
+            <div><span class="badge" style="background:#fee2e2; color:#991b1b; font-size:0.72rem; padding:2px 6px;"><i class="fa-solid fa-clock"></i> Pending Entry</span></div>
+          </td>
+          <td colspan="7" style="color: var(--text-muted); font-style: italic; font-size: 0.82rem;">
+            No IT equipment survey record submitted yet for this office.
+          </td>
+        </tr>
+      `;
+    }
+
+    const rawNets = (rec.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision')).filter(Boolean);
+    const netPills = rawNets.length > 0
+      ? rawNets.map(n => `<span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700; padding:2px 6px; font-size:0.75rem; margin:1px;">${escapeHtml(n)}</span>`).join('')
+      : '<span class="badge" style="background:#f1f5f9; color:#64748b;">None Specified</span>';
+    const speedHtml = rec.networkSpeed
+      ? `<div style="font-size: 0.78rem; color: #475569; margin-top: 4px;"><i class="fa-solid fa-gauge-high" style="color:#0284c7;"></i> ${escapeHtml(rec.networkSpeed)}</div>`
+      : '';
+
+    const hwHtml = `
+      <div style="display: flex; flex-direction: column; gap: 3px;">
+        <span class="badge-pill-hardware"><i class="fa-solid fa-desktop" style="color:#2563eb;"></i> Monitors: <strong>${rec.monitorsWorking ?? 0}</strong></span>
+        <span class="badge-pill-hardware"><i class="fa-solid fa-microchip" style="color:#059669;"></i> CPUs: <strong>${rec.cpuWorking ?? 0}</strong></span>
+        <span class="badge-pill-hardware"><i class="fa-solid fa-laptop" style="color:#8b5cf6;"></i> Laptops: <strong>${rec.laptopsWorking ?? 0}</strong></span>
+      </div>
+    `;
+
+    const osHtml = `
+      <div style="font-weight: 600; color: #1e293b; line-height: 1.4;">
+        <i class="fa-solid fa-laptop-code" style="color:#3b82f6;"></i> ${escapeHtml(rec.operatingSystem || 'Not Specified')}
+      </div>
+    `;
+
+    const ageUnder8Html = `
+      <div style="text-align: center;">
+        <span class="badge-pill-age-safe" style="font-size: 0.92rem; font-weight: 800;">${ageUnder8}</span>
+        <div style="font-size: 0.7rem; color: #047857; margin-top: 2px;">&lt;8 Yrs Total</div>
+      </div>
+    `;
+
+    const ageOver8Html = `
+      <div style="text-align: center;">
+        <span class="${ageOver8 > 0 ? 'badge-pill-age-alert' : 'badge-pill-age-safe'}" style="font-size: 0.92rem; font-weight: 800;">${ageOver8}</span>
+        <div style="font-size: 0.7rem; color: ${ageOver8 > 0 ? '#b91c1c' : '#64748b'}; margin-top: 2px;">&gt;8 Yrs Total</div>
+      </div>
+    `;
+
+    const upsHtml = `
+      <div style="display: flex; flex-direction: column; gap: 3px; min-width: 120px;">
+        <span style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 4px; padding: 2px 6px; font-weight: 700; font-size: 0.78rem;">
+          <i class="fa-solid fa-check"></i> Working: ${rec.upsWorking ?? 0}
+        </span>
+        <span style="background: ${(rec.upsNotWorking ?? 0) > 0 ? '#fef2f2' : '#f8fafc'}; color: ${(rec.upsNotWorking ?? 0) > 0 ? '#b91c1c' : '#64748b'}; border: 1px solid ${(rec.upsNotWorking ?? 0) > 0 ? '#fecaca' : '#e2e8f0'}; border-radius: 4px; padding: 2px 6px; font-weight: 700; font-size: 0.78rem;">
+          <i class="fa-solid ${(rec.upsNotWorking ?? 0) > 0 ? 'fa-triangle-exclamation' : 'fa-circle-minus'}"></i> Defective: ${rec.upsNotWorking ?? 0}
+        </span>
+      </div>
+    `;
+
+    const inUse = rec.batteriesInUse ?? 0;
+    const minReq = rec.minBatteriesRequired ?? 0;
+    const batHtml = `
+      <div style="text-align: center;">
+        <div style="font-size: 0.95rem; font-weight: 800;">
+          <span style="color: #047857;">${inUse}</span> / <span style="color: #1d4ed8;">${minReq}</span>
+        </div>
+        <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">Currently Using / Min Required</div>
+      </div>
+    `;
+
+    return `
+      <tr>
+        <td style="text-align: center; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
+        <td>
+          <div style="font-weight: 800; color: #0f172a;">${escapeHtml(officeName)}</div>
+          <div style="font-size: 0.74rem; color: #047857; margin-top: 2px;">
+            <i class="fa-solid fa-circle-check"></i> Recorded (${escapeHtml(rec.entryOfficerName || 'Officer')})
+          </div>
+        </td>
+        <td>${netPills}${speedHtml}</td>
+        <td>${hwHtml}</td>
+        <td>${osHtml}</td>
+        <td>${ageUnder8Html}</td>
+        <td>${ageOver8Html}</td>
+        <td>${upsHtml}</td>
+        <td>${batHtml}</td>
+      </tr>
+    `;
+  }).join('');
+
+  tfoot.innerHTML = `
+    <tr>
+      <th style="text-align: center;">Σ</th>
+      <th>Statewide Total (${totOfficesReported} Offices)</th>
+      <th>Multiple Networks Active</th>
+      <th>
+        <div style="display:flex; flex-direction:column; gap:2px; font-size:0.8rem;">
+          <span>Monitors: <strong>${totWorkingMonitors}</strong></span>
+          <span>CPUs: <strong>${totWorkingCPUs}</strong></span>
+          <span>Laptops: <strong>${totWorkingLaptops}</strong></span>
+        </div>
+      </th>
+      <th>Statewide Standard</th>
+      <th style="text-align: center; font-size: 1rem; color: #86efac;">${totAgeUnder8}</th>
+      <th style="text-align: center; font-size: 1rem; color: #fca5a5;">${totAgeOver8}</th>
+      <th>
+        <div style="text-align: center; font-size: 0.82rem;">
+          <span style="color:#86efac;">Working: ${totUpsWorking}</span><br>
+          <span style="color:#fca5a5;">Defective: ${totUpsDefective}</span>
+        </div>
+      </th>
+      <th style="text-align: center;">
+        <div style="font-size: 1rem; font-weight: 800;">
+          <span style="color:#86efac;">${totBatteriesInUse}</span> / <span style="color:#93c5fd;">${totMinBatteriesRequired}</span>
+        </div>
+        <div style="font-size: 0.72rem; color: #cbd5e1;">In Use / Min Required</div>
+      </th>
+    </tr>
+  `;
+}
+
+function resetSummaryFilters() {
+  const searchInput = document.getElementById('summarySearchInput');
+  const netFilter = document.getElementById('summaryNetworkFilter');
+  const ageFilter = document.getElementById('summaryAgeFilter');
+
+  if (searchInput) searchInput.value = '';
+  if (netFilter) netFilter.value = 'ALL';
+  if (ageFilter) ageFilter.value = 'ALL';
+
+  renderAdminSummaryReport();
+  showToast('Summary report filters reset', 'info');
+}
+
+function exportSummaryReportCSV() {
+  const headers = [
+    "Sl No",
+    "Office Name",
+    "Network",
+    "Network Speed",
+    "Working Monitors",
+    "Working CPUs",
+    "Working Laptops",
+    "Operating System(s) used with versions",
+    "Systems age <8 years",
+    "Systems age >8 years",
+    "UPS Working",
+    "UPS Defective",
+    "Number of Batteries currently using",
+    "Minimum Number of Batteries Required"
+  ];
+
+  const rows = [];
+  let idx = 1;
+
+  MVD_OFFICES.forEach(officeName => {
+    const rec = inventoryStore[officeName];
+    if (!rec) return;
+
+    const ageUnder8 = (rec.ageUnder3 || 0) + (rec.age3To5 || 0) + (rec.age5To8 || 0);
+    const ageOver8 = rec.ageAbove8 || 0;
+
+    rows.push([
+      idx++,
+      `"${officeName.replace(/"/g, '""')}"`,
+      `"${(rec.availableNetwork || '').replace(/"/g, '""')}"`,
+      `"${(rec.networkSpeed || 'N/A').replace(/"/g, '""')}"`,
+      rec.monitorsWorking ?? 0,
+      rec.cpuWorking ?? 0,
+      rec.laptopsWorking ?? 0,
+      `"${(rec.operatingSystem || 'Not Specified').replace(/"/g, '""')}"`,
+      ageUnder8,
+      ageOver8,
+      rec.upsWorking ?? 0,
+      rec.upsNotWorking ?? 0,
+      rec.batteriesInUse ?? 0,
+      rec.minBatteriesRequired ?? 0
+    ]);
+  });
+
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `MVD_IT_Equipment_Summary_Report_Keralam_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Summary Report CSV downloaded successfully!', 'success');
+}
+
+function printSummaryReport() {
+  const printWin = window.open('', '_blank', 'width=1200,height=800');
+  if (!printWin) {
+    showToast('Popup blocker blocked print window. Please allow popups for this site.', 'warning');
+    return;
+  }
+
+  const tableHtml = document.getElementById('adminSummaryReportTable')?.outerHTML || '';
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  printWin.document.write(`
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <title>Keralam MVD - IT Equipment Summary Report</title>
+      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
+      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+      <style>
+        body { font-family: 'Plus Jakarta Sans', sans-serif; padding: 24px; color: #1e293b; background: #ffffff; }
+        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0B3B24; padding-bottom: 14px; margin-bottom: 16px; }
+        .title-group h1 { font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase; }
+        .title-group p { font-size: 0.85rem; color: #047857; margin: 3px 0 0 0; font-weight: 700; }
+        .badge { background: #d1fae5; color: #065f46; font-weight: 700; padding: 4px 10px; border-radius: 4px; font-size: 0.78rem; display: inline-block; }
+        .badge-pill-hardware { display: inline-block; padding: 2px 6px; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 4px; margin: 1px 0; }
+        .badge-pill-age-safe { display: inline-block; padding: 2px 6px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; font-weight: 700; }
+        .badge-pill-age-alert { display: inline-block; padding: 2px 6px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 4px; font-weight: 700; }
+        table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 14px; }
+        th, td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; vertical-align: middle; }
+        th { background: #0f2b48 !important; color: #ffffff !important; font-weight: 700; font-size: 8pt; text-transform: uppercase; }
+        tfoot th { background: #0a192f !important; color: #ffffff !important; font-size: 8.5pt; }
+        .footer { margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 12px; display: flex; justify-content: space-between; font-size: 0.78rem; color: #64748b; }
+        @media print {
+          body { padding: 10px; }
+          button { display: none !important; }
+        }
+      </style>
+    </head>
+    <body>
+      <div class="header">
+        <div class="title-group">
+          <h1>Motor Vehicles Department • Government of Keralam</h1>
+          <p>STATEWIDE IT EQUIPMENT INVENTORY SUMMARY AUDIT REPORT</p>
+        </div>
+        <div style="text-align: right; font-size: 0.78rem; color: #475569;">
+          <div><strong>Generated On:</strong> ${formattedDate}</div>
+          <div><strong>Verification:</strong> Live Supabase Verified Record</div>
+        </div>
+      </div>
+
+      ${tableHtml}
+
+      <div class="footer">
+        <span>Keralam Motor Vehicles Department • Data AI Foundry</span>
+        <span>Confidential Official Departmental IT Audit Summary</span>
+      </div>
+
+      <script>
+        window.onload = function() { window.print(); };
+      </script>
+    </body>
+    </html>
+  `);
+  printWin.document.close();
 }
 
 // --- 16. HIDE IT EQUIPMENT LIST PROVISION (GLOBAL TOGGLE) ---
@@ -3121,7 +3569,7 @@ function generateComprehensiveReport() {
       <div style="display: flex; align-items: center; gap: 16px;">
         <img src="mvd_logo.png" alt="MVD Emblem" style="height: 64px; width: auto;">
         <div>
-          <h2 style="font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Kerala</h2>
+          <h2 style="font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Keralam</h2>
           <h4 style="font-size: 1.05rem; color: #047857; margin: 3px 0 0 0; font-weight: 700;">STATEWIDE IT & POWER INFRASTRUCTURE COMPREHENSIVE AUDIT REPORT</h4>
           <span style="font-size: 0.8rem; color: #64748b;">Transport Commissionerate, Thiruvananthapuram • IT Audit Division</span>
         </div>
@@ -3311,18 +3759,18 @@ function generateComprehensiveReport() {
     <div style="margin-top: 24px; padding: 16px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; page-break-inside: avoid;">
       <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-certificate" style="color: #047857;"></i> AUDIT VERIFICATION & CERTIFICATION STATEMENT</div>
       <p style="margin: 0 0 16px 0; color: #334155;">
-        This comprehensive audit report compiles real-time IT equipment inventory, network availability, hardware system age profiles, and power & battery infrastructure audit records across Motor Vehicles Department offices in Kerala. Verified against live Supabase Cloud records.
+        This comprehensive audit report compiles real-time IT equipment inventory, network availability, hardware system age profiles, and power & battery infrastructure audit records across Motor Vehicles Department offices in Keralam. Verified against live Supabase Cloud records.
       </p>
       <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 36px;">
         <div>
           <div style="border-top: 1px dashed #64748b; width: 220px; margin-bottom: 4px;"></div>
           <strong>IT Cell Nodal Officer</strong><br>
-          <span style="font-size: 0.78rem; color: #64748b;">Motor Vehicles Department, Kerala</span>
+          <span style="font-size: 0.78rem; color: #64748b;">Motor Vehicles Department, Keralam</span>
         </div>
         <div style="text-align: right;">
           <div style="border-top: 1px dashed #64748b; width: 240px; margin-bottom: 4px; margin-left: auto;"></div>
           <strong>Transport Commissionerate Approval</strong><br>
-          <span style="font-size: 0.78rem; color: #64748b;">Government of Kerala</span>
+          <span style="font-size: 0.78rem; color: #64748b;">Government of Keralam</span>
         </div>
       </div>
     </div>

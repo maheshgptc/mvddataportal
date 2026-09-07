@@ -1,5 +1,5 @@
 /* ==========================================================================
-   Kerala Motor Vehicles Department - IT Equipment Portal
+   Keralam Motor Vehicles Department - IT Equipment Portal
    Left Sidebar Navigation & Departmental Design System
    ========================================================================== */
 
@@ -1191,3 +1191,157 @@ input:checked + .slider:before {
     page-break-inside: avoid !important;
   }
 }
+
+/* ==========================================================================
+   MULTI-SELECT NETWORK PILLS
+   ========================================================================== */
+.network-multiselect-box {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 8px 10px;
+  background: #ffffff;
+  border: 1.5px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  min-height: 44px;
+  align-items: center;
+  transition: var(--transition-fast);
+}
+.network-multiselect-box:focus-within {
+  border-color: var(--primary-600);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+}
+.network-chk-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  background: #f8fafc;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 20px;
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: #334155;
+  cursor: pointer;
+  transition: all 0.15s ease-in-out;
+  user-select: none;
+}
+.network-chk-pill:hover {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+  transform: translateY(-1px);
+}
+.network-chk-pill input[type="checkbox"] {
+  accent-color: #047857;
+  cursor: pointer;
+  width: 15px;
+  height: 15px;
+  margin: 0;
+}
+.network-chk-pill.active {
+  background: #ecfdf5;
+  border-color: #059669;
+  color: #065f46;
+  box-shadow: 0 2px 4px rgba(5, 150, 105, 0.12);
+}
+
+/* ==========================================================================
+   ADMIN SUMMARY REPORT STYLING
+   ========================================================================== */
+.summary-report-card {
+  background: #ffffff;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+  margin-bottom: 24px;
+}
+.summary-filter-bar {
+  padding: 16px 20px;
+  background: #ffffff;
+  border-bottom: 1px solid var(--border-color);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+.summary-table-wrapper {
+  max-height: 680px;
+  overflow: auto;
+}
+.summary-report-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.86rem;
+  text-align: left;
+}
+.summary-report-table th {
+  background: #0f2b48;
+  color: #ffffff;
+  font-weight: 700;
+  padding: 12px 14px;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  border-bottom: 2px solid #163a61;
+  font-size: 0.82rem;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  white-space: nowrap;
+}
+.summary-report-table td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  color: #1e293b;
+  vertical-align: middle;
+}
+.summary-report-table tbody tr:nth-child(even) {
+  background-color: #f8fafc;
+}
+.summary-report-table tbody tr:hover {
+  background-color: #f0fdf4;
+}
+.summary-report-table tfoot th {
+  background: #0a192f;
+  color: #ffffff;
+  padding: 14px;
+  font-weight: 800;
+  position: sticky;
+  bottom: 0;
+  z-index: 9;
+  border-top: 2px solid #3b82f6;
+}
+.badge-pill-hardware {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  padding: 3px 8px;
+  border-radius: 6px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #0f172a;
+}
+.badge-pill-age-safe {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #ecfdf5;
+  color: #047857;
+  border: 1px solid #a7f3d0;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+.badge-pill-age-alert {
+  display: inline-block;
+  padding: 3px 8px;
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 6px;
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+

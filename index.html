@@ -3,11 +3,11 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kerala MVD - IT Equipment List & Inventory Management System</title>
+  <title>Keralam MVD - IT Equipment List & Inventory Management System</title>
   
   <!-- Meta Descriptions & SEO -->
-  <meta name="description" content="Official IT Equipment List and Inventory Portal for Motor Vehicles Department, Government of Kerala.">
-  <meta name="author" content="Motor Vehicles Department Kerala">
+  <meta name="description" content="Official IT Equipment List and Inventory Portal for Motor Vehicles Department, Government of Keralam.">
+  <meta name="author" content="Motor Vehicles Department Keralam">
 
   <!-- Google Fonts -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -35,8 +35,8 @@
   <div id="googleAuthOverlay" class="auth-overlay" style="display: flex;">
     <div class="auth-card">
       <div class="auth-header">
-        <img src="mvd_logo.png" alt="Kerala MVD Emblem" class="auth-emblem">
-        <h2>Kerala Motor Vehicles Department</h2>
+        <img src="mvd_logo.png" alt="Keralam MVD Emblem" class="auth-emblem">
+        <h2>Keralam Motor Vehicles Department</h2>
         <p class="auth-sub">Data AI Foundry • IT Infrastructure Portal</p>
       </div>
 
@@ -72,10 +72,10 @@
     <!-- LEFT NAVIGATION SIDEBAR MENU BAR -->
     <aside class="portal-sidebar">
       <div class="sidebar-header">
-        <img src="mvd_logo.png" alt="Kerala Motor Vehicles Department Official Emblem" class="brand-emblem-img">
+        <img src="mvd_logo.png" alt="Keralam Motor Vehicles Department Official Emblem" class="brand-emblem-img">
         <div class="brand-titles">
           <h1>MVD IT Portal</h1>
-          <p>Government of Kerala</p>
+          <p>Government of Keralam</p>
         </div>
       </div>
 
@@ -108,7 +108,7 @@
       <div class="top-gov-bar">
         <div class="gov-flag-group">
           <span class="gov-flag-badge"></span>
-          <span>Motor Vehicles Department • Government of Kerala</span>
+          <span>Motor Vehicles Department • Government of Keralam</span>
         </div>
         <div style="display: flex; align-items: center; gap: 16px;">
           <!-- Authenticated Google Account Profile Pill -->
@@ -116,7 +116,7 @@
             <img id="userGoogleAvatar" src="mvd_logo.png" alt="Google Profile Avatar" class="user-avatar-img">
             <div style="display: flex; flex-direction: column;">
               <span id="userGoogleName" class="user-profile-name">Officer Account</span>
-              <span id="userGoogleEmail" class="user-profile-email">officer@kerala.gov.in</span>
+              <span id="userGoogleEmail" class="user-profile-email">officer@keralam.gov.in</span>
             </div>
             <button type="button" id="btnViewEnteredData" class="btn btn-outline btn-sm" onclick="openCurrentUserRecordSummary()" style="display: none; margin-left: 10px; background: #ffffff; color: #064e3b; border: 1.5px solid #a7f3d0; font-weight: 700; border-radius: 6px; padding: 4px 10px;">
               <i class="fa-solid fa-window-restore"></i> View Entered Data
@@ -220,19 +220,43 @@
                 </div>
 
                 <div class="form-grid-2">
-                  <!-- Network Dropdown -->
+                  <!-- Network Multi-Selection -->
                   <div class="form-group">
-                    <label for="availableNetworkSelect"><i class="fa-solid fa-wifi"></i> Available Network *</label>
-                    <select id="availableNetworkSelect" class="form-control" required onchange="handleNetworkChange(this.value)">
-                      <option value="">-- Select Available Network --</option>
-                      <option value="KSWAN">KSWAN</option>
-                      <option value="KFONE">KFONE</option>
-                      <option value="BSNL">BSNL</option>
-                      <option value="JIO">JIO</option>
-                      <option value="Kerala Vision">Kerala Vision</option>
-                      <option value="Asianet">Asianet</option>
-                      <option value="Others">Others</option>
-                    </select>
+                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                      <span><i class="fa-solid fa-wifi"></i> Available Network(s) * (Multiple selection allowed)</span>
+                      <span id="selectedNetworksBadgeCount" style="font-size: 0.75rem; background: var(--primary-100); color: var(--primary-800); padding: 2px 8px; border-radius: 12px; font-weight: 700;">0 selected</span>
+                    </label>
+                    <div id="networkCheckboxContainer" class="network-multiselect-box">
+                      <label class="network-chk-pill">
+                        <input type="checkbox" name="networkOption" value="KSWAN" onchange="handleNetworkSelectionChange()">
+                        <span>KSWAN</span>
+                      </label>
+                      <label class="network-chk-pill">
+                        <input type="checkbox" name="networkOption" value="KFONE" onchange="handleNetworkSelectionChange()">
+                        <span>KFONE</span>
+                      </label>
+                      <label class="network-chk-pill">
+                        <input type="checkbox" name="networkOption" value="BSNL" onchange="handleNetworkSelectionChange()">
+                        <span>BSNL</span>
+                      </label>
+                      <label class="network-chk-pill">
+                        <input type="checkbox" name="networkOption" value="JIO" onchange="handleNetworkSelectionChange()">
+                        <span>JIO</span>
+                      </label>
+                      <label class="network-chk-pill">
+                        <input type="checkbox" name="networkOption" value="Keralam Vision" onchange="handleNetworkSelectionChange()">
+                        <span>Keralam Vision</span>
+                      </label>
+                      <label class="network-chk-pill">
+                        <input type="checkbox" name="networkOption" value="Asianet" onchange="handleNetworkSelectionChange()">
+                        <span>Asianet</span>
+                      </label>
+                      <label class="network-chk-pill">
+                        <input type="checkbox" name="networkOption" value="Others" onchange="handleNetworkSelectionChange()">
+                        <span>Others</span>
+                      </label>
+                    </div>
+                    <input type="hidden" id="availableNetworkSelect" value="">
                   </div>
 
                   <!-- Network Speed -->
@@ -635,7 +659,7 @@
                     <span>
                       <i class="fa-solid fa-shield-check" style="color: #047857;"></i> I certify that the above information is true and correct. <span style="color: #b91c1c;">*</span>
                       <small style="display: block; font-weight: 400; color: #047857; font-size: 0.82rem; margin-top: 4px;">
-                        By checking this box, you confirm official departmental reporting accuracy under Kerala MVD guidelines.
+                        By checking this box, you confirm official departmental reporting accuracy under Keralam MVD guidelines.
                       </small>
                     </span>
                   </label>
@@ -680,6 +704,9 @@
             <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
               <button class="btn btn-outline" id="btnAdminNavDashboard" onclick="switchAdminSubView('dashboard')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-chart-pie"></i> Executive Dashboard
+              </button>
+              <button class="btn btn-outline" id="btnAdminNavSummary" onclick="switchAdminSubView('summary')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
+                <i class="fa-solid fa-table-list"></i> Summary Report
               </button>
               <button class="btn btn-outline" id="btnAdminNavEntry" onclick="switchAdminSubView('entry')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-plus-circle"></i> Direct Admin Entry
@@ -961,6 +988,98 @@
             </div>
           </div>
 
+          <!-- ADMIN SUMMARY REPORT SUBVIEW -->
+          <div id="adminSummarySubView" style="display: none;">
+            <!-- Summary Header & Action Bar -->
+            <div class="summary-report-card">
+              <div class="summary-filter-bar">
+                <div>
+                  <h3 style="font-size: 1.18rem; font-weight: 800; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 8px;">
+                    <i class="fa-solid fa-table-list" style="color: var(--primary-600);"></i>
+                    Statewide IT Equipment Summary Report
+                  </h3>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                    Executive summary of Network & Speed, Hardware, Operating Systems, Lifecycle Age Profile, UPS Health, and Battery Provisioning across reported MVD offices.
+                  </p>
+                </div>
+
+                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                  <button class="btn btn-primary btn-sm" onclick="exportSummaryReportCSV()" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-file-csv"></i> Download Summary CSV
+                  </button>
+                  <button class="btn btn-outline btn-sm" onclick="printSummaryReport()" style="border-color: #cbd5e1; color: #1e293b; background: white; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-download"></i> Download / Print Summary Report
+                  </button>
+                </div>
+              </div>
+
+              <!-- Quick Filters Bar -->
+              <div style="padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <div style="flex: 1; min-width: 220px;">
+                  <div style="position: relative;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                    <input type="text" id="summarySearchInput" class="form-control" placeholder="Search office name, district, OS, or provider..." oninput="renderAdminSummaryReport()" style="padding-left: 36px;">
+                  </div>
+                </div>
+
+                <div style="min-width: 180px;">
+                  <select id="summaryNetworkFilter" class="form-control" onchange="renderAdminSummaryReport()">
+                    <option value="ALL">-- All Network Providers --</option>
+                    <option value="KSWAN">KSWAN</option>
+                    <option value="KFONE">KFONE</option>
+                    <option value="BSNL">BSNL</option>
+                    <option value="JIO">JIO</option>
+                    <option value="Keralam Vision">Keralam Vision</option>
+                    <option value="Asianet">Asianet</option>
+                    <option value="Others">Others</option>
+                  </select>
+                </div>
+
+                <div style="min-width: 180px;">
+                  <select id="summaryAgeFilter" class="form-control" onchange="renderAdminSummaryReport()">
+                    <option value="ALL">-- All Lifecycle Profiles --</option>
+                    <option value="OVER8">Offices with Systems > 8 Years</option>
+                    <option value="UNDER8_ONLY">Offices with All Systems ≤ 8 Years</option>
+                  </select>
+                </div>
+
+                <button class="btn btn-secondary btn-sm" onclick="resetSummaryFilters()">
+                  <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                </button>
+              </div>
+
+              <!-- Summary Quick Statistics Pill Strip -->
+              <div id="summaryQuickStatsStrip" style="padding: 10px 20px; background: #f1f5f9; border-bottom: 1px solid var(--border-color); display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem; color: #334155;">
+                <!-- Dynamically populated stats -->
+              </div>
+
+              <!-- Summary Report Table -->
+              <div class="summary-table-wrapper">
+                <table class="summary-report-table" id="adminSummaryReportTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px; text-align: center;">#</th>
+                      <th style="min-width: 190px;">Office Name</th>
+                      <th style="min-width: 160px;">Network and Speed</th>
+                      <th style="min-width: 210px;">Working Monitors / CPUs / Laptops</th>
+                      <th style="min-width: 180px;">Operating System(s) used with versions</th>
+                      <th style="min-width: 130px; text-align: center;">Systems age &lt;8 years</th>
+                      <th style="min-width: 130px; text-align: center;">Systems age &gt;8 years</th>
+                      <th style="min-width: 150px; text-align: center;">UPS Working / Defective</th>
+                      <th style="min-width: 200px; text-align: center;">Number of Batteries currently using / Minimum Number of Batteries Required</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminSummaryTableBody">
+                    <!-- Populated dynamically via JS -->
+                  </tbody>
+                  <tfoot id="adminSummaryTableFoot">
+                    <!-- Statewide totals row -->
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+          </div>
+
         </div>
 
       </main>
@@ -969,7 +1088,7 @@
       <footer class="app-footer">
         <div class="footer-container">
           <div>
-            <strong>Kerala Motor Vehicles Department</strong> • Data AI Foundry<br>
+            <strong>Keralam Motor Vehicles Department</strong> • Data AI Foundry<br>
             <small>© 2026 Transport Commissionerate, Thiruvananthapuram. All Rights Reserved.</small>
           </div>
           <div class="footer-links">
@@ -1073,7 +1192,7 @@
       </div>
 
       <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-shield-halved"></i> Kerala MVD • Data AI Foundry Verified Record</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-shield-halved"></i> Keralam MVD • Data AI Foundry Verified Record</span>
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-outline btn-sm" onclick="openStandalonePrintWindow()"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Standalone Print Window</button>
           <button class="btn btn-primary btn-sm" onclick="closePublicOfficeSummaryModal()"><i class="fa-solid fa-check"></i> Close Window</button>
@@ -1104,7 +1223,7 @@
       </div>
 
       <div class="print-hide" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-building-flag"></i> Motor Vehicles Department • Government of Kerala</span>
+        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-building-flag"></i> Motor Vehicles Department • Government of Keralam</span>
         <div style="display: flex; gap: 10px;">
           <button class="btn btn-primary btn-sm" onclick="triggerReportPrint()" style="background: #10b981; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-download"></i> Download Report
