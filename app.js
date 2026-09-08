@@ -632,9 +632,10 @@ async function syncWithSupabaseBackend() {
 
     if (equipErr) throw equipErr;
 
-    if (equipData && equipData.length > 0) {
+    if (equipData) {
+      const freshStore = {};
       equipData.forEach(row => {
-        inventoryStore[row.office_name] = {
+        freshStore[row.office_name] = {
           officeName: row.office_name,
           availableNetwork: row.network_provider || '',
           otherNetworkDetails: row.network_provider_other || '',
@@ -692,6 +693,7 @@ async function syncWithSupabaseBackend() {
         };
       });
 
+      inventoryStore = freshStore;
       localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
     }
 
@@ -722,8 +724,12 @@ async function syncWithSupabaseBackend() {
     renderPortalMenuBar();
     renderPublicDataTable();
     renderAdminDataTable();
+    renderAdminSummaryReport();
     renderMenuManagerUI();
-    if (activeSession === 'admin') renderAdminDashboard();
+    if (activeSession === 'admin') {
+      renderAdminDashboard();
+      renderAdminSummaryReport();
+    }
 
   } catch (err) {
     console.error("Supabase sync error:", err);
@@ -804,17 +810,41 @@ async function saveRecordToSupabase(record) {
 }
 
 async function deleteRecordFromSupabase(officeName) {
-  if (!supabaseClient) return;
+  if (!supabaseClient) {
+    console.warn("Supabase client not initialized. Deletion performed locally only.");
+    return false;
+  }
 
+  const cleanId = officeName.toLowerCase().replace(/[^a-z0-9]/g, '_');
   try {
-    const { error } = await supabaseClient
+    const res1 = await supabaseClient
       .from('mvd_it_equipment')
       .delete()
       .eq('office_name', officeName);
 
-    if (error) throw error;
+    if (res1.error) {
+      console.warn("Supabase delete by office_name error:", res1.error);
+    }
+
+    const res2 = await supabaseClient
+      .from('mvd_it_equipment')
+      .delete()
+      .eq('id', cleanId);
+
+    if (res2.error) {
+      console.warn("Supabase delete by id error:", res2.error);
+    }
+
+    if (res1.error && res2.error) {
+      throw (res1.error || res2.error);
+    }
+
+    console.log(`Supabase cloud deletion confirmed for office "${officeName}" (id: "${cleanId}").`);
+    return true;
   } catch (err) {
-    console.error("Error deleting from Supabase:", err);
+    console.error("Error deleting record from Supabase:", err);
+    showToast(`Supabase Cloud Deletion Error: ${err.message || err}`, 'danger');
+    return false;
   }
 }
 
@@ -898,6 +928,8 @@ function handleOfficeSelectChange(officeName) {
   const alertBox = document.getElementById('reflectionAlert');
   const alertText = document.getElementById('reflectionAlertText');
   const btnWindow = document.getElementById('btnPublicOpenWindow') || document.getElementById('btnOpenSelectedOfficeWindow');
+  const btnDeleteForm = document.getElementById('btnAdminDeleteCurrentEntry');
+  const btnDeleteAlert = document.getElementById('btnAdminDeleteFromAlert');
 
   // Explicitly hide "Open in New Window" button from the web page IRRESPECTIVE of accounts
   if (btnWindow) {
@@ -906,6 +938,8 @@ function handleOfficeSelectChange(officeName) {
 
   if (!officeName) {
     if (alertBox) alertBox.style.display = 'none';
+    if (btnDeleteForm) btnDeleteForm.style.display = 'none';
+    if (btnDeleteAlert) btnDeleteAlert.style.display = 'none';
     toggleFormFieldsDisabled(false);
     resetPublicFormFieldsOnly();
     updateViewEnteredDataButtonVisibility();
@@ -924,6 +958,9 @@ function handleOfficeSelectChange(officeName) {
       toggleFormFieldsDisabled(false);
       populateFormWithData(existingData);
 
+      if (btnDeleteForm) btnDeleteForm.style.display = isAdmin ? 'inline-flex' : 'none';
+      if (btnDeleteAlert) btnDeleteAlert.style.display = isAdmin ? 'inline-flex' : 'none';
+
       if (alertBox && alertText) {
         if (isAdmin) {
           alertBox.style.background = '#eff6ff';
@@ -941,6 +978,8 @@ function handleOfficeSelectChange(officeName) {
       showToast(`Loaded saved entry for ${officeName}`, 'info');
     } else {
       // Office submitted by DIFFERENT Google Email ID (Non-Admin) -> Block form, DO NOT show data in entry fields, and show security message
+      if (btnDeleteForm) btnDeleteForm.style.display = 'none';
+      if (btnDeleteAlert) btnDeleteAlert.style.display = 'none';
       resetPublicFormFieldsOnly();
       toggleFormFieldsDisabled(true);
 
@@ -964,6 +1003,8 @@ function handleOfficeSelectChange(officeName) {
     }
   } else {
     // Fresh Office Selection (Not yet submitted)
+    if (btnDeleteForm) btnDeleteForm.style.display = 'none';
+    if (btnDeleteAlert) btnDeleteAlert.style.display = 'none';
     toggleFormFieldsDisabled(false);
     resetPublicFormFieldsOnly();
     if (googleAuthUser && googleAuthUser.name) {
@@ -2779,17 +2820,45 @@ function editOfficeInAdmin(officeName) {
 }
 
 async function deleteOfficeEntry(officeName) {
-  if (confirm(`Are you sure you want to delete the IT equipment record for "${officeName}"?`)) {
-    delete inventoryStore[officeName];
-    localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
-    
-    await deleteRecordFromSupabase(officeName);
-
-    showToast(`Deleted entry for ${officeName}`, 'warning');
-    renderPublicDataTable();
-    renderAdminDataTable();
-    if (activeSession === 'admin') renderAdminDashboard();
+  if (!officeName) return;
+  if (!confirm(`Are you sure you want to permanently delete all IT equipment data for "${officeName}" from Supabase and the portal?`)) {
+    return;
   }
+
+  showToast(`Deleting ${officeName}...`, 'info');
+
+  const supabaseSuccess = await deleteRecordFromSupabase(officeName);
+
+  delete inventoryStore[officeName];
+  localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
+
+  const officeSelect = document.getElementById('officeSelect');
+  if (officeSelect && officeSelect.value === officeName) {
+    officeSelect.value = '';
+    handleOfficeSelectChange('');
+  }
+
+  renderPublicDataTable();
+  renderAdminDataTable();
+  renderAdminSummaryReport();
+  if (activeSession === 'admin') {
+    renderAdminDashboard();
+  }
+
+  if (supabaseSuccess) {
+    showToast(`Successfully deleted "${officeName}" from Supabase Cloud Database`, 'warning');
+  } else {
+    showToast(`Deleted "${officeName}" locally. Cloud sync warning.`, 'warning');
+  }
+}
+
+function deleteCurrentAdminOfficeEntry() {
+  const officeName = document.getElementById('officeSelect')?.value;
+  if (!officeName) {
+    showToast('No office selected to delete', 'warning');
+    return;
+  }
+  deleteOfficeEntry(officeName);
 }
 
 // --- 15. SESSION & NAVIGATION CONTROLLER ---
@@ -2977,7 +3046,7 @@ function renderAdminSummaryReport() {
   if (rows.length === 0) {
     tbody.innerHTML = `
       <tr>
-        <td colspan="9" style="text-align: center; padding: 32px; color: var(--text-muted);">
+        <td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted);">
           <i class="fa-solid fa-filter-circle-xmark" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 10px; display: block;"></i>
           No offices matched the current summary filters. Try changing or clearing the filters above.
         </td>
@@ -3000,6 +3069,11 @@ function renderAdminSummaryReport() {
           </td>
           <td colspan="7" style="color: var(--text-muted); font-style: italic; font-size: 0.82rem;">
             No IT equipment survey record submitted yet for this office.
+          </td>
+          <td style="text-align: center;">
+            <button class="btn btn-outline btn-sm" onclick="editOfficeInAdmin('${escapeHtml(officeName)}')" title="Enter Office Data">
+              <i class="fa-solid fa-plus"></i> Enter
+            </button>
           </td>
         </tr>
       `;
@@ -3079,6 +3153,16 @@ function renderAdminSummaryReport() {
         <td>${ageOver8Html}</td>
         <td>${upsHtml}</td>
         <td>${batHtml}</td>
+        <td style="text-align: center;">
+          <div style="display: flex; gap: 4px; justify-content: center;">
+            <button class="btn btn-outline btn-sm" onclick="editOfficeInAdmin('${escapeHtml(officeName)}')" title="Edit Office Entry">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteOfficeEntry('${escapeHtml(officeName)}')" title="Delete Record from Supabase">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
       </tr>
     `;
   }).join('');
@@ -3110,6 +3194,7 @@ function renderAdminSummaryReport() {
         </div>
         <div style="font-size: 0.72rem; color: #cbd5e1;">In Use / Min Required</div>
       </th>
+      <th style="text-align: center; color: #94a3b8;">—</th>
     </tr>
   `;
 }
@@ -3215,10 +3300,12 @@ function printSummaryReport() {
         th, td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; vertical-align: middle; }
         th { background: #0f2b48 !important; color: #ffffff !important; font-weight: 700; font-size: 8pt; text-transform: uppercase; }
         tfoot th { background: #0a192f !important; color: #ffffff !important; font-size: 8.5pt; }
+        th:last-child, td:last-child { display: none !important; }
         .footer { margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 12px; display: flex; justify-content: space-between; font-size: 0.78rem; color: #64748b; }
         @media print {
           body { padding: 10px; }
           button { display: none !important; }
+          th:last-child, td:last-child { display: none !important; }
         }
       </style>
     </head>
