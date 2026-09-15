@@ -2977,23 +2977,29 @@ function renderAdminSummaryReport() {
   let totMinBatteriesRequired = 0;
   let totOfficesReported = 0;
 
-  MVD_OFFICES.forEach(officeName => {
+  // Only include offices that have entered data
+  const reportedOfficeNames = [
+    ...MVD_OFFICES.filter(name => !!inventoryStore[name]),
+    ...Object.keys(inventoryStore).filter(name => !MVD_OFFICES.includes(name))
+  ];
+
+  reportedOfficeNames.forEach(officeName => {
     const rec = inventoryStore[officeName];
-    const isReported = !!rec;
+    if (!rec) return;
 
     if (searchTerm) {
       const hay = (
         officeName + ' ' +
-        (rec?.availableNetwork || '') + ' ' +
-        (rec?.operatingSystem || '') + ' ' +
-        (rec?.networkSpeed || '') + ' ' +
-        (rec?.entryOfficerName || '')
+        (rec.availableNetwork || '') + ' ' +
+        (rec.operatingSystem || '') + ' ' +
+        (rec.networkSpeed || '') + ' ' +
+        (rec.entryOfficerName || '')
       ).toLowerCase();
       if (!hay.includes(searchTerm)) return;
     }
 
     if (networkFilter !== 'ALL') {
-      const nets = (rec?.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision'));
+      const nets = (rec.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision'));
       if (networkFilter === 'Others') {
         if (!nets.includes('Others') && !nets.some(n => !['KSWAN', 'KFONE', 'BSNL', 'JIO', 'Keralam Vision', 'Asianet'].includes(n))) {
           return;
@@ -3003,32 +3009,29 @@ function renderAdminSummaryReport() {
       }
     }
 
-    const ageUnder8 = isReported ? ((rec.ageUnder3 || 0) + (rec.age3To5 || 0) + (rec.age5To8 || 0)) : 0;
-    const ageOver8 = isReported ? (rec.ageAbove8 || 0) : 0;
+    const ageUnder8 = (rec.ageUnder3 || 0) + (rec.age3To5 || 0) + (rec.age5To8 || 0);
+    const ageOver8 = rec.ageAbove8 || 0;
 
     if (ageFilter === 'OVER8') {
       if (ageOver8 <= 0) return;
     } else if (ageFilter === 'UNDER8_ONLY') {
-      if (ageOver8 > 0 || !isReported) return;
+      if (ageOver8 > 0) return;
     }
 
-    if (isReported) {
-      totOfficesReported++;
-      totWorkingMonitors += (rec.monitorsWorking || 0);
-      totWorkingCPUs += (rec.cpuWorking || 0);
-      totWorkingLaptops += (rec.laptopsWorking || 0);
-      totAgeUnder8 += ageUnder8;
-      totAgeOver8 += ageOver8;
-      totUpsWorking += (rec.upsWorking || 0);
-      totUpsDefective += (rec.upsNotWorking || 0);
-      totBatteriesInUse += (rec.batteriesInUse || 0);
-      totMinBatteriesRequired += (rec.minBatteriesRequired || 0);
-    }
+    totOfficesReported++;
+    totWorkingMonitors += (rec.monitorsWorking || 0);
+    totWorkingCPUs += (rec.cpuWorking || 0);
+    totWorkingLaptops += (rec.laptopsWorking || 0);
+    totAgeUnder8 += ageUnder8;
+    totAgeOver8 += ageOver8;
+    totUpsWorking += (rec.upsWorking || 0);
+    totUpsDefective += (rec.upsNotWorking || 0);
+    totBatteriesInUse += (rec.batteriesInUse || 0);
+    totMinBatteriesRequired += (rec.minBatteriesRequired || 0);
 
     rows.push({
       officeName,
-      isReported,
-      rec: rec || {},
+      rec,
       ageUnder8,
       ageOver8
     });
@@ -3036,7 +3039,7 @@ function renderAdminSummaryReport() {
 
   if (statsStrip) {
     statsStrip.innerHTML = `
-      <div><strong>Reported Offices:</strong> <span style="color:#047857; font-weight:800;">${totOfficesReported}</span> / ${MVD_OFFICES.length}</div>
+      <div><strong>Reported Offices:</strong> <span style="color:#047857; font-weight:800;">${totOfficesReported}</span> / ${MVD_OFFICES.length} Total</div>
       <div><strong>Working Hardware:</strong> Monitors: <strong>${totWorkingMonitors}</strong> | CPUs: <strong>${totWorkingCPUs}</strong> | Laptops: <strong>${totWorkingLaptops}</strong></div>
       <div><strong>Lifecycle Health:</strong> &lt;8 Yrs: <span style="color:#047857; font-weight:700;">${totAgeUnder8}</span> | &gt;8 Yrs: <span style="color:#b91c1c; font-weight:700;">${totAgeOver8}</span></div>
       <div><strong>Power &amp; Batteries:</strong> UPS Working: <strong>${totUpsWorking}</strong> | Batteries: <strong>${totBatteriesInUse} / ${totMinBatteriesRequired}</strong></div>
@@ -3048,7 +3051,7 @@ function renderAdminSummaryReport() {
       <tr>
         <td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted);">
           <i class="fa-solid fa-filter-circle-xmark" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 10px; display: block;"></i>
-          No offices matched the current summary filters. Try changing or clearing the filters above.
+          No entered office records matched the current summary filters.
         </td>
       </tr>
     `;
@@ -3057,27 +3060,7 @@ function renderAdminSummaryReport() {
   }
 
   tbody.innerHTML = rows.map((item, idx) => {
-    const { officeName, isReported, rec, ageUnder8, ageOver8 } = item;
-
-    if (!isReported) {
-      return `
-        <tr style="opacity: 0.65; background: #fffcfc;">
-          <td style="text-align: center; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
-          <td>
-            <strong>${escapeHtml(officeName)}</strong>
-            <div><span class="badge" style="background:#fee2e2; color:#991b1b; font-size:0.72rem; padding:2px 6px;"><i class="fa-solid fa-clock"></i> Pending Entry</span></div>
-          </td>
-          <td colspan="7" style="color: var(--text-muted); font-style: italic; font-size: 0.82rem;">
-            No IT equipment survey record submitted yet for this office.
-          </td>
-          <td style="text-align: center;">
-            <button class="btn btn-outline btn-sm" onclick="editOfficeInAdmin('${escapeHtml(officeName)}')" title="Enter Office Data">
-              <i class="fa-solid fa-plus"></i> Enter
-            </button>
-          </td>
-        </tr>
-      `;
-    }
+    const { officeName, rec, ageUnder8, ageOver8 } = item;
 
     const rawNets = (rec.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision')).filter(Boolean);
     const netPills = rawNets.length > 0
@@ -3233,7 +3216,12 @@ function exportSummaryReportCSV() {
   const rows = [];
   let idx = 1;
 
-  MVD_OFFICES.forEach(officeName => {
+  const reportedOfficeNames = [
+    ...MVD_OFFICES.filter(name => !!inventoryStore[name]),
+    ...Object.keys(inventoryStore).filter(name => !MVD_OFFICES.includes(name))
+  ];
+
+  reportedOfficeNames.forEach(officeName => {
     const rec = inventoryStore[officeName];
     if (!rec) return;
 
