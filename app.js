@@ -3305,15 +3305,14 @@ function printSummaryReport() {
         </div>
         <div style="text-align: right; font-size: 0.78rem; color: #475569;">
           <div><strong>Generated On:</strong> ${formattedDate}</div>
-          <div><strong>Verification:</strong> Live Supabase Verified Record</div>
         </div>
       </div>
 
       ${tableHtml}
 
       <div class="footer">
-        <span>Keralam Motor Vehicles Department • Data AI Foundry</span>
-        <span>Confidential Official Departmental IT Audit Summary</span>
+        <span>Motor Vehicles Department, Keralam • Data AI Foundry</span>
+        <span>Departmental IT Audit Summary</span>
       </div>
 
       <script>
