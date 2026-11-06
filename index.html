@@ -1,1252 +1,937 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Keralam MVD - IT Equipment List & Inventory Management System</title>
-  
-  <!-- Meta Descriptions & SEO -->
-  <meta name="description" content="Official IT Equipment List and Inventory Portal for Motor Vehicles Department, Government of Keralam.">
-  <meta name="author" content="Motor Vehicles Department Keralam">
-
-  <!-- Google Fonts -->
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-  
-  <!-- FontAwesome Icons for Executive Government Tech Design -->
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-  
-  <!-- Chart.js CDN for Admin Analytics -->
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-
-  <!-- Supabase JS Client CDN for Live Backend Synchronization -->
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-  <!-- Google Identity Services (GSI) Client SDK for Official OAuth Sign-In -->
-  <script src="https://accounts.google.com/gsi/client" async defer></script>
-
-  <!-- Application Stylesheet -->
-  <link rel="stylesheet" href="styles.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MVD IT Equipment Portal - Kerala</title>
+    
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    
+    <!-- Custom Style Sheet -->
+    <link rel="stylesheet" href="style.css">
+    
+    <!-- Supabase Client CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- Chart.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
 </head>
 <body>
-
-  <!-- MANDATORY GOOGLE AUTHENTICATION LOCK SCREEN OVERLAY -->
-  <div id="googleAuthOverlay" class="auth-overlay" style="display: flex;">
-    <div class="auth-card">
-      <div class="auth-header">
-        <img src="mvd_logo.png" alt="Motor Vehicles Department Keralam Emblem" class="auth-emblem">
-        <h2>Motor Vehicles Department Keralam</h2>
-        <p class="auth-sub">Data AI Foundry • IT Infrastructure Portal</p>
-      </div>
-
-      <div class="auth-body">
-        <p style="font-size: 0.92rem; color: var(--text-muted); margin: 16px 0 24px 0; text-align: center; line-height: 1.55; font-weight: 600;">
-          Please sign in with your Google Account
-        </p>
-
-        <!-- SINGLE OFFICIAL GOOGLE SIGN-IN BUTTON CONTAINER -->
-        <div id="googleSignInContainer" style="width: 100%; display: flex; flex-direction: column; align-items: center; margin: 10px 0 16px 0;">
-          <div id="googleSignInButtonDiv" style="display: flex; justify-content: center; width: 100%;"></div>
-          <button type="button" id="googleCustomSigninBtn" class="google-signin-btn" onclick="triggerGoogleSignIn()" style="display: none;">
-            <svg class="google-icon" viewBox="0 0 24 24" width="22" height="22">
-              <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-              <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-              <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-              <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-            </svg>
-            <span>Sign in with Google Account</span>
-          </button>
-        </div>
-
-        <div class="auth-footer" style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-          <span><i class="fa-solid fa-shield-halved"></i> 256-bit Encrypted Authentication Layer</span>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- App Main Root Layout: Left Sidebar Navigation + Right Main Area -->
-  <div class="app-layout" id="appMainLayout" style="display: none;">
-
-    <!-- LEFT NAVIGATION SIDEBAR MENU BAR -->
-    <aside class="portal-sidebar">
-      <div class="sidebar-header">
-        <img src="mvd_logo.png" alt="Keralam Motor Vehicles Department Official Emblem" class="brand-emblem-img">
-        <div class="brand-titles">
-          <h1>MVD IT Portal</h1>
-          <p>Government of Keralam</p>
-        </div>
-      </div>
-
-      <div class="sidebar-menu-label">Navigation Menu</div>
-
-      <!-- Vertical Left Menu Items (Populated via app.js) -->
-      <div class="sidebar-menu" id="dynamicPortalMenuBar">
-        <!-- Dynamic module buttons rendered here -->
-      </div>
-
-      <!-- Admin Access Control Button in Sidebar Footer -->
-      <div class="sidebar-footer">
-        <div class="sidebar-menu-label" style="padding: 0;">Portal Administration</div>
+    <!-- App Root Grid -->
+    <div class="app-container">
         
-        <button id="adminPortalToggleBtn" class="btn btn-outline btn-sm" style="color: white; border-color: rgba(255, 255, 255, 0.3); width: 100%; justify-content: center;" onclick="triggerAdminLogin()">
-          <i class="fa-solid fa-user-gear"></i> Admin Portal
-        </button>
-
-        <!-- Admin Logout Button (Visible only when Admin is logged in) -->
-        <button id="adminLogoutHeaderBtn" class="btn btn-danger btn-sm" style="display: none; width: 100%; justify-content: center;" onclick="logoutAdmin()">
-          <i class="fa-solid fa-right-from-bracket"></i> Logout Admin
-        </button>
-      </div>
-    </aside>
-
-    <!-- RIGHT MAIN CONTENT AREA -->
-    <div class="portal-main-area">
-
-      <!-- Top Official State Bar -->
-      <div class="top-gov-bar">
-        <div class="gov-flag-group">
-          <span class="gov-flag-badge"></span>
-          <span>Motor Vehicles Department • Government of Keralam</span>
-        </div>
-        <div style="display: flex; align-items: center; gap: 16px;">
-          <!-- Authenticated Google Account Profile Pill -->
-          <div id="googleUserProfileBar" class="user-profile-badge" style="display: none;">
-            <img id="userGoogleAvatar" src="mvd_logo.png" alt="Google Profile Avatar" class="user-avatar-img">
-            <div style="display: flex; flex-direction: column;">
-              <span id="userGoogleName" class="user-profile-name">Officer Account</span>
-              <span id="userGoogleEmail" class="user-profile-email">officer@keralam.gov.in</span>
+        <!-- Header -->
+        <header class="app-header">
+            <div class="header-logo">
+                <div class="logo-circle">
+                    <i data-lucide="car"></i>
+                </div>
+                <div class="logo-text">
+                    <h1>MVD IT Equipment List</h1>
+                    <span>Motor Vehicles Department • Government of Kerala</span>
+                </div>
             </div>
-            <button type="button" id="btnViewEnteredData" class="btn btn-outline btn-sm" onclick="openCurrentUserRecordSummary()" style="display: none; margin-left: 10px; background: #ffffff; color: #064e3b; border: 1.5px solid #a7f3d0; font-weight: 700; border-radius: 6px; padding: 4px 10px;">
-              <i class="fa-solid fa-window-restore"></i> View Entered Data
-            </button>
-            <button type="button" class="btn-signout" onclick="logoutGoogleUser()" title="Sign Out Google Account">
-              <i class="fa-solid fa-right-from-bracket"></i> Sign Out
-            </button>
-          </div>
-
-          <span id="liveClockDisplay"><i class="fa-regular fa-clock"></i> Loading System Time...</span>
-        </div>
-      </div>
-
-      <!-- Main Content Wrapper -->
-      <main class="main-wrapper">
-
-        <!-- MODULE VIEW CONTAINER FOR NON-IT EQUIPMENT MODULES -->
-        <div id="genericModuleContainer" style="display: none;">
-          <!-- Dynamically populated when selecting non-IT modules from Menu Bar -->
-        </div>
-
-        <!-- MAIN IT EQUIPMENT PORTAL CONTAINER -->
-        <div id="publicContainer">
-          
-          <!-- 1. PUBLIC ENTRY WINDOW CONTAINER -->
-          <div id="publicEntrySection">
-            <!-- Form Header Toolbar -->
-            <div class="table-toolbar" style="background: white; padding: 14px 20px; border-radius: var(--radius-md); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px; margin-bottom: 20px;">
-              <div>
-                <div style="font-weight: 700; color: var(--primary-900); font-size: 1.05rem;">
-                  <i class="fa-solid fa-file-pen"></i> MVD IT Equipment List & Office Entry
-                </div>
-                <div style="font-size: 0.85rem; color: var(--text-muted);">
-                  <i class="fa-solid fa-circle-info"></i> Select an office to enter or view data in a new window.
-                </div>
-              </div>
-
-              <div>
-                <button type="button" id="btnOpenSelectedOfficeWindow" class="btn btn-outline btn-sm" style="display: none; align-items: center; gap: 8px; font-weight: 600;" onclick="openSelectedOfficeSummaryWindow()">
-                  <i class="fa-solid fa-window-restore"></i> View Entered Office in New Window
-                </button>
-              </div>
-            </div>
-
-            <form id="itEquipmentForm" onsubmit="handleFormSubmit(event)">
-              <!-- 1. Office Identification -->
-              <div class="card-section sec-office">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-building-flag"></i> 1. Office Identification
-                  </h2>
-                  <span class="section-tag">Required</span>
-                </div>
-
-                <div class="form-grid-2">
-                  <!-- Office Name Dropdown -->
-                  <div class="form-group">
-                    <label for="officeSelect"><i class="fa-solid fa-building"></i> Select Office Name *</label>
-                    <select id="officeSelect" class="form-control" required onchange="handleOfficeSelectChange(this.value)">
-                      <option value="">-- Choose MVD Office --</option>
-                      <!-- Populated dynamically via JS -->
-                    </select>
-                    <div id="reflectionAlert" class="reflection-alert" style="display: none; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                      <div style="display: flex; align-items: center; gap: 8px;">
-                        <i class="fa-solid fa-sparkles"></i>
-                        <span id="reflectionAlertText">Existing entry found for this office. Values auto-filled below!</span>
-                      </div>
-                      <div style="display: flex; gap: 8px; align-items: center;">
-                        <button type="button" id="btnAdminDeleteFromAlert" class="btn btn-danger btn-sm" onclick="deleteCurrentAdminOfficeEntry()" style="display: none; padding: 5px 12px; font-size: 0.8rem; border-radius: 6px;">
-                          <i class="fa-solid fa-trash"></i> Delete Office Record
-                        </button>
-                        <button type="button" id="btnPublicOpenWindow" class="btn btn-primary btn-sm" onclick="openSelectedOfficeSummaryWindow()" style="padding: 4px 12px; font-size: 0.8rem; border-radius: 6px; display: none !important;">
-                          <i class="fa-solid fa-arrow-up-right-from-square"></i> Open in New Window
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Reporting / Entry Officer Details -->
-                <div class="form-grid-3" style="margin-top: 20px;">
-                  <div class="form-group">
-                    <label for="entryOfficerName"><i class="fa-solid fa-user-pen"></i> Entry Officer Name *</label>
-                    <input type="text" id="entryOfficerName" class="form-control" placeholder="Full name of reporting officer" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="entryOfficerDesignation"><i class="fa-solid fa-user-tag"></i> Designation *</label>
-                    <input type="text" id="entryOfficerDesignation" class="form-control" placeholder="e.g. Senior Superintendent / Joint RTO" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="entryOfficerMobile"><i class="fa-solid fa-phone"></i> Mobile Number *</label>
-                    <input type="tel" id="entryOfficerMobile" class="form-control" placeholder="10-digit mobile number" pattern="[0-9]{10}" maxlength="10" required>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 2. Network Infrastructure & Operating System -->
-              <div class="card-section sec-network">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-network-wired"></i> 2. Network Infrastructure & Operating System
-                  </h2>
-                  <span class="section-tag">Connectivity & OS</span>
-                </div>
-
-                <div class="form-grid-2">
-                  <!-- Network Multi-Selection -->
-                  <div class="form-group">
-                    <label style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
-                      <span><i class="fa-solid fa-wifi"></i> Available Network(s) * (Multiple selection allowed)</span>
-                      <span id="selectedNetworksBadgeCount" style="font-size: 0.75rem; background: var(--primary-100); color: var(--primary-800); padding: 2px 8px; border-radius: 12px; font-weight: 700;">0 selected</span>
-                    </label>
-                    <div id="networkCheckboxContainer" class="network-multiselect-box">
-                      <label class="network-chk-pill">
-                        <input type="checkbox" name="networkOption" value="KSWAN" onchange="handleNetworkSelectionChange()">
-                        <span>KSWAN</span>
-                      </label>
-                      <label class="network-chk-pill">
-                        <input type="checkbox" name="networkOption" value="KFONE" onchange="handleNetworkSelectionChange()">
-                        <span>KFONE</span>
-                      </label>
-                      <label class="network-chk-pill">
-                        <input type="checkbox" name="networkOption" value="BSNL" onchange="handleNetworkSelectionChange()">
-                        <span>BSNL</span>
-                      </label>
-                      <label class="network-chk-pill">
-                        <input type="checkbox" name="networkOption" value="JIO" onchange="handleNetworkSelectionChange()">
-                        <span>JIO</span>
-                      </label>
-                      <label class="network-chk-pill">
-                        <input type="checkbox" name="networkOption" value="Keralam Vision" onchange="handleNetworkSelectionChange()">
-                        <span>Keralam Vision</span>
-                      </label>
-                      <label class="network-chk-pill">
-                        <input type="checkbox" name="networkOption" value="Asianet" onchange="handleNetworkSelectionChange()">
-                        <span>Asianet</span>
-                      </label>
-                      <label class="network-chk-pill">
-                        <input type="checkbox" name="networkOption" value="Others" onchange="handleNetworkSelectionChange()">
-                        <span>Others</span>
-                      </label>
-                    </div>
-                    <input type="hidden" id="availableNetworkSelect" value="">
-                  </div>
-
-                  <!-- Network Speed -->
-                  <div class="form-group">
-                    <label for="networkSpeedInput"><i class="fa-solid fa-gauge-high"></i> Network Speed</label>
-                    <input type="text" id="networkSpeedInput" class="form-control" placeholder="e.g. 100 Mbps, 1 Gbps, 20 Mbps FTTH">
-                  </div>
-                </div>
-
-                <!-- Conditional Others Network Details -->
-                <div id="otherNetworkGroup" class="form-group" style="margin-top: 16px; display: none;">
-                  <label for="otherNetworkInput"><i class="fa-solid fa-pen-to-square"></i> Details for Other Network *</label>
-                  <input type="text" id="otherNetworkInput" class="form-control" placeholder="Specify ISP, provider name, or leased line details...">
-                </div>
-
-                <div class="form-grid-2" style="margin-top: 16px;">
-                  <!-- Are switches available -->
-                  <div class="form-group">
-                    <label for="switchesAvailableSelect"><i class="fa-solid fa-server"></i> Are switches available in the office? *</label>
-                    <select id="switchesAvailableSelect" class="form-control" required onchange="handleSwitchesAvailabilityChange(this.value)">
-                      <option value="">-- Select Option --</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                      <option value="Not Sure">Not Sure</option>
-                    </select>
-                  </div>
-
-                  <!-- Are servers available -->
-                  <div class="form-group">
-                    <label for="serversAvailableSelect"><i class="fa-solid fa-database"></i> Are Servers available in the office? *</label>
-                    <select id="serversAvailableSelect" class="form-control" required onchange="handleServersAvailabilityChange(this.value)">
-                      <option value="">-- Select Option --</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Conditional Switches Details -->
-                <div id="switchesDetailsGroup" class="form-group" style="margin-top: 16px; display: none;">
-                  <label for="switchesDetailsInput"><i class="fa-solid fa-circle-info"></i> If Yes, Enter Details such as Manufacturer, No of ports etc</label>
-                  <input type="text" id="switchesDetailsInput" class="form-control" placeholder="e.g. Cisco 24-port Gigabit Switch, D-Link 16-port Switch">
-                </div>
-
-                <!-- Conditional Servers Details -->
-                <div id="serversDetailsGroup" class="form-group" style="margin-top: 16px; display: none;">
-                  <label for="serversDetailsInput"><i class="fa-solid fa-circle-info"></i> If Yes, Enter Details such as Current status of server</label>
-                  <input type="text" id="serversDetailsInput" class="form-control" placeholder="e.g. HP ProLiant Rack Server - Operational / Active for Local DB">
-                </div>
-
-                <div class="form-group" style="margin-top: 16px;">
-                  <label for="operatingSystemInput"><i class="fa-solid fa-laptop-code"></i> Operating System(s) used with versions *</label>
-                  <input type="text" id="operatingSystemInput" class="form-control" placeholder="e.g. Ubuntu 22.04 LTS, Windows 11 Pro, BOSS Linux 9.0" required>
-                </div>
-              </div>
-
-              <!-- 3. Main Systems Breakdown (Working vs. Not Working) -->
-              <div class="card-section sec-hardware">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-desktop"></i> 3. Core IT Hardware Equipment Status *
-                  </h2>
-                  <span class="section-tag">Required *</span>
-                </div>
-
-                <div class="form-grid-4">
-                  <!-- Monitors -->
-                  <div class="pair-box">
-                    <div class="pair-title"><i class="fa-solid fa-display"></i> Monitors *</div>
-                    <div class="pair-inputs">
-                      <div class="counter-input-group">
-                        <label class="label-working">Working *</label>
-                        <input type="number" id="monitorsWorking" class="form-control input-working" min="0" value="0" required onchange="calculateNonWorkingDesktops()">
-                      </div>
-                      <div class="counter-input-group">
-                        <label class="label-not-working">Not Working *</label>
-                        <input type="number" id="monitorsNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- CPUs -->
-                  <div class="pair-box">
-                    <div class="pair-title"><i class="fa-solid fa-microchip"></i> CPU Units *</div>
-                    <div class="pair-inputs">
-                      <div class="counter-input-group">
-                        <label class="label-working">Working *</label>
-                        <input type="number" id="cpuWorking" class="form-control input-working" min="0" value="0" required onchange="calculateNonWorkingDesktops()">
-                      </div>
-                      <div class="counter-input-group">
-                        <label class="label-not-working">Not Working *</label>
-                        <input type="number" id="cpuNotWorking" class="form-control input-not-working" min="0" value="0" required onchange="calculateNonWorkingDesktops()">
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Laptops -->
-                  <div class="pair-box">
-                    <div class="pair-title"><i class="fa-solid fa-laptop"></i> Laptops *</div>
-                    <div class="pair-inputs">
-                      <div class="counter-input-group">
-                        <label class="label-working">Working *</label>
-                        <input type="number" id="laptopsWorking" class="form-control input-working" min="0" value="0" required>
-                      </div>
-                      <div class="counter-input-group">
-                        <label class="label-not-working">Not Working *</label>
-                        <input type="number" id="laptopsNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- All-in-One PCs -->
-                  <div class="pair-box">
-                    <div class="pair-title"><i class="fa-solid fa-tv"></i> All-In-One PCs *</div>
-                    <div class="pair-inputs">
-                      <div class="counter-input-group">
-                        <label class="label-working">Working *</label>
-                        <input type="number" id="aioWorking" class="form-control input-working" min="0" value="0" required>
-                      </div>
-                      <div class="counter-input-group">
-                        <label class="label-not-working">Not Working *</label>
-                        <input type="number" id="aioNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 4. Printers & Imaging Section -->
-              <div class="card-section sec-printer">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-print"></i> 4. Printer & Imaging Equipment Section
-                  </h2>
-                  <span class="section-tag">Status & Multipurpose Marking</span>
-                </div>
-
-                <div class="printers-table-container">
-                  <table class="printers-table">
-                    <thead>
-                      <tr>
-                        <th>Printer Category</th>
-                        <th>Working Count</th>
-                        <th>Not Working Count</th>
-                        <th>Multipurpose (Print, Scan, Copy)</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      <!-- Dot Matrix -->
-                      <tr>
-                        <td><strong><i class="fa-solid fa-table-cells"></i> Dot Matrix Printer</strong></td>
-                        <td>
-                          <input type="number" id="printerDotMatrixWorking" class="form-control input-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <input type="number" id="printerDotMatrixNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <label class="custom-checkbox-wrapper">
-                            <input type="checkbox" id="printerDotMatrixMulti"> Multipurpose
-                          </label>
-                        </td>
-                      </tr>
-
-                      <!-- Inkjet -->
-                      <tr>
-                        <td><strong><i class="fa-solid fa-droplet"></i> Ink Jet Printer</strong></td>
-                        <td>
-                          <input type="number" id="printerInkjetWorking" class="form-control input-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <input type="number" id="printerInkjetNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <label class="custom-checkbox-wrapper">
-                            <input type="checkbox" id="printerInkjetMulti"> Multipurpose
-                          </label>
-                        </td>
-                      </tr>
-
-                      <!-- Laser Printer -->
-                      <tr>
-                        <td><strong><i class="fa-solid fa-bolt"></i> Laser Printer</strong></td>
-                        <td>
-                          <input type="number" id="printerLaserWorking" class="form-control input-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <input type="number" id="printerLaserNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <label class="custom-checkbox-wrapper">
-                            <input type="checkbox" id="printerLaserMulti"> Multipurpose
-                          </label>
-                        </td>
-                      </tr>
-
-                      <!-- Xerox Machine -->
-                      <tr>
-                        <td><strong><i class="fa-solid fa-copy"></i> Xerox Machine</strong></td>
-                        <td>
-                          <input type="number" id="printerXeroxWorking" class="form-control input-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <input type="number" id="printerXeroxNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <label class="custom-checkbox-wrapper">
-                            <input type="checkbox" id="printerXeroxMulti" checked> Multipurpose
-                          </label>
-                        </td>
-                      </tr>
-
-                      <!-- Others -->
-                      <tr>
-                        <td><strong><i class="fa-solid fa-boxes-stacked"></i> Others (Thermal/Barcode etc.)</strong></td>
-                        <td>
-                          <input type="number" id="printerOthersWorking" class="form-control input-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <input type="number" id="printerOthersNotWorking" class="form-control input-not-working" min="0" value="0" required>
-                        </td>
-                        <td>
-                          <label class="custom-checkbox-wrapper">
-                            <input type="checkbox" id="printerOthersMulti"> Multipurpose
-                          </label>
-                        </td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              <!-- 5. Power & Battery Infrastructure -->
-              <div class="card-section sec-power">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-car-battery"></i> 5. Power & Battery Infrastructure
-                  </h2>
-                  <span class="section-tag">UPS & Battery Audit</span>
-                </div>
-
-                <div class="form-grid-2">
-                  <!-- Is a UPS available in the office? Multiple Choice (Required) -->
-                  <div class="form-group">
-                    <label for="upsAvailableSelect"><i class="fa-solid fa-plug"></i> Is a UPS available in the office? *</label>
-                    <select id="upsAvailableSelect" class="form-control" required onchange="handleUpsAvailabilityChange(this.value)">
-                      <option value="">-- Select Choice --</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-
-                  <!-- No. of UPS Units Working -->
-                  <div class="form-group">
-                    <label for="upsWorking"><i class="fa-solid fa-circle-check" style="color: #059669;"></i> No. of UPS Units Working *</label>
-                    <input type="number" id="upsWorking" class="form-control input-working" min="0" value="0" placeholder="e.g. 1, 2, 5" required>
-                  </div>
-
-                  <!-- No. of UPS Units Not Working -->
-                  <div class="form-group">
-                    <label for="upsNotWorking"><i class="fa-solid fa-circle-xmark" style="color: #dc2626;"></i> No. of UPS Units Not Working *</label>
-                    <input type="number" id="upsNotWorking" class="form-control input-not-working" min="0" value="0" placeholder="e.g. 0, 1" required>
-                  </div>
-
-                  <!-- UPS Capacity (kVA Rating) Dropdown -->
-                  <div class="form-group">
-                    <label for="upsCapacitySelect"><i class="fa-solid fa-bolt"></i> UPS Capacity (kVA Rating) *</label>
-                    <select id="upsCapacitySelect" class="form-control" required onchange="handleUpsCapacityChange(this.value)">
-                      <option value="">-- Select kVA Rating --</option>
-                      <option value="0.5 kVA">0.5 kVA</option>
-                      <option value="1 kVA">1 kVA</option>
-                      <option value="2 kVA">2 kVA</option>
-                      <option value="3 kVA">3 kVA</option>
-                      <option value="5 kVA">5 kVA</option>
-                      <option value="10 kVA">10 kVA</option>
-                      <option value="Other">Other (Specify)</option>
-                    </select>
-                  </div>
-
-                  <!-- Condition of Working UPS Multiple Choice -->
-                  <div class="form-group">
-                    <label for="upsConditionSelect"><i class="fa-solid fa-square-poll-vertical"></i> Condition of Working UPS *</label>
-                    <select id="upsConditionSelect" class="form-control" required>
-                      <option value="">-- Select Condition --</option>
-                      <option value="Good">Good</option>
-                      <option value="Working with Minor Issues">Working with Minor Issues</option>
-                      <option value="Requires Repair">Requires Repair</option>
-                      <option value="Not Working">Not Working</option>
-                      <option value="Not Available">Not Available</option>
-                    </select>
-                  </div>
-                </div>
-
-                <!-- Conditional Other Capacity Specification -->
-                <div id="upsCapacityOtherGroup" class="form-group" style="margin-top: 16px; display: none;">
-                  <label for="upsCapacityOtherInput"><i class="fa-solid fa-pen"></i> Specify Other UPS Capacity (kVA) *</label>
-                  <input type="text" id="upsCapacityOtherInput" class="form-control" placeholder="e.g. 7.5 kVA, 15 kVA, 20 kVA">
-                </div>
-
-                <div class="form-grid-4" style="margin-top: 16px;">
-                  <!-- Battery Type/Make (Short Answer) -->
-                  <div class="form-group">
-                    <label for="batteryMakeInput"><i class="fa-solid fa-battery-three-quarters"></i> Battery Type / Make *</label>
-                    <input type="text" id="batteryMakeInput" class="form-control" placeholder="e.g. Exide, Amaron, Quanta, Tubular, SMF" required>
-                  </div>
-
-                  <!-- Battery AH Rating (42, 65, 85) (Short Answer - Response validation: Number) -->
-                  <div class="form-group">
-                    <label for="batteryAhInput"><i class="fa-solid fa-gauge"></i> Battery AH Rating (42, 65, 85) *</label>
-                    <input type="number" id="batteryAhInput" class="form-control" min="0" placeholder="e.g. 42, 65, 85, 100" required>
-                  </div>
-
-                  <!-- Number of Batteries currently using -->
-                  <div class="form-group">
-                    <label for="batteriesInUseInput"><i class="fa-solid fa-battery-full"></i> Number of Batteries currently using *</label>
-                    <input type="number" id="batteriesInUseInput" class="form-control" min="0" value="0" placeholder="e.g. 2, 4, 16" required>
-                  </div>
-
-                  <!-- Minimum Number of Batteries Required (Short Answer - Response validation: Number) -->
-                  <div class="form-group">
-                    <label for="minBatteriesRequiredInput"><i class="fa-solid fa-battery-half"></i> Minimum Number of Batteries Required *</label>
-                    <input type="number" id="minBatteriesRequiredInput" class="form-control" min="0" value="0" placeholder="e.g. 2, 4, 16" required>
-                  </div>
-                </div>
-
-                <div class="form-grid-2" style="margin-top: 16px;">
-                  <!-- Has the Service Report been sent to TCO? Multiple Choice -->
-                  <div class="form-group">
-                    <label for="serviceReportSentSelect"><i class="fa-solid fa-paper-plane"></i> Has the Service Report been sent to TCO? *</label>
-                    <select id="serviceReportSentSelect" class="form-control" required onchange="handleServiceReportChange(this.value)">
-                      <option value="">-- Select Choice --</option>
-                      <option value="Yes">Yes</option>
-                      <option value="No">No</option>
-                    </select>
-                  </div>
-
-                  <!-- If Yes, Date of Sending Service Report -->
-                  <div id="serviceReportDateGroup" class="form-group" style="display: none;">
-                    <label for="serviceReportDateInput"><i class="fa-regular fa-calendar-check"></i> Date of Sending Service Report to TCO *</label>
-                    <input type="date" id="serviceReportDateInput" class="form-control">
-                  </div>
-                </div>
-
-                <!-- Power Remarks (if any) Paragraph -->
-                <div class="form-group" style="margin-top: 16px;">
-                  <label for="powerRemarksInput"><i class="fa-solid fa-comment-dots"></i> Power Infrastructure Remarks (if any)</label>
-                  <textarea id="powerRemarksInput" class="form-control" placeholder="Enter specific details regarding UPS battery backup hours, AMC contractor, replacement requests..." style="min-height: 70px;"></textarea>
-                </div>
-              </div>
-
-              <!-- 6. System Age Distribution (Desktops, Laptops, PCs) -->
-              <div class="card-section sec-age">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-hourglass-half"></i> 6. System Age Distribution (Desktop, Laptop, PCs)
-                  </h2>
-                  <span class="section-tag">Hardware Lifecycle Profile</span>
-                </div>
-
-                <div class="form-grid-4">
-                  <div class="form-group">
-                    <label for="ageUnder3"><i class="fa-solid fa-seedling"></i> Systems &lt; 3 Years Old *</label>
-                    <input type="number" id="ageUnder3" class="form-control" min="0" value="0" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="age3To5"><i class="fa-solid fa-clock-rotate-left"></i> Systems 3–5 Years Old *</label>
-                    <input type="number" id="age3To5" class="form-control" min="0" value="0" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="age5To8"><i class="fa-solid fa-calendar-xmark"></i> Systems 5–8 Years Old *</label>
-                    <input type="number" id="age5To8" class="form-control" min="0" value="0" required>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="ageAbove8" style="color: #b91c1c;"><i class="fa-solid fa-triangle-exclamation"></i> Systems &gt; 8 Years Old *</label>
-                    <input type="number" id="ageAbove8" class="form-control input-not-working" min="0" value="0" required>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 7. Specific Condition Remarks -->
-              <div class="card-section sec-remarks">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-comment-dots"></i> 7. Specific Condition Remarks
-                  </h2>
-                </div>
-
-                <div class="form-group">
-                  <label for="remarksInput"><i class="fa-solid fa-comment-dots"></i> General Remarks (Enter overall condition of IT systems and equipments)</label>
-                  <textarea id="remarksInput" class="form-control" placeholder="Enter details regarding system defects, warranty status, AMC contracts, or pending replacement requests..."></textarea>
-                </div>
-
-                <!-- Official Certification Checkbox -->
-                <div class="certification-box" style="background: #f0fdf4; border: 1.5px solid #a7f3d0; padding: 18px 22px; border-radius: var(--radius-md); margin-top: 24px;">
-                  <label class="custom-checkbox-wrapper" style="display: flex; align-items: flex-start; gap: 12px; font-weight: 700; color: #064e3b; font-size: 0.95rem; cursor: pointer;">
-                    <input type="checkbox" id="certificationCheckbox" required style="width: 20px; height: 20px; margin-top: 2px; accent-color: var(--primary-600);">
-                    <span>
-                      <i class="fa-solid fa-shield-check" style="color: #047857;"></i> I certify that the above information is true and correct. <span style="color: #b91c1c;">*</span>
-                      <small style="display: block; font-weight: 400; color: #047857; font-size: 0.82rem; margin-top: 4px;">
-                        By checking this box, you confirm official departmental reporting accuracy under Keralam MVD guidelines.
-                      </small>
-                    </span>
-                  </label>
-                </div>
-
-                <!-- Submit Button Bar -->
-                <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; align-items: center;">
-                  <button type="button" id="btnAdminDeleteCurrentEntry" class="btn btn-danger" onclick="deleteCurrentAdminOfficeEntry()" style="display: none; margin-right: auto;">
-                    <i class="fa-solid fa-trash"></i> Delete Office Record from Supabase
-                  </button>
-                  <button type="button" class="btn btn-secondary" onclick="resetPublicForm()">
-                    <i class="fa-solid fa-rotate-left"></i> Reset Form
-                  </button>
-                  <button type="submit" class="btn btn-primary btn-lg" onclick="handleFormSubmit(event)">
-                    <i class="fa-solid fa-floppy-disk"></i> Submit / Save Office Entry
-                  </button>
-                </div>
-              </div>
-
-            </form>
-          </div>
-
-        </div>
-
-        <!-- ADMIN SESSION CONTAINER -->
-        <div id="adminContainer" style="display: none;">
-          
-          <!-- Admin Controls Bar & Option Switcher -->
-          <div class="card-section" style="background: linear-gradient(135deg, var(--primary-900) 0%, var(--primary-800) 100%); color: white;">
-            <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-              <div>
-                <h2 style="font-size: 1.3rem; font-weight: 700; color: #ffffff;"><i class="fa-solid fa-user-shield"></i> MVD Administrative Portal</h2>
-                <p style="font-size: 0.85rem; color: #93c5fd;">Manage state inventory, view analytics dashboard, configure future menu modules, and manage portal parameters.</p>
-              </div>
-
-              <div style="display: flex; align-items: center; gap: 16px;">
-                <!-- Explicit Admin Logout Button in Admin Banner -->
-                <button class="btn btn-danger" onclick="logoutAdmin()">
-                  <i class="fa-solid fa-right-from-bracket"></i> Exit Admin Mode
-                </button>
-              </div>
-            </div>
-
-            <!-- Admin Options Sub-Nav -->
-            <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
-              <button class="btn btn-outline" id="btnAdminNavDashboard" onclick="switchAdminSubView('dashboard')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                <i class="fa-solid fa-chart-pie"></i> Executive Dashboard
-              </button>
-              <button class="btn btn-outline" id="btnAdminNavSummary" onclick="switchAdminSubView('summary')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                <i class="fa-solid fa-table-list"></i> Summary Report
-              </button>
-              <button class="btn btn-outline" id="btnAdminNavEntry" onclick="switchAdminSubView('entry')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                <i class="fa-solid fa-plus-circle"></i> Direct Admin Entry
-              </button>
-              <button class="btn btn-outline" id="btnAdminNavView" onclick="switchAdminSubView('view')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                <i class="fa-solid fa-list-check"></i> Master View & Management
-              </button>
-              <button class="btn btn-outline" id="btnAdminNavMenus" onclick="switchAdminSubView('menus')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                <i class="fa-solid fa-sliders"></i> Menu & Module Manager
-              </button>
-            </div>
-          </div>
-
-          <!-- ADMIN DASHBOARD SUBVIEW -->
-          <div id="adminDashboardSubView">
             
-            <!-- Dashboard Filter Bar -->
-            <div class="card-section" style="padding: 16px 24px; margin-bottom: 20px; background: #ffffff;">
-              <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px;">
-                <div style="display: flex; align-items: center; gap: 10px;">
-                  <i class="fa-solid fa-filter" style="color: var(--primary-600); font-size: 1.1rem;"></i>
-                  <span style="font-weight: 700; color: var(--primary-900);">Dashboard Office Scope Filter:</span>
-                </div>
-                <div style="flex: 1; max-width: 420px; min-width: 250px;">
-                  <select id="dashboardOfficeFilter" class="form-control" onchange="renderAdminDashboard()" style="font-weight: 600;">
-                    <option value="ALL">-- Statewide Aggregate (All MVD Offices) --</option>
-                    <!-- Populated dynamically via JS -->
-                  </select>
-                </div>
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-primary btn-sm" onclick="generateComprehensiveReport()" style="background: var(--primary-800); border-color: var(--primary-900); font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-download"></i> Download Report
-                  </button>
-                  <div style="font-size: 0.82rem; color: var(--text-muted);">
-                    <i class="fa-solid fa-arrow-pointer"></i> <strong>Drill-Down:</strong> Click KPI cards.
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <!-- KPI Cards Grid with Interactive Drill-Down -->
-            <div class="dashboard-grid-4" style="grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));">
-              <div class="metric-card emerald" onclick="drillDownDashboard('offices')" style="cursor: pointer;" title="Click to view Reported vs Pending Offices Breakdown">
-                <div class="metric-icon"><i class="fa-solid fa-building-circle-check"></i></div>
-                <div class="metric-content">
-                  <h4>Offices Reported <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-emerald);"></i></h4>
-                  <div class="metric-value" id="kpiOfficesReported">0 / 100+</div>
-                  <div class="metric-sub">Click for Office Status List</div>
-                </div>
-              </div>
-
-              <div class="metric-card gold" onclick="drillDownDashboard('systems')" style="cursor: pointer;" title="Click to view Systems Distribution Breakdown">
-                <div class="metric-icon"><i class="fa-solid fa-computer"></i></div>
-                <div class="metric-content">
-                  <h4>Total IT Systems <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-gold);"></i></h4>
-                  <div class="metric-value" id="kpiTotalSystems">0</div>
-                  <div class="metric-sub">Click for System Types Breakdown</div>
-                </div>
-              </div>
-
-              <div class="metric-card rose" onclick="drillDownDashboard('defective')" style="cursor: pointer;" title="Click to view Defective Hardware Breakdown">
-                <div class="metric-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
-                <div class="metric-content">
-                  <h4>Non-Working Hardware <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-rose);"></i></h4>
-                  <div class="metric-value" id="kpiNonWorkingHardware">0</div>
-                  <div class="metric-sub">Click for Defective Items List</div>
-                </div>
-              </div>
-
-              <div class="metric-card purple" onclick="drillDownDashboard('network')" style="cursor: pointer;" title="Click to view KSWAN / KFONE Network Distribution">
-                <div class="metric-icon"><i class="fa-solid fa-network-wired"></i></div>
-                <div class="metric-content">
-                  <h4>KSWAN / KFONE Offices <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: var(--accent-purple);"></i></h4>
-                  <div class="metric-value" id="kpiGovNetworkCount">0</div>
-                  <div class="metric-sub">Click for Network Provider List</div>
-                </div>
-              </div>
-
-              <div class="metric-card cyan" onclick="drillDownDashboard('switches')" style="cursor: pointer;" title="Click to view Network Switches Available Offices">
-                <div class="metric-icon"><i class="fa-solid fa-server"></i></div>
-                <div class="metric-content">
-                  <h4>Switches Available <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #0284c7;"></i></h4>
-                  <div class="metric-value" id="kpiSwitchesCount">0</div>
-                  <div class="metric-sub">Click for Switches List</div>
-                </div>
-              </div>
-
-              <div class="metric-card indigo" onclick="drillDownDashboard('servers')" style="cursor: pointer;" title="Click to view Servers Installed Offices">
-                <div class="metric-icon"><i class="fa-solid fa-database"></i></div>
-                <div class="metric-content">
-                  <h4>Servers Installed <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #4f46e5;"></i></h4>
-                  <div class="metric-value" id="kpiServersCount">0</div>
-                  <div class="metric-sub">Click for Server Details</div>
-                </div>
-              </div>
-
-              <div class="metric-card emerald" onclick="drillDownDashboard('ups')" style="cursor: pointer;" title="Click to view Power & Battery Infrastructure Drill-Down">
-                <div class="metric-icon"><i class="fa-solid fa-bolt"></i></div>
-                <div class="metric-content">
-                  <h4>Working UPS Units <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #059669;"></i></h4>
-                  <div class="metric-value" id="kpiUpsWorkingCount">0</div>
-                  <div class="metric-sub">Click for Power Audit List</div>
-                </div>
-              </div>
-
-              <div class="metric-card amber" onclick="drillDownDashboard('service_reports')" style="cursor: pointer;" title="Click to view TCO Service Reports Sent Offices">
-                <div class="metric-icon"><i class="fa-solid fa-paper-plane"></i></div>
-                <div class="metric-content">
-                  <h4>TCO Service Reports <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.75rem; color: #d97706;"></i></h4>
-                  <div class="metric-value" id="kpiServiceReportCount">0</div>
-                  <div class="metric-sub">Click for TCO Reports Status</div>
-                </div>
-              </div>
-            </div>
-
-            <!-- Charts Row 1: Hardware Health & System Age -->
-            <div class="charts-grid-2">
-              <!-- Chart 1: Hardware Health Breakdown -->
-              <div class="chart-card">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-pie"></i> Hardware Equipment Health (Working vs. Defective)</h3>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartHardwareHealth"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 2: System Age Distribution -->
-              <div class="chart-card" onclick="drillDownDashboard('age')" style="cursor: pointer;" title="Click to view System Age Profile Breakdown Drill-Down">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-chart-column"></i> System Age Profile Across Offices</h3>
-                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartAgeDistribution"></canvas>
-                </div>
-              </div>
-            </div>
-
-            <!-- Charts Row 2: UPS & Battery Infrastructure Status Charts -->
-            <div class="charts-grid-2" style="margin-top: 20px;">
-              <!-- Chart 3: UPS Working Condition & Defect Status -->
-              <div class="chart-card" onclick="drillDownDashboard('ups')" style="cursor: pointer;" title="Click for Power & Battery Infrastructure Drill-Down">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-bolt" style="color: #059669;"></i> UPS Working Condition & Defect Status</h3>
-                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartDashboardUpsCondition"></canvas>
-                </div>
-              </div>
-
-              <!-- Chart 4: UPS Capacity Ratings Distribution -->
-              <div class="chart-card" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Power & Battery Audit Drill-Down">
-                <div class="section-header" style="margin-bottom: 12px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center;">
-                  <h3 class="section-title" style="font-size: 1rem;"><i class="fa-solid fa-car-battery" style="color: #0891b2;"></i> UPS Capacity Ratings Distribution (kVA)</h3>
-                  <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
-                </div>
-                <div class="chart-container">
-                  <canvas id="chartDashboardUpsCapacity"></canvas>
-                </div>
-              </div>
-            </div>
-
-            <!-- Network Provider Breakdown Card -->
-            <div class="card-section">
-              <div class="section-header">
-                <h3 class="section-title"><i class="fa-solid fa-wifi"></i> Available Network Distribution across MVD Offices</h3>
-              </div>
-              <div id="networkStatsGrid" class="form-grid-4">
-                <!-- Dynamic network pills -->
-              </div>
-            </div>
-
-            <!-- Power Infrastructure Breakdown Card -->
-            <div class="card-section" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Power & Battery Audit Drill-Down">
-              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 class="section-title"><i class="fa-solid fa-bolt"></i> Power & UPS Infrastructure Status across MVD Offices</h3>
-                <span style="font-size: 0.78rem; color: var(--primary-600); font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
-              </div>
-              <div id="powerStatsGrid" class="form-grid-4">
-                <!-- Dynamic power pills -->
-              </div>
-            </div>
-
-            <!-- Dedicated Battery Infrastructure Audit & Capacity Title Card -->
-            <div class="card-section" onclick="drillDownDashboard('power')" style="cursor: pointer; background: linear-gradient(135deg, #ffffff 0%, #f0fdf4 100%); border-left: 6px solid #10b981;" title="Click for Power & Battery Audit Drill-Down">
-              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center;">
-                <h3 class="section-title"><i class="fa-solid fa-car-battery" style="color: #059669;"></i> Battery Infrastructure Audit & Provisioning Title Card</h3>
-                <span style="font-size: 0.78rem; color: #047857; font-weight: 700;"><i class="fa-solid fa-magnifying-glass-plus"></i> Drill Down</span>
-              </div>
-              <div id="batteryDetailsGrid" class="form-grid-3">
-                <!-- Dynamic battery details pills -->
-              </div>
-            </div>
-          </div>
-
-          <!-- ADMIN DIRECT ENTRY SUBVIEW -->
-          <div id="adminEntrySubView" style="display: none;">
-            <div class="reflection-alert" style="margin-bottom: 16px;">
-              <i class="fa-solid fa-user-lock"></i>
-              <span>Admin Direct Entry Mode Active. Data submitted here updates the live Supabase cloud database directly.</span>
-            </div>
-            <div id="adminFormContainer"></div>
-          </div>
-
-          <!-- ADMIN MASTER VIEW SUBVIEW -->
-          <div id="adminViewSubView" style="display: none;">
-            <div class="card-section">
-              <div class="section-header">
-                <h3 class="section-title"><i class="fa-solid fa-database"></i> Master IT Inventory Database</h3>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-primary btn-sm" onclick="generateComprehensiveReport()" style="background: var(--primary-800); border-color: var(--primary-900); font-weight: 700; display: inline-flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-download"></i> Download Report
-                  </button>
-                  <button class="btn btn-outline btn-sm" onclick="exportDataToCSV()">
-                    <i class="fa-solid fa-file-excel"></i> Export CSV
-                  </button>
-                  <button class="btn btn-secondary btn-sm" onclick="window.print()">
-                    <i class="fa-solid fa-print"></i> Print Quick Table
-                  </button>
-                </div>
-              </div>
-
-              <div class="table-toolbar">
-                <div class="search-box">
-                  <i class="fa-solid fa-magnifying-glass"></i>
-                  <input type="text" id="adminSearchInput" class="form-control" placeholder="Filter by office, code, district..." onkeyup="filterAdminTable()">
-                </div>
-              </div>
-
-              <div class="data-table-container">
-                <table class="data-table" id="adminDataTable">
-                  <thead>
-                    <tr>
-                      <th>Office Code & Name</th>
-                      <th>Entered Officer & Email ID</th>
-                      <th>Updated Officer & Email ID</th>
-                      <th>Network & Speed</th>
-                      <th>Switches Available</th>
-                      <th>Servers Installed</th>
-                      <th>OS Details</th>
-                      <th>Monitors (W/NW)</th>
-                      <th>CPUs (W/NW)</th>
-                      <th>Laptops (W/NW)</th>
-                      <th>AIO (W/NW)</th>
-                      <th>Dot Matrix</th>
-                      <th>UPS (W/NW)</th>
-                      <th>Batteries</th>
-                      <th>Age > 8 Yrs</th>
-                      <th>Remarks</th>
-                      <th>Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminTableBody">
-                    <!-- Dynamically populated -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- ADMIN MODULE & MENU MANAGER SUBVIEW -->
-          <div id="adminMenusSubView" style="display: none;">
-            <div class="card-section">
-              <div class="section-header">
-                <h3 class="section-title"><i class="fa-solid fa-sliders"></i> Menu & Module Visibility Control Manager</h3>
-                <button class="btn btn-primary btn-sm" onclick="openAddMenuModal()">
-                  <i class="fa-solid fa-plus"></i> Add Future Menu Module
+            <!-- Navigation -->
+            <nav class="app-nav">
+                <button class="nav-btn active" id="nav-btn-form" data-target="panel-public-form">
+                    <i data-lucide="file-text"></i> IT Equipment
                 </button>
-              </div>
-              <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 20px;">
-                Provision to configure, enable, or hide portal menus. Toggling a menu hides its submission form and view windows from portal users.
-              </p>
-
-              <div id="menuManagerContainer" class="form-grid-2">
-                <!-- Dynamically populated module cards -->
-              </div>
-            </div>
-          </div>
-
-          <!-- ADMIN SUMMARY REPORT SUBVIEW -->
-          <div id="adminSummarySubView" style="display: none;">
-            <!-- Summary Header & Action Bar -->
-            <div class="summary-report-card">
-              <div class="summary-filter-bar">
-                <div>
-                  <h3 style="font-size: 1.18rem; font-weight: 800; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-table-list" style="color: var(--primary-600);"></i>
-                    Statewide IT Equipment Summary Report
-                  </h3>
-                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
-                    Executive summary of Network & Speed, Hardware, Operating Systems, Lifecycle Age Profile, UPS Health, and Battery Provisioning across reported MVD offices.
-                  </p>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-primary btn-sm" onclick="exportSummaryReportCSV()" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-file-csv"></i> Download Summary CSV
-                  </button>
-                  <button class="btn btn-outline btn-sm" onclick="printSummaryReport()" style="border-color: #cbd5e1; color: #1e293b; background: white; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-download"></i> Download / Print Summary Report
-                  </button>
-                </div>
-              </div>
-
-              <!-- Quick Filters Bar -->
-              <div style="padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 220px;">
-                  <div style="position: relative;">
-                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                    <input type="text" id="summarySearchInput" class="form-control" placeholder="Search office name, district, OS, or provider..." oninput="renderAdminSummaryReport()" style="padding-left: 36px;">
-                  </div>
-                </div>
-
-                <div style="min-width: 180px;">
-                  <select id="summaryNetworkFilter" class="form-control" onchange="renderAdminSummaryReport()">
-                    <option value="ALL">-- All Network Providers --</option>
-                    <option value="KSWAN">KSWAN</option>
-                    <option value="KFONE">KFONE</option>
-                    <option value="BSNL">BSNL</option>
-                    <option value="JIO">JIO</option>
-                    <option value="Keralam Vision">Keralam Vision</option>
-                    <option value="Asianet">Asianet</option>
-                    <option value="Others">Others</option>
-                  </select>
-                </div>
-
-                <div style="min-width: 180px;">
-                  <select id="summaryAgeFilter" class="form-control" onchange="renderAdminSummaryReport()">
-                    <option value="ALL">-- All Lifecycle Profiles --</option>
-                    <option value="OVER8">Offices with Systems > 8 Years</option>
-                    <option value="UNDER8_ONLY">Offices with All Systems ≤ 8 Years</option>
-                  </select>
-                </div>
-
-                <button class="btn btn-secondary btn-sm" onclick="resetSummaryFilters()">
-                  <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                <button class="nav-btn" id="nav-btn-officers" onclick="goToOfficerQualificationModule()">
+                    <i data-lucide="graduation-cap"></i> Officer Qualification
                 </button>
-              </div>
-
-              <!-- Summary Quick Statistics Pill Strip -->
-              <div id="summaryQuickStatsStrip" style="padding: 10px 20px; background: #f1f5f9; border-bottom: 1px solid var(--border-color); display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem; color: #334155;">
-                <!-- Dynamically populated stats -->
-              </div>
-
-              <!-- Summary Report Table -->
-              <div class="summary-table-wrapper">
-                <table class="summary-report-table" id="adminSummaryReportTable">
-                  <thead>
-                    <tr>
-                      <th style="width: 40px; text-align: center;">#</th>
-                      <th style="min-width: 190px;">Office Name</th>
-                      <th style="min-width: 160px;">Network and Speed</th>
-                      <th style="min-width: 210px;">Working Monitors / CPUs / Laptops</th>
-                      <th style="min-width: 180px;">Operating System(s) used with versions</th>
-                      <th style="min-width: 130px; text-align: center;">Systems age &lt;8 years</th>
-                      <th style="min-width: 130px; text-align: center;">Systems age &gt;8 years</th>
-                      <th style="min-width: 150px; text-align: center;">UPS Working / Defective</th>
-                      <th style="min-width: 200px; text-align: center;">Number of Batteries currently using / Minimum Number of Batteries Required</th>
-                      <th style="min-width: 100px; text-align: center;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="adminSummaryTableBody">
-                    <!-- Populated dynamically via JS -->
-                  </tbody>
-                  <tfoot id="adminSummaryTableFoot">
-                    <!-- Statewide totals row -->
-                  </tfoot>
-                </table>
-              </div>
+                <button class="nav-btn" id="nav-btn-view" data-target="panel-public-view">
+                    <i data-lucide="eye"></i> View Data
+                </button>
+                <button class="nav-btn" id="nav-btn-admin" data-target="panel-admin">
+                    <i data-lucide="shield-check"></i> Admin Session
+                </button>
+            </nav>
+            
+            <!-- Controls -->
+            <div class="header-controls">
+                <div class="supabase-status-badge disconnected" id="db-status-badge" onclick="openConfigModal()">
+                    <span class="status-indicator"></span>
+                    <span class="status-label">Supabase Config Required</span>
+                </div>
+                <button class="theme-toggle-btn" id="theme-toggle" aria-label="Toggle Theme">
+                    <i data-lucide="sun"></i>
+                </button>
             </div>
-          </div>
+        </header>
 
-        </div>
+        <!-- Main Workspace Area -->
+        <main class="app-main">
+            
+            <!-- 1. Public Submission Form Section -->
+            <section id="panel-public-form" class="app-panel active">
+                <div class="panel-header">
+                    <h2>IT Equipment Details Entry Form</h2>
+                    <p>Select your office and fill out the equipment counts. Submitting will update the record for that office.</p>
+                </div>
+                
+                <!-- Submission Closed Banner (Hidden by default) -->
+                <div class="banner closed-banner hidden" id="submission-closed-banner">
+                    <i data-lucide="lock"></i>
+                    <div>
+                        <h3>Submissions Closed</h3>
+                        <p>IT Equipment collection is temporarily hidden from the public view by the administrator. Please contact your administrator if you need to submit data.</p>
+                    </div>
+                </div>
 
-      </main>
+                <form id="equipment-form" class="grid-form">
+                    
+                    <!-- Card 1: Office Name & Network Details -->
+                    <div class="form-card">
+                        <div class="card-header">
+                            <i data-lucide="building-2"></i>
+                            <h3>1. Office & Network Information</h3>
+                        </div>
+                        
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="form-office-name">Office Name <span class="required">*</span></label>
+                                <select id="form-office-name" required>
+                                    <option value="" disabled selected>Select Office</option>
+                                    <!-- Populated dynamically via offices.js -->
+                                </select>
+                            </div>
 
-      <!-- Application Footer -->
-      <footer class="app-footer">
-        <div class="footer-container">
-          <div>
-            <strong>Motor Vehicles Department, Keralam</strong> • Data AI Foundry<br>
-            <small>© 2026 Transport Commissionerate, Thiruvananthapuram. All Rights Reserved.</small>
-          </div>
-          <div class="footer-links">
-            <a href="javascript:void(0)" onclick="showToast('Helpdesk Contact: mvdaicell@gmail.com | 0471-2333317', 'info')"><i class="fa-solid fa-headset"></i> IT Helpdesk</a>
-          </div>
-        </div>
-      </footer>
+                            <div class="form-group">
+                                <label for="form-os-version">Operating System(s) used with versions <span class="required">*</span></label>
+                                <input type="text" id="form-os-version" placeholder="e.g., Windows 10 Pro, Ubuntu 22.04 LTS" required>
+                            </div>
 
-    </div>
-  </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="form-network-type">Available Network <span class="required">*</span></label>
+                                    <select id="form-network-type" required>
+                                        <option value="" disabled selected>Select Network</option>
+                                        <option value="KSWAN">KSWAN</option>
+                                        <option value="KFONE">KFONE</option>
+                                        <option value="BSNL">BSNL</option>
+                                        <option value="JIO">JIO</option>
+                                        <option value="Kerala Vision">Kerala Vision</option>
+                                        <option value="Asianet">Asianet</option>
+                                        <option value="Others">Others</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="form-network-speed">Network Speed</label>
+                                    <input type="text" id="form-network-speed" placeholder="e.g., 100 Mbps, 1 Gbps">
+                                </div>
+                            </div>
 
-  <!-- Admin Passcode Modal Dialog -->
-  <div id="adminModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-lock"></i> Admin Authorization</h3>
-        <button class="btn btn-outline btn-sm" onclick="closeAdminModal()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      
-      <form onsubmit="verifyAdminPasscode(event)">
-        <div class="form-group" style="margin-bottom: 20px;">
-          <label for="adminPasscodeInput">Admin Passcode *</label>
-          <input type="password" id="adminPasscodeInput" class="form-control" placeholder="Enter admin passcode" required autofocus>
-        </div>
+                            <!-- Conditional Others Network Detail -->
+                            <div class="form-group hidden" id="other-network-container">
+                                <label for="form-network-other">Specify Other Network <span class="required">*</span></label>
+                                <input type="text" id="form-network-other" placeholder="Please specify your network provider">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 2: Core Hardware (Monitors, CPUs, Laptops, AIOs) -->
+                    <div class="form-card">
+                        <div class="card-header">
+                            <i data-lucide="monitor"></i>
+                            <h3>2. Desktop, Laptop & PC Inventory</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-input-container">
+                                <table class="table-input">
+                                    <thead>
+                                        <tr>
+                                            <th>Equipment Type</th>
+                                            <th>Working Count</th>
+                                            <th>Not Working Count</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr>
+                                            <td>Monitors</td>
+                                            <td><input type="number" id="form-monitor-working" min="0" value="0"></td>
+                                            <td><input type="number" id="form-monitor-not-working" min="0" value="0"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>CPUs</td>
+                                            <td><input type="number" id="form-cpu-working" min="0" value="0"></td>
+                                            <td><input type="number" id="form-cpu-not-working" min="0" value="0"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>Laptops</td>
+                                            <td><input type="number" id="form-laptops-working" min="0" value="0"></td>
+                                            <td><input type="number" id="form-laptops-not-working" min="0" value="0"></td>
+                                        </tr>
+                                        <tr>
+                                            <td>All-in-One PCs</td>
+                                            <td><input type="number" id="form-aio-working" min="0" value="0"></td>
+                                            <td><input type="number" id="form-aio-not-working" min="0" value="0"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 3: Printers & Copying Machines -->
+                    <div class="form-card full-width">
+                        <div class="card-header">
+                            <i data-lucide="printer"></i>
+                            <h3>3. Printer & Copy Machine Inventory</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="table-input-container">
+                                <table class="table-input" id="printers-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Printer / Copier Type</th>
+                                            <th>Working Count</th>
+                                            <th>Not Working Count</th>
+                                            <th>Multipurpose Count <span class="help-tooltip" title="Devices capable of Printing, Scanning, Copying, etc.">?</span></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody>
+                                        <tr data-printer-type="dot_matrix">
+                                            <td>Dot Matrix Printer</td>
+                                            <td><input type="number" class="print-work" min="0" value="0"></td>
+                                            <td><input type="number" class="print-nowork" min="0" value="0"></td>
+                                            <td><input type="number" class="print-multi" min="0" value="0"></td>
+                                        </tr>
+                                        <tr data-printer-type="ink_jet">
+                                            <td>Ink Jet Printer</td>
+                                            <td><input type="number" class="print-work" min="0" value="0"></td>
+                                            <td><input type="number" class="print-nowork" min="0" value="0"></td>
+                                            <td><input type="number" class="print-multi" min="0" value="0"></td>
+                                        </tr>
+                                        <tr data-printer-type="laser">
+                                            <td>Laser Printer</td>
+                                            <td><input type="number" class="print-work" min="0" value="0"></td>
+                                            <td><input type="number" class="print-nowork" min="0" value="0"></td>
+                                            <td><input type="number" class="print-multi" min="0" value="0"></td>
+                                        </tr>
+                                        <tr data-printer-type="xerox">
+                                            <td>Xerox Machine</td>
+                                            <td><input type="number" class="print-work" min="0" value="0"></td>
+                                            <td><input type="number" class="print-nowork" min="0" value="0"></td>
+                                            <td><input type="number" class="print-multi" min="0" value="0"></td>
+                                        </tr>
+                                        <tr data-printer-type="others">
+                                            <td>Others</td>
+                                            <td><input type="number" class="print-work" min="0" value="0"></td>
+                                            <td><input type="number" class="print-nowork" min="0" value="0"></td>
+                                            <td><input type="number" class="print-multi" min="0" value="0"></td>
+                                        </tr>
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 4: Battery & Power Management -->
+                    <div class="form-card">
+                        <div class="card-header">
+                            <i data-lucide="battery-charging"></i>
+                            <h3>4. Batteries & Power Session</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="form-ups-working">No. of UPS Working</label>
+                                    <input type="number" id="form-ups-working" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="form-ups-not-working">No. of UPS Not Working</label>
+                                    <input type="number" id="form-ups-not-working" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="form-batteries-working">No. of Batteries in Use</label>
+                                    <input type="number" id="form-batteries-working" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="form-batteries-not-working">No. of Batteries Not in Use</label>
+                                    <input type="number" id="form-batteries-not-working" min="0" value="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 5: System Age (Desktop, Laptop, PCs) -->
+                    <div class="form-card">
+                        <div class="card-header">
+                            <i data-lucide="calendar"></i>
+                            <h3>5. Hardware Age Distribution</h3>
+                        </div>
+                        <div class="card-body">
+                            <p class="section-desc">Classify your compute systems (Desktop, Laptop, PCs) by their age:</p>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="form-age-3yr">3 Years Old</label>
+                                    <input type="number" id="form-age-3yr" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="form-age-3-5yr">3 to 5 Years Old</label>
+                                    <input type="number" id="form-age-3-5yr" min="0" value="0">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="form-age-5-8yr">5 to 8 Years Old</label>
+                                    <input type="number" id="form-age-5-8yr" min="0" value="0">
+                                </div>
+                                <div class="form-group">
+                                    <label for="form-age-above-8yr">More than 8 Years Old</label>
+                                    <input type="number" id="form-age-above-8yr" min="0" value="0">
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Card 6: Aggregates, Specific Conditions & Remarks -->
+                    <div class="form-card full-width">
+                        <div class="card-header">
+                            <i data-lucide="pencil-line"></i>
+                            <h3>6. Auto-Calculated Tally & Remarks</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="calc-tallies-grid">
+                                <div class="tally-box">
+                                    <span class="tally-label">No. of Working Dot Matrix Printers</span>
+                                    <span class="tally-value" id="calc-working-dot-matrix">0</span>
+                                </div>
+                                <div class="tally-box danger">
+                                    <span class="tally-label">No. of Not Working Desktop Units (CPU/Monitor)</span>
+                                    <span class="tally-value" id="calc-not-working-desktops">0</span>
+                                </div>
+                            </div>
+
+                            <div class="form-group margin-top-md">
+                                <label for="form-remarks">Remarks (Enter specific condition of IT systems and equipments)</label>
+                                <textarea id="form-remarks" rows="4" placeholder="Mention battery replacements required, system failures, support issues, etc."></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Bar -->
+                    <div class="form-submit-bar full-width">
+                        <button type="submit" class="submit-btn" id="submit-form-btn">
+                            <i data-lucide="send"></i> Submit Equipment Details
+                        </button>
+                    </div>
+                </form>
+
+                <!-- MODULE: Officer Qualification (Below IT Equipment List) -->
+                <div class="module-divider" id="module-officer-qualification">
+                    <div class="module-badge">
+                        <i data-lucide="graduation-cap"></i> Officer Qualification Module
+                    </div>
+                    <div class="module-header-text">
+                        <h2>Officer Qualification</h2>
+                        <p>Departmental officer records, academic degrees, technical specializations, and training history.</p>
+                    </div>
+                </div>
+
+                <form id="officer-qualification-form" class="grid-form">
+                    <!-- Office Section -->
+                    <div class="form-card">
+                        <div class="card-header">
+                            <i data-lucide="building-2"></i>
+                            <h3>Office Section</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="oq-office-name">Office Name <span class="required">*</span></label>
+                                <select id="oq-office-name" required>
+                                    <option value="" disabled selected>Select Office</option>
+                                    <!-- Populated dynamically via offices.js -->
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="oq-entry-officer-name">Entry Officer Name <span class="required">*</span></label>
+                                <input type="text" id="oq-entry-officer-name" placeholder="Name of officer entering details" required>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="oq-entry-officer-designation">Designation <span class="required">*</span></label>
+                                    <input type="text" id="oq-entry-officer-designation" placeholder="e.g., Senior Superintendent / Clerk / MVI" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="oq-entry-officer-mobile">Mobile Number <span class="required">*</span></label>
+                                    <input type="tel" id="oq-entry-officer-mobile" placeholder="10-digit mobile number" pattern="[0-9]{10}" title="Please enter a valid 10-digit mobile number" required>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Officer Profile Section -->
+                    <div class="form-card">
+                        <div class="card-header">
+                            <i data-lucide="user-check"></i>
+                            <h3>Officer Profile Section</h3>
+                        </div>
+                        <div class="card-body">
+                            <div class="form-group">
+                                <label for="oq-officer-name">Name of Officer <span class="required">*</span></label>
+                                <input type="text" id="oq-officer-name" placeholder="Full name of officer" required>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="oq-officer-designation">Designation <span class="required">*</span></label>
+                                    <select id="oq-officer-designation" required>
+                                        <option value="" disabled selected>Select Designation</option>
+                                        <option value="Regional Transport Officer">Regional Transport Officer</option>
+                                        <option value="Joint Regional Transport Officer">Joint Regional Transport Officer</option>
+                                        <option value="Motor Vehicle Inspector">Motor Vehicle Inspector</option>
+                                        <option value="Asst. Motor Vehicles Inspector">Asst. Motor Vehicles Inspector</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="oq-education-qualification">Educational Qualification <span class="required">*</span></label>
+                                    <select id="oq-education-qualification" required>
+                                        <option value="" disabled selected>Select Qualification</option>
+                                        <option value="PHD with Postdoc">PHD with Postdoc</option>
+                                        <option value="PHD">PHD</option>
+                                        <option value="M.Tech">M.Tech</option>
+                                        <option value="B.Tech">B.Tech</option>
+                                        <option value="Diploma">Diploma</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <!-- Conditional Other Qualification Container -->
+                            <div class="form-group hidden" id="oq-other-qualification-container">
+                                <label for="oq-qualification-other">Specify Other Qualification <span class="required">*</span></label>
+                                <input type="text" id="oq-qualification-other" placeholder="e.g., M.Sc, MBA, MCA, LLB, etc.">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="oq-specialization">Specialization</label>
+                                <input type="text" id="oq-specialization" placeholder="e.g., Automobile, Mechanical, IT, Road Safety, EV Technology">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="oq-training-attended">Training Attended</label>
+                                <textarea id="oq-training-attended" rows="3" placeholder="Enter details of departmental, technical, or specialized trainings attended"></textarea>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Submit Bar for Officer Qualification -->
+                    <div class="form-submit-bar full-width">
+                        <button type="submit" class="submit-btn" id="oq-submit-btn">
+                            <i data-lucide="user-plus"></i> Submit Officer Qualification
+                        </button>
+                    </div>
+                </form>
+
+                <!-- Office Existing Officers Card -->
+                <div class="form-card full-width hidden" id="oq-office-officers-card">
+                    <div class="card-header" style="justify-content:space-between;">
+                        <div style="display:flex;align-items:center;gap:0.75rem;">
+                            <i data-lucide="users"></i>
+                            <h3 id="oq-office-officers-title">Registered Officers for this Office</h3>
+                        </div>
+                        <span class="badge badge-network" id="oq-office-officers-count">0 Officers</span>
+                    </div>
+                    <div class="card-body">
+                        <div class="table-scroll-container">
+                            <table class="data-table" id="oq-office-officers-table">
+                                <thead>
+                                    <tr>
+                                        <th>Officer Name</th>
+                                        <th>Designation</th>
+                                        <th>Qualification</th>
+                                        <th>Specialization</th>
+                                        <th>Training Attended</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody></tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 2. Public Data View Section -->
+            <section id="panel-public-view" class="app-panel">
+                <div class="panel-header">
+                    <h2>Public Data Viewer</h2>
+                    <p>Directory of IT equipment inventories and officer qualifications submitted across MVD offices.</p>
+                </div>
+
+                <!-- View Switch Tabs -->
+                <div class="view-switch-bar">
+                    <button class="view-pill active" id="view-pill-equipment" onclick="switchPublicView('equipment')">
+                        <i data-lucide="server"></i> IT Equipment Inventory
+                    </button>
+                    <button class="view-pill" id="view-pill-officers" onclick="switchPublicView('officers')">
+                        <i data-lucide="graduation-cap"></i> Officer Qualifications
+                    </button>
+                </div>
+
+                <!-- Container 1: IT Equipment Table -->
+                <div id="public-view-equipment-container">
+                    <!-- Search & Filters Bar -->
+                    <div class="table-controls">
+                        <div class="search-input-wrapper">
+                            <i data-lucide="search"></i>
+                            <input type="text" id="public-search" placeholder="Search by Office Name...">
+                        </div>
+                        <div class="filter-controls">
+                            <select id="public-filter-network">
+                                <option value="">All Networks</option>
+                                <option value="KSWAN">KSWAN</option>
+                                <option value="KFONE">KFONE</option>
+                                <option value="BSNL">BSNL</option>
+                                <option value="JIO">JIO</option>
+                                <option value="Kerala Vision">Kerala Vision</option>
+                                <option value="Asianet">Asianet</option>
+                                <option value="Others">Others</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Entries Table Card -->
+                    <div class="table-card card">
+                        <div class="table-scroll-container">
+                            <table class="data-table" id="public-entries-table">
+                                <thead>
+                                    <tr>
+                                        <th>Office Name</th>
+                                        <th>OS Version</th>
+                                        <th>Network</th>
+                                        <th>Speed</th>
+                                        <th>Working Systems (CPU/Laptop/AIO)</th>
+                                        <th>Last Updated</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Loaded dynamically via app.js -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Container 2: Officer Qualifications Table -->
+                <div id="public-view-officers-container" class="hidden">
+                    <!-- Search & Filters Bar -->
+                    <div class="table-controls">
+                        <div class="search-input-wrapper">
+                            <i data-lucide="search"></i>
+                            <input type="text" id="public-officers-search" placeholder="Search by Officer Name, Office, Specialization...">
+                        </div>
+                        <div class="filter-controls" style="display:flex;gap:0.5rem;flex-wrap:wrap;">
+                            <select id="public-officers-filter-desig">
+                                <option value="">All Designations</option>
+                                <option value="Regional Transport Officer">Regional Transport Officer</option>
+                                <option value="Joint Regional Transport Officer">Joint Regional Transport Officer</option>
+                                <option value="Motor Vehicle Inspector">Motor Vehicle Inspector</option>
+                                <option value="Asst. Motor Vehicles Inspector">Asst. Motor Vehicles Inspector</option>
+                            </select>
+                            <select id="public-officers-filter-qual">
+                                <option value="">All Qualifications</option>
+                                <option value="PHD with Postdoc">PHD with Postdoc</option>
+                                <option value="PHD">PHD</option>
+                                <option value="M.Tech">M.Tech</option>
+                                <option value="B.Tech">B.Tech</option>
+                                <option value="Diploma">Diploma</option>
+                                <option value="Other">Other</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Officers Table Card -->
+                    <div class="table-card card">
+                        <div class="table-scroll-container">
+                            <table class="data-table" id="public-officers-table">
+                                <thead>
+                                    <tr>
+                                        <th>Office Name</th>
+                                        <th>Officer Name</th>
+                                        <th>Designation</th>
+                                        <th>Qualification</th>
+                                        <th>Specialization</th>
+                                        <th>Training Attended</th>
+                                        <th>Date</th>
+                                        <th>Action</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <!-- Loaded dynamically via app.js -->
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- 3. Admin Entry Section -->
+            <section id="panel-admin" class="app-panel">
+                <!-- Login Panel (Default state) -->
+                <div class="admin-login-wrapper" id="admin-login-panel">
+                    <div class="login-card glass-card">
+                        <div class="login-badge">
+                            <i data-lucide="lock"></i>
+                        </div>
+                        <h2>Admin Authentication</h2>
+                        <p>Authenticate to view metrics, export logs, delete entries, or configure submission visibility.</p>
+                        
+                        <form id="admin-login-form">
+                            <div class="form-group">
+                                <label for="admin-password">Admin Access Key</label>
+                                <input type="password" id="admin-password" placeholder="Enter password (default: mvdadmin123)" required>
+                            </div>
+                            <button type="submit" class="admin-login-btn">
+                                <i data-lucide="log-in"></i> Access Admin Console
+                            </button>
+                        </form>
+                    </div>
+                </div>
+
+                <!-- Admin Workspace Panel (Hidden by default, shown after login) -->
+                <div class="admin-workspace-wrapper hidden" id="admin-workspace-panel">
+                    <div class="admin-inner-nav">
+                        <div class="admin-nav-tabs">
+                            <button class="admin-tab active" data-target="admin-tab-dashboard">
+                                <i data-lucide="layout-dashboard"></i> Dashboard Analytics
+                            </button>
+                            <button class="admin-tab" id="admin-tab-entry-btn" data-target="admin-tab-entry">
+                                <i data-lucide="file-edit"></i> Admin Entry
+                            </button>
+                            <button class="admin-tab" data-target="admin-tab-view">
+                                <i data-lucide="database"></i> Manage Entries
+                            </button>
+                            <button class="admin-tab" data-target="admin-tab-settings">
+                                <i data-lucide="settings"></i> System Settings
+                            </button>
+                        </div>
+                        <button class="admin-logout-btn" onclick="logoutAdmin()">
+                            <i data-lucide="log-out"></i> Logout
+                        </button>
+                    </div>
+
+                    <!-- Admin Sub-tab 1: Dashboard -->
+                    <div class="admin-tab-content active" id="admin-tab-dashboard">
+                        <!-- KPI Metric Row 1: IT Equipment -->
+                        <div class="metric-row">
+                            <div class="metric-card">
+                                <div class="metric-icon primary"><i data-lucide="building"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-offices-count">0</h4>
+                                    <span>Offices Registered</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon success"><i data-lucide="cpu"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-working-systems">0</h4>
+                                    <span>Working Systems</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon danger"><i data-lucide="alert-octagon"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-faulty-desktops">0</h4>
+                                    <span>Not Working Desktops</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon info"><i data-lucide="wifi"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-kswan-percent">0%</h4>
+                                    <span>KSWAN Penetration</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- KPI Metric Row 2: Officer Qualifications -->
+                        <div class="metric-row" style="margin-top: -0.5rem;">
+                            <div class="metric-card">
+                                <div class="metric-icon primary"><i data-lucide="graduation-cap"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-officers-count">0</h4>
+                                    <span>Officers Registered</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon success"><i data-lucide="award"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-higher-qual-count">0</h4>
+                                    <span>PhD / M.Tech Holders</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon info"><i data-lucide="book-open"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-technical-count">0</h4>
+                                    <span>B.Tech / Diploma</span>
+                                </div>
+                            </div>
+                            <div class="metric-card">
+                                <div class="metric-icon danger" style="background:rgba(168,85,247,0.15);color:#c084fc;"><i data-lucide="shield"></i></div>
+                                <div class="metric-info">
+                                    <h4 id="kpi-inspectors-count">0</h4>
+                                    <span>MVIs & AMVIs</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Chart Visualizations -->
+                        <div class="charts-grid">
+                            <div class="chart-card card">
+                                <h3>Systems Health Ratio</h3>
+                                <div class="chart-container">
+                                    <canvas id="chart-systems-health"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card card">
+                                <h3>System Age Breakdown</h3>
+                                <div class="chart-container">
+                                    <canvas id="chart-systems-age"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card card">
+                                <h3>Officer Educational Qualifications</h3>
+                                <div class="chart-container">
+                                    <canvas id="chart-officers-qual"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card card">
+                                <h3>Officer Designation Distribution</h3>
+                                <div class="chart-container">
+                                    <canvas id="chart-officers-desig"></canvas>
+                                </div>
+                            </div>
+                            <div class="chart-card card full-width">
+                                <h3>Network Provider Distribution</h3>
+                                <div class="chart-container pie-container">
+                                    <canvas id="chart-network-dist"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Sub-tab 2: Admin Entry (Reuses/Mirrors Entry form layout) -->
+                    <div class="admin-tab-content" id="admin-tab-entry">
+                        <div class="panel-header">
+                            <h2>Admin Direct Entry Mode</h2>
+                            <p>Submit or overwrite equipment records and officer qualifications directly from this console.</p>
+                        </div>
+                        <div class="view-switch-bar">
+                            <button class="view-pill active" id="admin-entry-pill-equipment" onclick="switchAdminEntryView('equipment')">
+                                <i data-lucide="server"></i> IT Equipment Entry
+                            </button>
+                            <button class="view-pill" id="admin-entry-pill-officers" onclick="switchAdminEntryView('officers')">
+                                <i data-lucide="graduation-cap"></i> Officer Qualification Entry
+                            </button>
+                        </div>
+                        <div id="admin-equipment-form-container">
+                            <div id="admin-form-placeholder">
+                                <!-- Populated dynamically via JavaScript -->
+                            </div>
+                        </div>
+                        <div id="admin-officers-form-container" class="hidden">
+                            <div id="admin-officers-form-placeholder">
+                                <!-- Populated dynamically via JavaScript -->
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Sub-tab 3: Manage Entries -->
+                    <div class="admin-tab-content" id="admin-tab-view">
+                        <div class="panel-header">
+                            <h2>Manage Database Records</h2>
+                            <p>Review all submissions, export raw logs, or remove entries if necessary.</p>
+                        </div>
+
+                        <!-- Sub-navigation for Manage Entries -->
+                        <div class="view-switch-bar">
+                            <button class="view-pill active" id="admin-manage-pill-equipment" onclick="switchAdminManageView('equipment')">
+                                <i data-lucide="server"></i> Manage IT Equipment
+                            </button>
+                            <button class="view-pill" id="admin-manage-pill-officers" onclick="switchAdminManageView('officers')">
+                                <i data-lucide="graduation-cap"></i> Manage Officer Qualifications
+                            </button>
+                        </div>
+
+                        <!-- Container 1: Manage Equipment -->
+                        <div id="admin-manage-equipment-container">
+                            <div class="table-controls">
+                                <div class="search-input-wrapper">
+                                    <i data-lucide="search"></i>
+                                    <input type="text" id="admin-search" placeholder="Search equipment entries...">
+                                </div>
+                                <button class="export-btn" id="csv-export-btn">
+                                    <i data-lucide="download"></i> Export Equipment CSV
+                                </button>
+                            </div>
+
+                            <div class="table-card card">
+                                <div class="table-scroll-container">
+                                    <table class="data-table" id="admin-entries-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Office Name</th>
+                                                <th>OS Version</th>
+                                                <th>Network Info</th>
+                                                <th>Working (Mon/CPU/Lap)</th>
+                                                <th>Broken (Mon/CPU/Lap)</th>
+                                                <th>Batteries (In-Use/Idle)</th>
+                                                <th>Last Updated</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Loaded dynamically via app.js -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Container 2: Manage Officer Qualifications -->
+                        <div id="admin-manage-officers-container" class="hidden">
+                            <div class="table-controls">
+                                <div class="search-input-wrapper">
+                                    <i data-lucide="search"></i>
+                                    <input type="text" id="admin-officers-search" placeholder="Search officer entries...">
+                                </div>
+                                <button class="export-btn" id="csv-export-officers-btn">
+                                    <i data-lucide="download"></i> Export Officers CSV
+                                </button>
+                            </div>
+
+                            <div class="table-card card">
+                                <div class="table-scroll-container">
+                                    <table class="data-table" id="admin-officers-table">
+                                        <thead>
+                                            <tr>
+                                                <th>Office Name</th>
+                                                <th>Officer Name</th>
+                                                <th>Designation</th>
+                                                <th>Qualification</th>
+                                                <th>Specialization</th>
+                                                <th>Training Attended</th>
+                                                <th>Entry Officer</th>
+                                                <th>Actions</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <!-- Loaded dynamically via app.js -->
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Admin Sub-tab 4: Settings -->
+                    <div class="admin-tab-content" id="admin-tab-settings">
+                        <div class="panel-header">
+                            <h2>System Administration Panel</h2>
+                            <p>Configure backend settings, check status and adjust database permissions.</p>
+                        </div>
+
+                        <div class="settings-grid">
+                            <div class="settings-card card">
+                                <h3>Public Form Access Settings</h3>
+                                <p>Manage whether other offices can access the submissions form page to add their details.</p>
+                                
+                                <div class="setting-row">
+                                    <div class="setting-info">
+                                        <h4>Hide "IT Equipment List" from Public View</h4>
+                                        <p>When active, the submission form tab is hidden/disabled for non-administrators.</p>
+                                    </div>
+                                    <label class="switch">
+                                        <input type="checkbox" id="setting-hide-public">
+                                        <span class="slider round"></span>
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div class="settings-card card">
+                                <h3>Global Connection Setup</h3>
+                                <p>Reconfigure your Supabase database instance connection parameters.</p>
+                                <button class="action-btn-outline" onclick="openConfigModal()">
+                                    <i data-lucide="database"></i> Change Supabase Database Keys
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+        </main>
         
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button type="button" class="btn btn-secondary" onclick="closeAdminModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-key"></i> Unlock Admin Portal</button>
-        </div>
-      </form>
+        <!-- App Footer -->
+        <footer class="app-footer">
+            <p>&copy; 2026 Motor Vehicles Department, Government of Kerala. Developed for IT inventory tracking.</p>
+        </footer>
     </div>
-  </div>
 
-  <!-- Add Future Menu Module Modal -->
-  <div id="addMenuModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card">
-      <div class="modal-header">
-        <h3><i class="fa-solid fa-folder-plus"></i> Add Future Menu Module</h3>
-        <button class="btn btn-outline btn-sm" onclick="closeAddMenuModal()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px;">
-        Register a new departmental module provision in the administrative registry.
-      </p>
-      
-      <form onsubmit="handleAddMenuSubmit(event)">
-        <div class="form-group" style="margin-bottom: 12px;">
-          <label for="newMenuTitleInput">Module / Menu Title *</label>
-          <input type="text" id="newMenuTitleInput" class="form-control" placeholder="e.g. Software & Licensing Compliance" required>
+    <!-- Details Modal (For inspecting record details) -->
+    <div class="modal-backdrop hidden" id="details-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3 id="modal-title">Office Equipment details</h3>
+                <button class="modal-close" onclick="closeDetailsModal()">&times;</button>
+            </div>
+            <div class="modal-body" id="modal-body-content">
+                <!-- Content injected dynamically via app.js -->
+            </div>
         </div>
-
-        <div class="form-group" style="margin-bottom: 12px;">
-          <label for="newMenuIconInput">FontAwesome Icon Class</label>
-          <input type="text" id="newMenuIconInput" class="form-control" placeholder="e.g. fa-certificate or fa-network-wired" value="fa-cube">
-        </div>
-
-        <div class="form-group" style="margin-bottom: 20px;">
-          <label for="newMenuDescInput">Module Description</label>
-          <textarea id="newMenuDescInput" class="form-control" placeholder="Describe the purpose of this menu module..." style="min-height: 70px;"></textarea>
-        </div>
-        
-        <div style="display: flex; justify-content: flex-end; gap: 10px;">
-          <button type="button" class="btn btn-secondary" onclick="closeAddMenuModal()">Cancel</button>
-          <button type="submit" class="btn btn-primary"><i class="fa-solid fa-plus"></i> Register Module</button>
-        </div>
-      </form>
     </div>
-  </div>
 
-  <!-- Office Details Modal View -->
-  <div id="officeDetailModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card" style="max-width: 680px;">
-      <div class="modal-header">
-        <h3 id="modalOfficeTitle"><i class="fa-solid fa-building-circle-check"></i> Office Detail Summary</h3>
-        <button class="btn btn-outline btn-sm" onclick="closeOfficeDetailModal()"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-      <div id="modalOfficeBody" style="max-height: 70vh; overflow-y: auto; font-size: 0.9rem;">
-        <!-- Dynamically rendered -->
-      </div>
-      <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
-        <button class="btn btn-outline btn-sm" onclick="exportDrillDownToCSV()">
-          <i class="fa-solid fa-file-excel"></i> Download CSV
-        </button>
-        <button class="btn btn-secondary" onclick="closeOfficeDetailModal()">Close Window</button>
-      </div>
+    <!-- Supabase Configuration Modal (Popup for credentials entry) -->
+    <div class="modal-backdrop hidden" id="config-modal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i data-lucide="settings" style="vertical-align:middle;margin-right:8px;"></i>Supabase Connection Parameters</h3>
+                <button class="modal-close" onclick="closeConfigModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <p class="modal-desc">To connect this frontend web application to your Supabase backend database, paste your project connection keys below. They are saved securely in your browser's local storage.</p>
+                <div class="form-group margin-bottom-sm">
+                    <label for="config-url">Supabase Project URL</label>
+                    <input type="text" id="config-url" placeholder="https://your-project-id.supabase.co" class="modal-input">
+                </div>
+                <div class="form-group margin-bottom-sm">
+                    <label for="config-key">Supabase Public API Anon Key</label>
+                    <input type="password" id="config-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." class="modal-input">
+                </div>
+                
+                <div class="alert-info-box">
+                    <i data-lucide="info"></i>
+                    <div>
+                        <h4>Need to create these tables first?</h4>
+                        <p>Open your Supabase dashboard, click "SQL Editor", create a new query, and paste the commands from the file <a href="supabase_schema.sql" target="_blank" style="color:var(--primary-color);">supabase_schema.sql</a> to prepare the tables.</p>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="action-btn-outline" onclick="closeConfigModal()">Cancel</button>
+                <button class="action-btn" onclick="saveConnectionSettings()">
+                    <i data-lucide="save"></i> Connect Database
+                </button>
+            </div>
+        </div>
     </div>
-  </div>
 
-  <!-- Public Entered Office Summary New Window / Modal Dialog -->
-  <div id="publicOfficeSummaryModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card" style="max-width: 760px; width: 92%;">
-      <div class="modal-header" style="background: linear-gradient(135deg, #0B3B24 0%, #062C1A 100%); color: white; margin: -24px -24px 20px -24px; padding: 20px 24px; border-radius: var(--radius-lg) var(--radius-lg) 0 0;">
-        <div>
-          <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #a7f3d0;"><i class="fa-solid fa-building-circle-check"></i> Entered Office Equipment Record</span>
-          <h3 id="publicModalOfficeTitle" style="font-size: 1.25rem; margin-top: 4px; color: #ffffff;"><i class="fa-solid fa-building"></i> Office Name Summary</h3>
-        </div>
-        <button class="btn btn-outline btn-sm" onclick="closePublicOfficeSummaryModal()" style="color: white; border-color: rgba(255,255,255,0.3);"><i class="fa-solid fa-xmark"></i></button>
-      </div>
-
-      <div id="publicModalOfficeBody" style="max-height: 70vh; overflow-y: auto; padding: 4px;">
-        <!-- Dynamically populated office summary details -->
-      </div>
-
-      <div style="margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-shield-halved"></i> Keralam MVD • Data AI Foundry Verified Record</span>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-outline btn-sm" onclick="openStandalonePrintWindow()"><i class="fa-solid fa-arrow-up-right-from-square"></i> Open Standalone Print Window</button>
-          <button class="btn btn-primary btn-sm" onclick="closePublicOfficeSummaryModal()"><i class="fa-solid fa-check"></i> Close Window</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- COMPREHENSIVE STATEWIDE IT & POWER INFRASTRUCTURE REPORT MODAL -->
-  <div id="comprehensiveReportModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card printable-report-card" style="max-width: 1050px; width: 96%; max-height: 92vh; overflow-y: auto;">
-      <div class="modal-header print-hide" style="background: linear-gradient(135deg, #0B3B24 0%, #062C1A 100%); color: white; margin: -24px -24px 20px -24px; padding: 20px 24px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; display: flex; justify-content: space-between; align-items: center;">
-        <div>
-          <span style="font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #a7f3d0;"><i class="fa-solid fa-file-invoice"></i> Admin Executive Portal</span>
-          <h3 style="font-size: 1.2rem; margin-top: 4px; color: #ffffff;"><i class="fa-solid fa-print"></i> Comprehensive Statewide IT & Power Audit Report</h3>
-        </div>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-primary btn-sm" onclick="triggerReportPrint()" style="background: #10b981; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-download"></i> Download Report
-          </button>
-          <button class="btn btn-outline btn-sm" onclick="closeComprehensiveReportModal()" style="color: white; border-color: rgba(255,255,255,0.3);"><i class="fa-solid fa-xmark"></i></button>
-        </div>
-      </div>
-
-      <!-- PRINTABLE REPORT CONTENT CONTAINER -->
-      <div id="compReportContent" class="printable-report-area">
-        <!-- Dynamically rendered Header, KPIs, Charts, Tables, and Verification Statement -->
-      </div>
-
-      <div class="print-hide" style="margin-top: 24px; padding-top: 16px; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 0.8rem; color: var(--text-muted);"><i class="fa-solid fa-building-flag"></i> Motor Vehicles Department • Government of Keralam</span>
-        <div style="display: flex; gap: 10px;">
-          <button class="btn btn-primary btn-sm" onclick="triggerReportPrint()" style="background: #10b981; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-download"></i> Download Report
-          </button>
-          <button class="btn btn-secondary btn-sm" onclick="closeComprehensiveReportModal()">Close Window</button>
-        </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Toast Notification Container -->
-  <div id="toastContainer" class="toast-container"></div>
-
-  <!-- Application Script -->
-  <script src="app.js"></script>
+    <!-- Core App Logic -->
+    <script src="offices.js"></script>
+    <script src="app.js"></script>
 </body>
 </html>
