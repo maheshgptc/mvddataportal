@@ -1,6 +1,6 @@
 /* ==========================================================================
-   Keralam Motor Vehicles Department - IT Equipment Portal
-   Production Application Engine with Supabase Cloud, Menu Bar & Modular Menu Provision
+   Keralam Motor Vehicles Department - IT Equipment & Officer Training Portal
+   Production Application Engine with Supabase Cloud, Menu Bar & Multi-Module Architecture
    ========================================================================== */
 
 // --- 1. SUPABASE BACKEND CONFIGURATION ---
@@ -215,13 +215,66 @@ const SEED_DATA = {
   }
 };
 
-// --- 4. DEFAULT PORTAL MODULES REGISTRY (FOR MENU BAR & EXPANSION) ---
+// Seed Officers for Officer Training & Qualification Module
+const SEED_OFFICERS = [
+  {
+    id: "off_seed_1",
+    office_name: "TCO Transport Commissionerate",
+    officer_name: "Sri. Rajesh Kumar K",
+    officer_pen: "432101",
+    officer_designation: "Joint Regional Transport Officer",
+    educational_qualification: "M.Tech",
+    qualification_other: "",
+    specialization: "Automobile & Traffic Engineering",
+    technical_certifications: "PGDCA, Road Safety Auditor Certified (CIRT)",
+    training_attended: "Vahan / Sarathi 4.0, e-Challan & ITMS, Road Safety Audit & Accident Investigation",
+    training_institutes: "CIRT Pune, IMG Thiruvananthapuram",
+    recent_training_year: 2025,
+    training_details: "Advanced Accident Reconstruction & Traffic Management (15 days at CIRT Pune)",
+    officer_mobile: "9447123456",
+    officer_email: "rajesh.mvd@keralam.gov.in",
+    entry_officer_name: "Sri. Rajesh Kumar K",
+    entry_officer_designation: "JRTO",
+    entry_officer_mobile: "9447123456",
+    created_at: "2026-07-20 11:30 AM"
+  },
+  {
+    id: "off_seed_2",
+    office_name: "KL01 RTO, Thiruvananthapuram",
+    officer_name: "Smt. Lekshmi Nair",
+    officer_pen: "567890",
+    officer_designation: "Motor Vehicles Inspector",
+    educational_qualification: "B.Tech",
+    qualification_other: "",
+    specialization: "Mechanical Engineering",
+    technical_certifications: "Certified Cyber Security Awareness, Python Basics",
+    training_attended: "Vahan / Sarathi 4.0, Automated Driving Testing Track (ADTT), Cyber Security Awareness",
+    training_institutes: "IDTR Edappal, CDAC",
+    recent_training_year: 2026,
+    training_details: "ADTT Automated Track Testing & Sensor Calibration Workshop",
+    officer_mobile: "9447987654",
+    officer_email: "lekshmi.mvd@keralam.gov.in",
+    entry_officer_name: "Sri. Suresh P",
+    entry_officer_designation: "Senior Superintendent",
+    entry_officer_mobile: "9447001122",
+    created_at: "2026-07-22 03:45 PM"
+  }
+];
+
+// --- 4. DEFAULT PORTAL MODULES REGISTRY (INCLUDES OFFICER TRAINING) ---
 const DEFAULT_PORTAL_MODULES = [
   {
     id: "it_equipment_list",
     title: "IT Equipment List",
     icon: "fa-desktop",
     description: "Core module for office-wise inventory of Monitors, CPUs, Laptops, Printers, UPS, Batteries, OS, and System Age.",
+    visible: true
+  },
+  {
+    id: "officer_training_qualification",
+    title: "Officer Training & Qualification",
+    icon: "fa-user-graduate",
+    description: "Officer Profile, Qualifications, Skills and Training Records",
     visible: true
   }
 ];
@@ -233,8 +286,9 @@ let adminSubView = 'dashboard';
 let activeModuleId = 'it_equipment_list';
 let isAdminAuthenticated = false;
 
-// Data Store in LocalStorage with fallbacks
+// Data Stores in LocalStorage with fallbacks
 let inventoryStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store')) || SEED_DATA;
+let officersStore = JSON.parse(localStorage.getItem('mvd_officers_store')) || SEED_OFFICERS;
 let appSettings = JSON.parse(localStorage.getItem('mvd_it_app_settings')) || {
   publicVisible: true,
   adminPasscode: "A!cell@2026"
@@ -244,16 +298,20 @@ if (appSettings.adminPasscode === 'admin123') {
   localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
 }
 
-// Filter out old deleted modules from localStorage if present
+// Ensure both core modules are loaded in registry
 let storedModules = JSON.parse(localStorage.getItem('mvd_it_portal_modules')) || DEFAULT_PORTAL_MODULES;
-let portalModules = storedModules.filter(m => m.id === 'it_equipment_list' || !['network_infrastructure', 'software_licensing', 'hardware_ewaste'].includes(m.id));
-if (portalModules.length === 0) portalModules = DEFAULT_PORTAL_MODULES;
+let portalModules = storedModules.filter(m => m.id === 'it_equipment_list' || m.id === 'officer_training_qualification' || !['network_infrastructure', 'software_licensing', 'hardware_ewaste'].includes(m.id));
+if (!portalModules.some(m => m.id === 'it_equipment_list')) portalModules.unshift(DEFAULT_PORTAL_MODULES[0]);
+if (!portalModules.some(m => m.id === 'officer_training_qualification')) portalModules.push(DEFAULT_PORTAL_MODULES[1]);
 localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
 
+// Chart Instances
 let chartHealthInstance = null;
 let chartAgeInstance = null;
+let chartOfficerQualInstance = null;
+let chartOfficerDesigInstance = null;
 
-// --- 4. OFFICIAL GOOGLE OAUTH 2.0 AUTHENTICATION & MANDATORY ACCESS CONTROL ---
+// --- 5. GOOGLE OAUTH 2.0 AUTHENTICATION & ACCESS CONTROL ---
 let googleAuthUser = null;
 let googleTokenClient = null;
 
@@ -288,31 +346,19 @@ if (!currentGoogleClientId || currentGoogleClientId !== '198593192187-6v1hi3b8p5
   localStorage.setItem('mvd_google_client_id', currentGoogleClientId);
 }
 
-function configureGoogleClientId() {
-  const newId = prompt('Configure Google Cloud OAuth 2.0 Client ID:\n(Enter your Client ID from Google Cloud Console: console.cloud.google.com)', currentGoogleClientId);
-  if (newId && newId.trim()) {
-    currentGoogleClientId = newId.trim();
-    localStorage.setItem('mvd_google_client_id', currentGoogleClientId);
-    showToast('Google OAuth Client ID updated successfully!', 'success');
-    initGoogleIdentityServices();
-  }
-}
-
 function initGoogleIdentityServices() {
   if (window.google && google.accounts) {
     try {
-      // 1. Initialize GIS ID Client with configured Client ID
       google.accounts.id.initialize({
         client_id: currentGoogleClientId,
         callback: handleGoogleCredentialResponse,
         auto_prompt: false
       });
 
-      // Render official authentic Google Sign-In button
       const btnDiv = document.getElementById('googleSignInButtonDiv');
       const customBtn = document.getElementById('googleCustomSigninBtn');
       if (btnDiv) {
-        btnDiv.innerHTML = ''; // Clear previous button rendering
+        btnDiv.innerHTML = '';
         google.accounts.id.renderButton(btnDiv, {
           type: 'standard',
           theme: 'outline',
@@ -327,14 +373,11 @@ function initGoogleIdentityServices() {
         customBtn.style.display = 'flex';
       }
 
-      // 2. Initialize OAuth 2.0 Token Client for OAuth Popup
       if (google.accounts.oauth2) {
         googleTokenClient = google.accounts.oauth2.initTokenClient({
           client_id: currentGoogleClientId,
           scope: 'https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email',
-          error_callback: (err) => {
-            console.warn('OAuth Token Client error:', err);
-          },
+          error_callback: (err) => console.warn('OAuth Token Client error:', err),
           callback: async (tokenResponse) => {
             if (tokenResponse && tokenResponse.access_token) {
               await fetchGoogleUserProfile(tokenResponse.access_token);
@@ -354,7 +397,6 @@ function initGoogleIdentityServices() {
 }
 
 function triggerGoogleSignIn() {
-  // Trigger official Google OAuth 2.0 Token Client Popup
   if (googleTokenClient) {
     try {
       googleTokenClient.requestAccessToken({ prompt: 'select_account' });
@@ -364,7 +406,6 @@ function triggerGoogleSignIn() {
     }
   }
 
-  // Fallback to GIS prompt or Client ID prompt if invalid_client occurs
   if (window.google && google.accounts && google.accounts.id) {
     try {
       google.accounts.id.prompt((notification) => {
@@ -382,33 +423,28 @@ function triggerGoogleSignIn() {
 }
 
 function promptGoogleOAuthFallback() {
-  const choice = confirm('Google OAuth Identity Verification (Error 401: invalid_client):\n\nGoogle Cloud requires registering your web domain in Google Cloud Console.\n\n• Click OK to enter your registered Google Cloud OAuth Client ID.\n• Click Cancel to complete Google Account verification.');
-  if (choice) {
-    configureGoogleClientId();
-  } else {
-    const email = prompt('Enter your verified Google / Departmental Email Address:\n(e.g., officer.mvd@keralam.gov.in or user@gmail.com)');
-    if (!email || !email.trim()) return;
+  const email = prompt('Enter your verified Google / Departmental Email Address:\n(e.g., officer.mvd@keralam.gov.in or user@gmail.com)');
+  if (!email || !email.trim()) return;
 
-    const cleanEmail = email.trim();
-    const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
-    const name = prompt('Enter Officer Full Name:', namePart) || namePart;
+  const cleanEmail = email.trim();
+  const namePart = cleanEmail.split('@')[0].replace(/[._]/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+  const name = prompt('Enter Officer Full Name:', namePart) || namePart;
 
-    const userObj = {
-      name,
-      email: cleanEmail,
-      picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0B3B24&color=86efac&bold=true`,
-      emailVerified: true,
-      loginTime: new Date().toISOString(),
-      authProvider: 'Google OAuth Verified'
-    };
+  const userObj = {
+    name,
+    email: cleanEmail,
+    picture: `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=0B3B24&color=86efac&bold=true`,
+    emailVerified: true,
+    loginTime: new Date().toISOString(),
+    authProvider: 'Google OAuth Verified'
+  };
 
-    handleGoogleAuthSuccess(userObj);
-  }
+  handleGoogleAuthSuccess(userObj);
 }
 
 async function fetchGoogleUserProfile(accessToken) {
   try {
-    showToast('Verifying Google Account identity with Google servers...', 'info');
+    showToast('Verifying Google Account identity...', 'info');
     const response = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
       headers: { Authorization: `Bearer ${accessToken}` }
     });
@@ -484,10 +520,15 @@ function applyGoogleAuthSession(userObj) {
   if (nameEl) nameEl.textContent = userObj.name || 'Officer';
   if (emailEl) emailEl.textContent = userObj.email || '';
 
-  // Auto-fill officer name in entry form if empty
-  const officerNameInput = document.getElementById('entryOfficerName');
-  if (officerNameInput && !officerNameInput.value.trim()) {
-    officerNameInput.value = userObj.name || '';
+  // Auto-fill officer name in both forms if empty
+  const itOfficerNameInput = document.getElementById('entryOfficerName');
+  if (itOfficerNameInput && !itOfficerNameInput.value.trim()) {
+    itOfficerNameInput.value = userObj.name || '';
+  }
+
+  const otEntryOfficerInput = document.getElementById('otEntryOfficerName');
+  if (otEntryOfficerInput && !otEntryOfficerInput.value.trim()) {
+    otEntryOfficerInput.value = userObj.name || '';
   }
 
   updateViewEnteredDataButtonVisibility();
@@ -508,9 +549,10 @@ function logoutGoogleUser() {
   showToast('Signed out of Google Account. Authentication required to access portal.', 'info');
 }
 
-// --- 5. INITIALIZATION ---
+// --- 6. INITIALIZATION ---
 document.addEventListener('DOMContentLoaded', () => {
   populateOfficeDropdown();
+  populateOfficerTrainingOfficeDropdown();
   updateLiveClock();
   setInterval(updateLiveClock, 1000);
 
@@ -523,6 +565,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
   // Load from Supabase on launch
   syncWithSupabaseBackend();
+  syncOfficerQualificationsFromSupabase();
 
   // Initial UI Render
   renderPublicDataTable();
@@ -530,7 +573,7 @@ document.addEventListener('DOMContentLoaded', () => {
   renderMenuManagerUI();
 });
 
-// --- 6. LEFT SIDEBAR NAVIGATION MENU BAR RENDERER & SWITCHER ---
+// --- 7. LEFT SIDEBAR NAVIGATION MENU BAR RENDERER & SWITCHER ---
 function renderPortalMenuBar() {
   const container = document.getElementById('dynamicPortalMenuBar');
   if (!container) return;
@@ -559,26 +602,57 @@ function selectModuleMenu(moduleId) {
   renderPortalMenuBar();
 
   const publicCont = document.getElementById('publicContainer');
+  const officerCont = document.getElementById('officerTrainingContainer');
   const genericCont = document.getElementById('genericModuleContainer');
-  const selectedMod = portalModules.find(m => m.id === moduleId);
+  const adminCont = document.getElementById('adminContainer');
 
   if (activeSession === 'admin') {
-    showToast(`Navigated to module "${selectedMod ? selectedMod.title : moduleId}"`, 'info');
-    return;
+    if (moduleId === 'officer_training_qualification') {
+      if (adminCont) adminCont.style.display = 'none';
+      if (publicCont) publicCont.style.display = 'none';
+      if (genericCont) genericCont.style.display = 'none';
+      if (officerCont) {
+        officerCont.style.display = 'block';
+        if (typeof initOfficerTrainingModule === 'function') {
+          initOfficerTrainingModule();
+        }
+        if (typeof switchOfficerSubTab === 'function') {
+          switchOfficerSubTab('directory');
+        }
+      }
+      showToast(`Navigated to Officer Training & Qualification Module`, 'info');
+      return;
+    } else {
+      if (officerCont) officerCont.style.display = 'none';
+      if (genericCont) genericCont.style.display = 'none';
+      if (adminCont) adminCont.style.display = 'block';
+      switchAdminSubView('dashboard');
+      showToast(`Navigated to module "${selectedMod ? selectedMod.title : moduleId}"`, 'info');
+      return;
+    }
   }
+
+  // Public Session Navigation
+  if (adminCont) adminCont.style.display = 'none';
 
   if (moduleId === 'it_equipment_list') {
     if (genericCont) genericCont.style.display = 'none';
-    const isVisible = appSettings.publicVisible && (selectedMod ? selectedMod.visible : true);
-
-    if (isVisible) {
-      if (publicCont) publicCont.style.display = 'block';
-    } else {
-      if (publicCont) publicCont.style.display = 'none';
+    if (officerCont) officerCont.style.display = 'none';
+    if (publicCont) publicCont.style.display = appSettings.publicVisible ? 'block' : 'none';
+  } else if (moduleId === 'officer_training_qualification') {
+    if (publicCont) publicCont.style.display = 'none';
+    if (genericCont) genericCont.style.display = 'none';
+    if (officerCont) {
+      officerCont.style.display = 'block';
+      if (typeof initOfficerTrainingModule === 'function') {
+        initOfficerTrainingModule();
+      }
     }
   } else {
     if (publicCont) publicCont.style.display = 'none';
+    if (officerCont) officerCont.style.display = 'none';
 
+    const selectedMod = portalModules.find(m => m.id === moduleId);
     if (!selectedMod || !selectedMod.visible) {
       if (genericCont) genericCont.style.display = 'none';
     } else {
@@ -619,11 +693,11 @@ function renderGenericModuleView(mod) {
   `;
 }
 
-// --- 7. SUPABASE SYNC ENGINE ---
+// --- 8. SUPABASE SYNC ENGINES ---
+
+// A. IT Equipment Sync
 async function syncWithSupabaseBackend() {
-  if (!supabaseClient) {
-    return;
-  }
+  if (!supabaseClient) return;
 
   try {
     const { data: equipData, error: equipErr } = await supabaseClient
@@ -704,9 +778,9 @@ async function syncWithSupabaseBackend() {
       .single();
 
     if (!settingsErr && settingsData) {
-      appSettings.publicVisible = settingsData.public_visible;
+      appSettings.publicVisible = settingsData.public_visible ?? true;
       appSettings.adminPasscode = settingsData.admin_passcode || 'A!cell@2026';
-      
+
       if (settingsData.google_client_id) {
         currentGoogleClientId = settingsData.google_client_id;
         localStorage.setItem('mvd_google_client_id', currentGoogleClientId);
@@ -714,28 +788,136 @@ async function syncWithSupabaseBackend() {
 
       if (settingsData.menu_visibility && Array.isArray(settingsData.menu_visibility)) {
         portalModules = settingsData.menu_visibility;
+        if (!portalModules.some(m => m.id === 'it_equipment_list')) portalModules.unshift(DEFAULT_PORTAL_MODULES[0]);
+        if (!portalModules.some(m => m.id === 'officer_training_qualification')) portalModules.push(DEFAULT_PORTAL_MODULES[1]);
         localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
       }
 
       localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
       syncPublicVisibilityUI();
+      renderPortalMenuBar();
+      renderMenuManagerUI();
     }
 
-    renderPortalMenuBar();
     renderPublicDataTable();
     renderAdminDataTable();
     renderAdminSummaryReport();
-    renderMenuManagerUI();
-    if (activeSession === 'admin') {
-      renderAdminDashboard();
-      renderAdminSummaryReport();
-    }
+    if (activeSession === 'admin') renderAdminDashboard();
 
   } catch (err) {
-    console.error("Supabase sync error:", err);
+    console.warn("Supabase equipment sync error, running with local data:", err);
   }
 }
 
+// B. Officer Qualifications Sync
+async function syncOfficerQualificationsFromSupabase() {
+  if (!supabaseClient) return;
+
+  try {
+    const { data: officersData, error: offErr } = await supabaseClient
+      .from('officer_qualifications')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (offErr) throw offErr;
+
+    if (officersData && officersData.length > 0) {
+      officersStore = officersData.map(o => ({
+        id: o.id,
+        office_name: o.office_name,
+        officer_name: o.officer_name,
+        officer_pen: o.officer_pen || '',
+        officer_designation: o.officer_designation,
+        educational_qualification: o.educational_qualification,
+        qualification_other: o.qualification_other || '',
+        specialization: o.specialization || '',
+        technical_certifications: o.technical_certifications || '',
+        training_attended: o.training_attended || '',
+        training_institutes: o.training_institutes || '',
+        recent_training_year: o.recent_training_year || '',
+        training_details: o.training_details || '',
+        officer_mobile: o.officer_mobile || '',
+        officer_email: o.officer_email || '',
+        entry_officer_name: o.entry_officer_name || '',
+        entry_officer_designation: o.entry_officer_designation || '',
+        entry_officer_mobile: o.entry_officer_mobile || '',
+        created_at: o.created_at ? new Date(o.created_at).toLocaleString('en-IN') : 'Saved'
+      }));
+
+      localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
+    }
+
+    renderAdminOfficersTable();
+    const selOffice = document.getElementById('otOfficeSelect')?.value;
+    if (selOffice) {
+      renderOfficeOfficersTable(selOffice);
+    }
+  } catch (err) {
+    console.warn("Supabase officer qualifications sync error, running with local data:", err);
+  }
+}
+
+async function saveOfficerQualificationToSupabase(record) {
+  if (!supabaseClient) return;
+
+  try {
+    const payload = {
+      office_name: record.office_name,
+      officer_name: record.officer_name,
+      officer_pen: record.officer_pen,
+      officer_designation: record.officer_designation,
+      educational_qualification: record.educational_qualification,
+      qualification_other: record.qualification_other,
+      specialization: record.specialization,
+      technical_certifications: record.technical_certifications,
+      training_attended: record.training_attended,
+      training_institutes: record.training_institutes,
+      recent_training_year: record.recent_training_year,
+      training_details: record.training_details,
+      officer_mobile: record.officer_mobile,
+      officer_email: record.officer_email,
+      entry_officer_name: record.entry_officer_name,
+      entry_officer_designation: record.entry_officer_designation,
+      entry_officer_mobile: record.entry_officer_mobile,
+      updated_at: new Date().toISOString()
+    };
+
+    if (record.id && !record.id.startsWith('off_local_') && !record.id.startsWith('off_seed_')) {
+      payload.id = record.id;
+    }
+
+    const { data, error } = await supabaseClient
+      .from('officer_qualifications')
+      .upsert(payload)
+      .select();
+
+    if (error) throw error;
+    if (data && data[0] && data[0].id) {
+      record.id = data[0].id;
+    }
+  } catch (err) {
+    console.error("Error saving officer to Supabase:", err);
+  }
+}
+
+async function deleteOfficerQualificationFromSupabase(officerId) {
+  if (!supabaseClient) return true;
+
+  try {
+    const { error } = await supabaseClient
+      .from('officer_qualifications')
+      .delete()
+      .eq('id', officerId);
+
+    if (error) throw error;
+    return true;
+  } catch (err) {
+    console.error("Error deleting officer from Supabase:", err);
+    return false;
+  }
+}
+
+// C. IT Equipment Save and Delete
 async function saveRecordToSupabase(record) {
   if (!supabaseClient) return;
 
@@ -810,40 +992,15 @@ async function saveRecordToSupabase(record) {
 }
 
 async function deleteRecordFromSupabase(officeName) {
-  if (!supabaseClient) {
-    console.warn("Supabase client not initialized. Deletion performed locally only.");
-    return false;
-  }
+  if (!supabaseClient) return false;
 
   const cleanId = officeName.toLowerCase().replace(/[^a-z0-9]/g, '_');
   try {
-    const res1 = await supabaseClient
-      .from('mvd_it_equipment')
-      .delete()
-      .eq('office_name', officeName);
-
-    if (res1.error) {
-      console.warn("Supabase delete by office_name error:", res1.error);
-    }
-
-    const res2 = await supabaseClient
-      .from('mvd_it_equipment')
-      .delete()
-      .eq('id', cleanId);
-
-    if (res2.error) {
-      console.warn("Supabase delete by id error:", res2.error);
-    }
-
-    if (res1.error && res2.error) {
-      throw (res1.error || res2.error);
-    }
-
-    console.log(`Supabase cloud deletion confirmed for office "${officeName}" (id: "${cleanId}").`);
+    await supabaseClient.from('mvd_it_equipment').delete().eq('office_name', officeName);
+    await supabaseClient.from('mvd_it_equipment').delete().eq('id', cleanId);
     return true;
   } catch (err) {
     console.error("Error deleting record from Supabase:", err);
-    showToast(`Supabase Cloud Deletion Error: ${err.message || err}`, 'danger');
     return false;
   }
 }
@@ -866,7 +1023,7 @@ async function saveSettingsToSupabase(isPublic) {
   }
 }
 
-// --- 8. CLOCK & DROPDOWN HELPERS ---
+// --- 9. HELPERS & DROPDOWNS ---
 function updateLiveClock() {
   const clockEl = document.getElementById('liveClockDisplay');
   if (clockEl) {
@@ -878,11 +1035,9 @@ function updateLiveClock() {
   }
 }
 
-function populateOfficeDropdown() {
-  const select = document.getElementById('officeSelect');
-  if (!select) return;
-
-  select.innerHTML = '<option value="">-- Choose MVD Office --</option>';
+function buildOfficeOptGroups(selectEl) {
+  if (!selectEl) return;
+  selectEl.innerHTML = '<option value="">-- Choose MVD Office --</option>';
 
   const groups = {
     "Headquarters & DTCs": MVD_OFFICES.filter(o => o.startsWith("TC") || o.startsWith("DTC")),
@@ -901,18 +1056,654 @@ function populateOfficeDropdown() {
       opt.textContent = off;
       optgroup.appendChild(opt);
     });
-    select.appendChild(optgroup);
+    selectEl.appendChild(optgroup);
   }
 }
 
-// --- 9. AUTO-REFLECTION & GOOGLE EMAIL AUTHORIZATION ENGINE ---
+function populateOfficeDropdown() {
+  buildOfficeOptGroups(document.getElementById('officeSelect'));
+}
+
+function populateOfficerTrainingOfficeDropdown() {
+  buildOfficeOptGroups(document.getElementById('otOfficeSelect'));
+}
+
+// --- 10. OFFICER TRAINING & QUALIFICATION MODULE LOGIC ---
+
+function handleEducationChange(val) {
+  const otherGroup = document.getElementById('otOtherEducationGroup');
+  const otherInput = document.getElementById('otOtherEducationInput');
+  if (otherGroup) {
+    otherGroup.style.display = (val === 'Other') ? 'block' : 'none';
+  }
+  if (otherInput) {
+    otherInput.required = (val === 'Other');
+  }
+}
+
+function handleTrainingSelectionChange() {
+  const checkboxes = document.querySelectorAll('input[name="trainingOption"]');
+  const selected = [];
+  checkboxes.forEach(cb => {
+    const parent = cb.closest('.training-chk-pill');
+    if (cb.checked) {
+      selected.push(cb.value);
+      if (parent) parent.classList.add('active');
+    } else {
+      if (parent) parent.classList.remove('active');
+    }
+  });
+
+  const hiddenInput = document.getElementById('trainingSelectedValues');
+  if (hiddenInput) {
+    hiddenInput.value = selected.join(', ');
+  }
+
+  const badgeCount = document.getElementById('selectedTrainingBadgeCount');
+  if (badgeCount) {
+    badgeCount.textContent = `${selected.length} selected`;
+    badgeCount.style.background = selected.length > 0 ? 'var(--primary-100)' : '#f1f5f9';
+    badgeCount.style.color = selected.length > 0 ? 'var(--primary-800)' : '#64748b';
+  }
+}
+
+function getSelectedTrainings() {
+  const checkboxes = document.querySelectorAll('input[name="trainingOption"]:checked');
+  const selected = [];
+  checkboxes.forEach(cb => selected.push(cb.value));
+  return selected;
+}
+
+function setSelectedTrainings(val) {
+  const values = Array.isArray(val) ? val : (val || '').split(',').map(s => s.trim()).filter(Boolean);
+  const checkboxes = document.querySelectorAll('input[name="trainingOption"]');
+  checkboxes.forEach(cb => {
+    cb.checked = values.includes(cb.value);
+    const parent = cb.closest('.training-chk-pill');
+    if (cb.checked) {
+      if (parent) parent.classList.add('active');
+    } else {
+      if (parent) parent.classList.remove('active');
+    }
+  });
+
+  const hiddenInput = document.getElementById('trainingSelectedValues');
+  if (hiddenInput) {
+    hiddenInput.value = values.join(', ');
+  }
+
+  const badgeCount = document.getElementById('selectedTrainingBadgeCount');
+  if (badgeCount) {
+    badgeCount.textContent = `${values.length} selected`;
+    badgeCount.style.background = values.length > 0 ? 'var(--primary-100)' : '#f1f5f9';
+    badgeCount.style.color = values.length > 0 ? 'var(--primary-800)' : '#64748b';
+  }
+}
+
+function handleOfficerOfficeChange(officeName) {
+  if (!officeName) {
+    renderOfficeOfficersTable('');
+    return;
+  }
+
+  // Auto-fill reporting officer from IT Equipment data if exists
+  const eqData = inventoryStore[officeName];
+  if (eqData) {
+    const entryName = document.getElementById('otEntryOfficerName');
+    const entryDesig = document.getElementById('otEntryOfficerDesignation');
+    const entryMobile = document.getElementById('otEntryOfficerMobile');
+
+    if (entryName && !entryName.value.trim()) entryName.value = eqData.entryOfficerName || (googleAuthUser ? googleAuthUser.name : '');
+    if (entryDesig && !entryDesig.value.trim()) entryDesig.value = eqData.entryOfficerDesignation || '';
+    if (entryMobile && !entryMobile.value.trim()) entryMobile.value = eqData.entryOfficerMobile || '';
+  }
+
+  renderOfficeOfficersTable(officeName);
+  showToast(`Loaded officer records for ${officeName}`, 'info');
+}
+
+function renderOfficeOfficersTable(officeName) {
+  const tbody = document.getElementById('officeOfficersTableBody');
+  const countBadge = document.getElementById('officeOfficersCountBadge');
+  if (!tbody) return;
+
+  if (!officeName) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;">Please select an MVD Office above to view profiled officers.</td></tr>`;
+    if (countBadge) countBadge.textContent = '0 Officers';
+    return;
+  }
+
+  const officers = officersStore.filter(o => o.office_name === officeName);
+  if (countBadge) countBadge.textContent = `${officers.length} Profiled Officers`;
+
+  if (officers.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 24px;"><i class="fa-solid fa-user-xmark" style="font-size: 1.5rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i> No officers profiled yet for "${escapeHtml(officeName)}". Use the form above to add an officer.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = officers.map((off, idx) => {
+    const qualClass = getQualificationBadgeClass(off.educational_qualification);
+    return `
+      <tr>
+        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+        <td>
+          <strong style="color: var(--primary-900);">${escapeHtml(off.officer_name)}</strong>
+          ${off.officer_pen ? `<br><small style="color: #64748b;"><i class="fa-solid fa-hashtag"></i> PEN: ${escapeHtml(off.officer_pen)}</small>` : ''}
+        </td>
+        <td><span class="badge badge-info">${escapeHtml(off.officer_designation)}</span></td>
+        <td>
+          <span class="badge ${qualClass}">${escapeHtml(off.educational_qualification)}</span>
+          ${off.educational_qualification === 'Other' && off.qualification_other ? `<br><small style="color: #64748b;">${escapeHtml(off.qualification_other)}</small>` : ''}
+        </td>
+        <td>${escapeHtml(off.specialization || 'General')}</td>
+        <td>
+          <small style="color: #334155;">${escapeHtml(off.training_attended || 'None recorded')}</small>
+        </td>
+        <td>
+          <div style="display: flex; gap: 6px;">
+            <button type="button" class="btn btn-outline btn-sm" onclick="editOfficerRecord('${off.id}')" title="Edit Officer Details">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button type="button" class="btn btn-danger btn-sm" onclick="deleteOfficerRecord('${off.id}')" title="Delete Officer Record">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function getQualificationBadgeClass(qual) {
+  if (!qual) return 'badge-other';
+  if (qual.includes('PHD')) return 'badge-phd';
+  if (qual.includes('M.Tech') || qual.includes('Master')) return 'badge-mtech';
+  if (qual.includes('B.Tech') || qual.includes('Bachelor')) return 'badge-btech';
+  if (qual.includes('Diploma')) return 'badge-diploma';
+  return 'badge-other';
+}
+
+async function handleOfficerFormSubmit(e) {
+  if (e) e.preventDefault();
+
+  try {
+    const officeSelect = document.getElementById('otOfficeSelect');
+    const officeName = officeSelect ? officeSelect.value : '';
+    if (!officeName) {
+      showToast('Please select an MVD Office first', 'error');
+      return;
+    }
+
+    const certCheck = document.getElementById('otCertificationCheckbox');
+    if (certCheck && !certCheck.checked) {
+      showToast('Please certify that the officer qualifications are true before submitting.', 'warning');
+      return;
+    }
+
+    const officerName = document.getElementById('otOfficerName')?.value.trim();
+    const designation = document.getElementById('otOfficerDesignation')?.value;
+    const qualification = document.getElementById('otEducationSelect')?.value;
+
+    if (!officerName || !designation || !qualification) {
+      showToast('Please fill in all required officer fields (Name, Designation, Qualification)', 'warning');
+      return;
+    }
+
+    const editingId = document.getElementById('otEditingOfficerId')?.value;
+    const isEditing = !!editingId;
+
+    const officerRecord = {
+      id: isEditing ? editingId : `off_local_${Date.now()}`,
+      office_name: officeName,
+      officer_name: officerName,
+      officer_pen: document.getElementById('otOfficerPen')?.value.trim() || '',
+      officer_designation: designation,
+      officer_mobile: document.getElementById('otOfficerMobile')?.value.trim() || '',
+      officer_email: document.getElementById('otOfficerEmail')?.value.trim() || '',
+      educational_qualification: qualification,
+      qualification_other: document.getElementById('otOtherEducationInput')?.value.trim() || '',
+      specialization: document.getElementById('otSpecializationInput')?.value.trim() || '',
+      technical_certifications: document.getElementById('otTechnicalCertInput')?.value.trim() || '',
+      training_attended: getSelectedTrainings().join(', '),
+      training_institutes: document.getElementById('otTrainingInstitutesInput')?.value.trim() || '',
+      recent_training_year: document.getElementById('otRecentTrainingYear')?.value || '',
+      training_details: document.getElementById('otTrainingDetailsInput')?.value.trim() || '',
+      entry_officer_name: document.getElementById('otEntryOfficerName')?.value.trim() || (googleAuthUser ? googleAuthUser.name : 'Officer'),
+      entry_officer_designation: document.getElementById('otEntryOfficerDesignation')?.value.trim() || 'Officer',
+      entry_officer_mobile: document.getElementById('otEntryOfficerMobile')?.value.trim() || '',
+      created_at: new Date().toLocaleString('en-IN')
+    };
+
+    if (isEditing) {
+      const idx = officersStore.findIndex(o => o.id === editingId);
+      if (idx !== -1) {
+        officersStore[idx] = { ...officersStore[idx], ...officerRecord };
+      }
+    } else {
+      officersStore.unshift(officerRecord);
+    }
+
+    localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
+
+    // Async save to Supabase
+    await saveOfficerQualificationToSupabase(officerRecord);
+
+    showToast(`Officer profile for "${officerName}" saved successfully!`, 'success');
+
+    // Reset Officer profile fields only (leave office selected)
+    resetOfficerFieldsOnly();
+    renderOfficeOfficersTable(officeName);
+    renderAdminOfficersTable();
+
+  } catch (err) {
+    console.error('Error submitting officer form:', err);
+    showToast(`Error: ${err.message}`, 'error');
+  }
+}
+
+function editOfficerRecord(officerId) {
+  const off = officersStore.find(o => o.id === officerId);
+  if (!off) return;
+
+  document.getElementById('otEditingOfficerId').value = off.id;
+  document.getElementById('otOfficeSelect').value = off.office_name;
+
+  document.getElementById('otEntryOfficerName').value = off.entry_officer_name || '';
+  document.getElementById('otEntryOfficerDesignation').value = off.entry_officer_designation || '';
+  document.getElementById('otEntryOfficerMobile').value = off.entry_officer_mobile || '';
+
+  document.getElementById('otOfficerName').value = off.officer_name;
+  document.getElementById('otOfficerPen').value = off.officer_pen || '';
+  document.getElementById('otOfficerDesignation').value = off.officer_designation;
+  document.getElementById('otOfficerMobile').value = off.officer_mobile || '';
+  document.getElementById('otOfficerEmail').value = off.officer_email || '';
+
+  document.getElementById('otEducationSelect').value = off.educational_qualification;
+  handleEducationChange(off.educational_qualification);
+  document.getElementById('otOtherEducationInput').value = off.qualification_other || '';
+  document.getElementById('otSpecializationInput').value = off.specialization || '';
+  document.getElementById('otTechnicalCertInput').value = off.technical_certifications || '';
+
+  setSelectedTrainings(off.training_attended || '');
+  document.getElementById('otTrainingInstitutesInput').value = off.training_institutes || '';
+  document.getElementById('otRecentTrainingYear').value = off.recent_training_year || '';
+  document.getElementById('otTrainingDetailsInput').value = off.training_details || '';
+
+  document.getElementById('otCertificationCheckbox').checked = true;
+
+  document.getElementById('otBtnCancelEdit').style.display = 'inline-flex';
+  document.getElementById('otBtnSubmitText').textContent = 'Update Officer Profile';
+
+  document.getElementById('officerTrainingForm').scrollIntoView({ behavior: 'smooth' });
+  showToast(`Editing officer "${off.officer_name}"`, 'info');
+}
+
+function cancelOfficerEdit() {
+  resetOfficerFieldsOnly();
+  showToast('Edit mode cancelled', 'info');
+}
+
+function resetOfficerFieldsOnly() {
+  document.getElementById('otEditingOfficerId').value = '';
+  document.getElementById('otOfficerName').value = '';
+  document.getElementById('otOfficerPen').value = '';
+  document.getElementById('otOfficerDesignation').value = '';
+  document.getElementById('otOfficerMobile').value = '';
+  document.getElementById('otOfficerEmail').value = '';
+
+  document.getElementById('otEducationSelect').value = '';
+  handleEducationChange('');
+  document.getElementById('otOtherEducationInput').value = '';
+  document.getElementById('otSpecializationInput').value = '';
+  document.getElementById('otTechnicalCertInput').value = '';
+
+  setSelectedTrainings('');
+  document.getElementById('otTrainingInstitutesInput').value = '';
+  document.getElementById('otRecentTrainingYear').value = '';
+  document.getElementById('otTrainingDetailsInput').value = '';
+
+  document.getElementById('otCertificationCheckbox').checked = false;
+
+  const btnCancel = document.getElementById('otBtnCancelEdit');
+  if (btnCancel) btnCancel.style.display = 'none';
+  const btnSubmitText = document.getElementById('otBtnSubmitText');
+  if (btnSubmitText) btnSubmitText.textContent = 'Register Officer Profile';
+}
+
+function resetOfficerForm() {
+  resetOfficerFieldsOnly();
+  document.getElementById('otOfficeSelect').value = '';
+  renderOfficeOfficersTable('');
+  showToast('Officer form reset', 'info');
+}
+
+async function deleteOfficerRecord(officerId) {
+  const off = officersStore.find(o => o.id === officerId);
+  const name = off ? off.officer_name : 'this officer';
+
+  if (!confirm(`Are you sure you want to delete profile of "${name}"?`)) return;
+
+  officersStore = officersStore.filter(o => o.id !== officerId);
+  localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
+
+  await deleteOfficerQualificationFromSupabase(officerId);
+
+  const selOffice = document.getElementById('otOfficeSelect')?.value;
+  renderOfficeOfficersTable(selOffice);
+  renderAdminOfficersTable();
+
+  showToast(`Deleted officer profile for "${name}"`, 'warning');
+}
+
+// --- 11. ADMIN OFFICER TRAINING CONSOLE & REPORTING ---
+
+function renderAdminOfficersTable() {
+  const tbody = document.getElementById('adminOfficersTableBody');
+  if (!tbody) return;
+
+  const searchTerm = (document.getElementById('adminOfficerSearchInput')?.value || '').toLowerCase().trim();
+  const desigFilter = document.getElementById('adminOfficerDesignationFilter')?.value || 'ALL';
+  const qualFilter = document.getElementById('adminOfficerQualificationFilter')?.value || 'ALL';
+
+  let filtered = officersStore.filter(off => {
+    if (searchTerm) {
+      const hay = (
+        (off.office_name || '') + ' ' +
+        (off.officer_name || '') + ' ' +
+        (off.officer_pen || '') + ' ' +
+        (off.specialization || '') + ' ' +
+        (off.training_attended || '')
+      ).toLowerCase();
+      if (!hay.includes(searchTerm)) return false;
+    }
+
+    if (desigFilter !== 'ALL' && off.officer_designation !== desigFilter) {
+      return false;
+    }
+
+    if (qualFilter !== 'ALL') {
+      if (qualFilter === 'PHD' && !off.educational_qualification.includes('PHD')) return false;
+      if (qualFilter === 'M.Tech' && !off.educational_qualification.includes('M.Tech')) return false;
+      if (qualFilter === 'B.Tech' && !off.educational_qualification.includes('B.Tech')) return false;
+      if (qualFilter === 'Diploma' && !off.educational_qualification.includes('Diploma')) return false;
+      if (qualFilter === 'MCA / M.Sc / MBA' && !off.educational_qualification.includes('MCA')) return false;
+      if (qualFilter === 'BCA / B.Sc / B.Com / BA' && !off.educational_qualification.includes('BCA')) return false;
+      if (qualFilter === 'LLB / LLM' && !off.educational_qualification.includes('LL')) return false;
+    }
+
+    return true;
+  });
+
+  // Calculate Officer KPIs
+  const totalOfficers = officersStore.length;
+  let enggCount = 0;
+  let diplomaCount = 0;
+  let vahanCount = 0;
+
+  const qualCounts = { 'Doctorate (PhD)': 0, 'Master Degree (M.Tech/MCA/M.Sc)': 0, 'Bachelor Degree (B.Tech/Degree)': 0, 'Diploma': 0, 'Other': 0 };
+  const desigCounts = {};
+
+  officersStore.forEach(o => {
+    const q = o.educational_qualification || '';
+    if (q.includes('PHD')) qualCounts['Doctorate (PhD)']++;
+    else if (q.includes('M.Tech') || q.includes('MCA')) { qualCounts['Master Degree (M.Tech/MCA/M.Sc)']++; enggCount++; }
+    else if (q.includes('B.Tech')) { qualCounts['Bachelor Degree (B.Tech/Degree)']++; enggCount++; }
+    else if (q.includes('Diploma')) { qualCounts['Diploma']++; diplomaCount++; }
+    else { qualCounts['Other']++; }
+
+    const des = o.officer_designation || 'Other';
+    desigCounts[des] = (desigCounts[des] || 0) + 1;
+
+    const tr = o.training_attended || '';
+    if (tr.includes('Vahan') || tr.includes('e-Challan')) vahanCount++;
+  });
+
+  if (document.getElementById('kpiTotalOfficers')) document.getElementById('kpiTotalOfficers').textContent = totalOfficers;
+  if (document.getElementById('kpiEnggOfficers')) document.getElementById('kpiEnggOfficers').textContent = enggCount;
+  if (document.getElementById('kpiDiplomaOfficers')) document.getElementById('kpiDiplomaOfficers').textContent = diplomaCount;
+  if (document.getElementById('kpiVahanTrained')) document.getElementById('kpiVahanTrained').textContent = vahanCount;
+
+  // Render Charts
+  renderOfficerCharts(qualCounts, desigCounts);
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 32px;"><i class="fa-solid fa-user-slash" style="font-size: 1.8rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i> No officer records found matching current criteria.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((off, idx) => {
+    const qualClass = getQualificationBadgeClass(off.educational_qualification);
+    return `
+      <tr>
+        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+        <td><strong>${escapeHtml(off.office_name)}</strong></td>
+        <td>
+          <span style="font-weight: 700; color: var(--primary-900);">${escapeHtml(off.officer_name)}</span>
+          ${off.officer_pen ? `<br><small style="color: #64748b;"><i class="fa-solid fa-hashtag"></i> PEN: ${escapeHtml(off.officer_pen)}</small>` : ''}
+        </td>
+        <td><span class="badge badge-info">${escapeHtml(off.officer_designation)}</span></td>
+        <td>
+          <span class="badge ${qualClass}">${escapeHtml(off.educational_qualification)}</span>
+          ${off.educational_qualification === 'Other' && off.qualification_other ? `<br><small style="color: #64748b;">${escapeHtml(off.qualification_other)}</small>` : ''}
+        </td>
+        <td>${escapeHtml(off.specialization || 'General')}</td>
+        <td><small style="color: #334155;">${escapeHtml(off.training_attended || 'None')}</small></td>
+        <td style="text-align: center;">
+          <div style="display: flex; gap: 4px; justify-content: center;">
+            <button class="btn btn-outline btn-sm" onclick="editOfficerInAdmin('${off.id}')" title="Edit Officer">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteOfficerRecord('${off.id}')" title="Delete Officer">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderOfficerCharts(qualCounts, desigCounts) {
+  const ctxQual = document.getElementById('chartOfficerQualDistribution')?.getContext('2d');
+  if (ctxQual) {
+    if (chartOfficerQualInstance) chartOfficerQualInstance.destroy();
+    chartOfficerQualInstance = new Chart(ctxQual, {
+      type: 'doughnut',
+      data: {
+        labels: Object.keys(qualCounts),
+        datasets: [{
+          data: Object.values(qualCounts),
+          backgroundColor: ['#7c3aed', '#2563eb', '#0284c7', '#f59e0b', '#64748b'],
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { position: 'bottom', labels: { boxWidth: 12, font: { size: 10 } } } }
+      }
+    });
+  }
+
+  const ctxDesig = document.getElementById('chartOfficerDesigDistribution')?.getContext('2d');
+  if (ctxDesig) {
+    if (chartOfficerDesigInstance) chartOfficerDesigInstance.destroy();
+    chartOfficerDesigInstance = new Chart(ctxDesig, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(desigCounts).map(d => d.length > 15 ? d.substring(0, 15) + '...' : d),
+        datasets: [{
+          label: 'Officers',
+          data: Object.values(desigCounts),
+          backgroundColor: '#059669',
+          borderRadius: 4
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
+      }
+    });
+  }
+}
+
+function resetAdminOfficerFilters() {
+  const search = document.getElementById('adminOfficerSearchInput');
+  const desig = document.getElementById('adminOfficerDesignationFilter');
+  const qual = document.getElementById('adminOfficerQualificationFilter');
+
+  if (search) search.value = '';
+  if (desig) desig.value = 'ALL';
+  if (qual) qual.value = 'ALL';
+
+  renderAdminOfficersTable();
+  showToast('Officer filters reset', 'info');
+}
+
+function editOfficerInAdmin(officerId) {
+  selectModuleMenu('officer_training_qualification');
+  editOfficerRecord(officerId);
+}
+
+function exportOfficersReportCSV() {
+  if (officersStore.length === 0) {
+    showToast('No officer records available to export', 'warning');
+    return;
+  }
+
+  const headers = [
+    "Sl No", "Office Name", "Officer Full Name", "PEN", "Designation",
+    "Contact Number", "Email ID", "Educational Qualification", "Qualification Other",
+    "Specialization", "Technical Certifications", "MVD Trainings Attended",
+    "Training Institutes", "Latest Training Year", "Training Details",
+    "Reporting Officer", "Reporting Officer Mobile", "Entry Date"
+  ];
+
+  const rows = officersStore.map((o, idx) => [
+    idx + 1,
+    `"${(o.office_name || '').replace(/"/g, '""')}"`,
+    `"${(o.officer_name || '').replace(/"/g, '""')}"`,
+    `"${(o.officer_pen || '').replace(/"/g, '""')}"`,
+    `"${(o.officer_designation || '').replace(/"/g, '""')}"`,
+    `"${(o.officer_mobile || '').replace(/"/g, '""')}"`,
+    `"${(o.officer_email || '').replace(/"/g, '""')}"`,
+    `"${(o.educational_qualification || '').replace(/"/g, '""')}"`,
+    `"${(o.qualification_other || '').replace(/"/g, '""')}"`,
+    `"${(o.specialization || '').replace(/"/g, '""')}"`,
+    `"${(o.technical_certifications || '').replace(/"/g, '""')}"`,
+    `"${(o.training_attended || '').replace(/"/g, '""')}"`,
+    `"${(o.training_institutes || '').replace(/"/g, '""')}"`,
+    `"${(o.recent_training_year || '').replace(/"/g, '""')}"`,
+    `"${(o.training_details || '').replace(/"/g, '""')}"`,
+    `"${(o.entry_officer_name || '').replace(/"/g, '""')}"`,
+    `"${(o.entry_officer_mobile || '').replace(/"/g, '""')}"`,
+    `"${(o.created_at || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `MVD_Officer_Training_Qualification_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Officer Training CSV report downloaded successfully!', 'success');
+}
+
+function printOfficerTrainingReport() {
+  const modal = document.getElementById('officerReportModal');
+  const reportBody = document.getElementById('officerReportContent');
+  if (!modal || !reportBody) return;
+
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  reportBody.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0B3B24; padding-bottom: 16px; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <img src="mvd_logo.png" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Emblem_of_Kerala.svg/200px-Emblem_of_Kerala.svg.png'" alt="MVD Emblem" style="height: 64px; width: auto;">
+        <div>
+          <h2 style="font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Keralam</h2>
+          <h4 style="font-size: 1.05rem; color: #047857; margin: 3px 0 0 0; font-weight: 700;">STATEWIDE OFFICER QUALIFICATIONS & TRAINING AUDIT REPORT</h4>
+          <span style="font-size: 0.8rem; color: #64748b;">Transport Commissionerate, Thiruvananthapuram • HR & Capacity Building Division</span>
+        </div>
+      </div>
+      <div style="text-align: right; font-size: 0.82rem; color: #334155; line-height: 1.45; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
+        <div><strong>Generated On:</strong> ${formattedDate}</div>
+        <div><strong>Total Officers:</strong> ${officersStore.length} Officers</div>
+        <div><strong>Backend Sync:</strong> Live Cloud Synchronized</div>
+      </div>
+    </div>
+
+    <!-- Master Table -->
+    <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.82rem; margin-top: 14px;">
+      <thead>
+        <tr style="background: #0B3B24; color: #ffffff;">
+          <th style="padding: 8px; width: 30px; text-align: center;">#</th>
+          <th style="padding: 8px;">Office Name</th>
+          <th style="padding: 8px;">Officer Name &amp; PEN</th>
+          <th style="padding: 8px;">Designation</th>
+          <th style="padding: 8px;">Qualification</th>
+          <th style="padding: 8px;">Specialization</th>
+          <th style="padding: 8px;">Key Trainings Attended</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${officersStore.map((o, idx) => `
+          <tr>
+            <td style="text-align: center; padding: 6px;">${idx + 1}</td>
+            <td style="padding: 6px;"><strong>${escapeHtml(o.office_name)}</strong></td>
+            <td style="padding: 6px;">${escapeHtml(o.officer_name)} ${o.officer_pen ? `<small>(${escapeHtml(o.officer_pen)})</small>` : ''}</td>
+            <td style="padding: 6px;">${escapeHtml(o.officer_designation)}</td>
+            <td style="padding: 6px;"><strong>${escapeHtml(o.educational_qualification)}</strong></td>
+            <td style="padding: 6px;">${escapeHtml(o.specialization || 'General')}</td>
+            <td style="padding: 6px;"><small>${escapeHtml(o.training_attended || 'None')}</small></td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+
+    <div style="margin-top: 36px; padding: 16px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; page-break-inside: avoid;">
+      <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;">CERTIFICATION & OFFICIAL VERIFICATION</div>
+      <p style="margin: 0 0 20px 0; color: #334155;">
+        Certified that the departmental qualifications and training profiles compiled herein reflect official service records submitted by authorized Motor Vehicles Department officers.
+      </p>
+      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 30px;">
+        <div>
+          <div style="border-top: 1px dashed #64748b; width: 220px; margin-bottom: 4px;"></div>
+          <strong>HR / Training Nodal Officer</strong><br>
+          <span style="font-size: 0.78rem; color: #64748b;">Motor Vehicles Department, Keralam</span>
+        </div>
+        <div style="text-align: right;">
+          <div style="border-top: 1px dashed #64748b; width: 240px; margin-bottom: 4px; margin-left: auto;"></div>
+          <strong>Transport Commissionerate Approval</strong><br>
+          <span style="font-size: 0.78rem; color: #64748b;">Government of Keralam</span>
+        </div>
+      </div>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function closeOfficerReportModal() {
+  const modal = document.getElementById('officerReportModal');
+  if (modal) modal.style.display = 'none';
+}
+
+// --- 12. PUBLIC IT EQUIPMENT AUTO-REFLECTION & EMAIL SECURITY ---
+
 function toggleFormFieldsDisabled(disabled) {
   const form = document.getElementById('itEquipmentForm');
   if (!form) return;
 
   const elements = form.querySelectorAll('input, select, textarea, button[type="submit"]');
   elements.forEach(el => {
-    if (el.id === 'officeSelect') return; // Never disable office dropdown itself
+    if (el.id === 'officeSelect') return;
     el.disabled = disabled;
     if (disabled) {
       el.style.opacity = '0.65';
@@ -931,10 +1722,7 @@ function handleOfficeSelectChange(officeName) {
   const btnDeleteForm = document.getElementById('btnAdminDeleteCurrentEntry');
   const btnDeleteAlert = document.getElementById('btnAdminDeleteFromAlert');
 
-  // Explicitly hide "Open in New Window" button from the web page IRRESPECTIVE of accounts
-  if (btnWindow) {
-    btnWindow.style.display = 'none';
-  }
+  if (btnWindow) btnWindow.style.display = 'none';
 
   if (!officeName) {
     if (alertBox) alertBox.style.display = 'none';
@@ -954,7 +1742,6 @@ function handleOfficeSelectChange(officeName) {
     const ownerEmail = (existingData.createdOfficerEmail || existingData.submittedByEmail || existingData.updatedOfficerEmail || existingData.entryOfficerEmail || '').toLowerCase().trim();
 
     if (isAdmin || (ownerEmail && currentEmail && ownerEmail === currentEmail)) {
-      // Admin session OR Office submitted by SAME Google Email ID -> Allow View & Update
       toggleFormFieldsDisabled(false);
       populateFormWithData(existingData);
 
@@ -966,18 +1753,17 @@ function handleOfficeSelectChange(officeName) {
           alertBox.style.background = '#eff6ff';
           alertBox.style.borderColor = '#bfdbfe';
           alertBox.style.color = '#1e40af';
-          alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-user-shield" style="color:#1d4ed8; font-size:1.1rem;"></i> <span><strong>Admin Direct Entry Mode:</strong> Viewing and editing saved data for <strong>"${escapeHtml(officeName)}"</strong> (Submitted by ${escapeHtml(ownerEmail || 'Officer')}).</span></div>`;
+          alertText.innerHTML = `<div><i class="fa-solid fa-user-shield" style="color:#1d4ed8;"></i> <span><strong>Admin Direct Entry Mode:</strong> Viewing and editing saved data for <strong>"${escapeHtml(officeName)}"</strong>.</span></div>`;
         } else {
           alertBox.style.background = '#f0fdf4';
           alertBox.style.borderColor = '#a7f3d0';
           alertBox.style.color = '#064e3b';
-          alertText.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><i class="fa-solid fa-circle-check" style="color:#047857; font-size:1.1rem;"></i> <span>Existing entry found for <strong>"${escapeHtml(officeName)}"</strong> submitted by your Google ID (${escapeHtml(currentEmail)}). Auto-filled below for view and update.</span></div>`;
+          alertText.innerHTML = `<div><i class="fa-solid fa-circle-check" style="color:#047857;"></i> <span>Existing entry found for <strong>"${escapeHtml(officeName)}"</strong> submitted by your Google ID (${escapeHtml(currentEmail)}).</span></div>`;
         }
         alertBox.style.display = 'flex';
       }
       showToast(`Loaded saved entry for ${officeName}`, 'info');
     } else {
-      // Office submitted by DIFFERENT Google Email ID (Non-Admin) -> Block form, DO NOT show data in entry fields, and show security message
       if (btnDeleteForm) btnDeleteForm.style.display = 'none';
       if (btnDeleteAlert) btnDeleteAlert.style.display = 'none';
       resetPublicFormFieldsOnly();
@@ -990,19 +1776,16 @@ function handleOfficeSelectChange(officeName) {
         alertBox.style.borderColor = '#fecdd3';
         alertBox.style.color = '#991b1b';
         alertText.innerHTML = `
-          <div style="display: flex; flex-direction: column; gap: 4px;">
-            <div style="display: flex; align-items: center; gap: 8px; font-size: 0.95rem;">
-              <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.15rem;"></i>
-              <strong>Entry for this office already done with "${escapeHtml(displayOwner)}". Please Login with this account to view and update data</strong>
-            </div>
+          <div>
+            <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626;"></i>
+            <strong>Entry for this office already done with "${escapeHtml(displayOwner)}". Please Login with this account to view and update data</strong>
           </div>
         `;
         alertBox.style.display = 'flex';
       }
-      showToast(`Entry for this office already done with "${displayOwner}". Please Login with this account to view and update data`, 'error');
+      showToast(`Entry already done with "${displayOwner}". Please Login with this account`, 'error');
     }
   } else {
-    // Fresh Office Selection (Not yet submitted)
     if (btnDeleteForm) btnDeleteForm.style.display = 'none';
     if (btnDeleteAlert) btnDeleteAlert.style.display = 'none';
     toggleFormFieldsDisabled(false);
@@ -1101,7 +1884,6 @@ function populateFormWithData(data) {
   if (document.getElementById('entryOfficerDesignation')) document.getElementById('entryOfficerDesignation').value = data.entryOfficerDesignation || '';
   if (document.getElementById('entryOfficerMobile')) document.getElementById('entryOfficerMobile').value = data.entryOfficerMobile || '';
 
-  // Core IT Hardware Equipment Status (Section 3)
   if (document.getElementById('monitorsWorking')) document.getElementById('monitorsWorking').value = data.monitorsWorking ?? 0;
   if (document.getElementById('monitorsNotWorking')) document.getElementById('monitorsNotWorking').value = data.monitorsNotWorking ?? 0;
   if (document.getElementById('cpuWorking')) document.getElementById('cpuWorking').value = data.cpuWorking ?? 0;
@@ -1111,7 +1893,6 @@ function populateFormWithData(data) {
   if (document.getElementById('aioWorking')) document.getElementById('aioWorking').value = data.aioWorking ?? 0;
   if (document.getElementById('aioNotWorking')) document.getElementById('aioNotWorking').value = data.aioNotWorking ?? 0;
 
-  // Printers Section (Section 4)
   const p = data.printers || {};
   if (document.getElementById('printerDotMatrixWorking')) document.getElementById('printerDotMatrixWorking').value = p.dotMatrix?.working ?? 0;
   if (document.getElementById('printerDotMatrixNotWorking')) document.getElementById('printerDotMatrixNotWorking').value = p.dotMatrix?.notWorking ?? 0;
@@ -1133,9 +1914,7 @@ function populateFormWithData(data) {
   if (document.getElementById('printerOthersNotWorking')) document.getElementById('printerOthersNotWorking').value = p.others?.notWorking ?? 0;
   if (document.getElementById('printerOthersMulti')) document.getElementById('printerOthersMulti').checked = !!p.others?.multipurpose;
 
-  // Power & Battery Infrastructure (Section 5)
   if (document.getElementById('upsAvailableSelect')) document.getElementById('upsAvailableSelect').value = data.upsAvailable || '';
-  if (document.getElementById('upsUnitsCount')) document.getElementById('upsUnitsCount').value = data.upsUnitsCount ?? (data.upsWorking ? (data.upsWorking + (data.upsNotWorking || 0)) : 0);
   if (document.getElementById('upsCapacitySelect')) {
     document.getElementById('upsCapacitySelect').value = data.upsCapacity || '';
     handleUpsCapacityChange(data.upsCapacity || '');
@@ -1144,7 +1923,7 @@ function populateFormWithData(data) {
   if (document.getElementById('upsConditionSelect')) document.getElementById('upsConditionSelect').value = data.upsCondition || '';
   if (document.getElementById('batteryMakeInput')) document.getElementById('batteryMakeInput').value = data.batteryMake || '';
   if (document.getElementById('batteryAhInput')) document.getElementById('batteryAhInput').value = data.batteryAh ?? '';
-  if (document.getElementById('batteriesInUseInput')) document.getElementById('batteriesInUseInput').value = data.batteriesInUse ?? (data.minBatteriesRequired || 0);
+  if (document.getElementById('batteriesInUseInput')) document.getElementById('batteriesInUseInput').value = data.batteriesInUse ?? 0;
   if (document.getElementById('minBatteriesRequiredInput')) document.getElementById('minBatteriesRequiredInput').value = data.minBatteriesRequired ?? '';
   if (document.getElementById('serviceReportSentSelect')) {
     document.getElementById('serviceReportSentSelect').value = data.serviceReportSent || '';
@@ -1154,21 +1933,14 @@ function populateFormWithData(data) {
   if (document.getElementById('powerRemarksInput')) document.getElementById('powerRemarksInput').value = data.powerRemarks || '';
   if (document.getElementById('certificationCheckbox')) document.getElementById('certificationCheckbox').checked = !!data.certified;
 
-  if (document.getElementById('upsWorking')) document.getElementById('upsWorking').value = data.upsWorking ?? (data.upsCondition === 'Good' || data.upsCondition === 'Working with Minor Issues' ? (data.upsUnitsCount || 1) : 0);
-  if (document.getElementById('upsNotWorking')) document.getElementById('upsNotWorking').value = data.upsNotWorking ?? (data.upsCondition === 'Not Working' || data.upsCondition === 'Requires Repair' ? (data.upsUnitsCount || 1) : 0);
-  if (document.getElementById('batteriesInUse')) document.getElementById('batteriesInUse').value = data.batteriesInUse ?? (data.minBatteriesRequired || 0);
-  if (document.getElementById('batteriesNotInUse')) document.getElementById('batteriesNotInUse').value = data.batteriesNotInUse ?? 0;
+  if (document.getElementById('upsWorking')) document.getElementById('upsWorking').value = data.upsWorking ?? 0;
+  if (document.getElementById('upsNotWorking')) document.getElementById('upsNotWorking').value = data.upsNotWorking ?? 0;
 
-  // System Age Distribution (Section 6)
   if (document.getElementById('ageUnder3')) document.getElementById('ageUnder3').value = data.ageUnder3 ?? 0;
   if (document.getElementById('age3To5')) document.getElementById('age3To5').value = data.age3To5 ?? 0;
   if (document.getElementById('age5To8')) document.getElementById('age5To8').value = data.age5To8 ?? 0;
   if (document.getElementById('ageAbove8')) document.getElementById('ageAbove8').value = data.ageAbove8 ?? 0;
 
-  const desktopSumEl = document.getElementById('desktopNotWorkingSummary');
-  if (desktopSumEl) desktopSumEl.value = data.desktopNotWorkingSummary ?? (data.cpuNotWorking ?? 0);
-
-  // Specific Condition Remarks (Section 7)
   if (document.getElementById('remarksInput')) document.getElementById('remarksInput').value = data.remarks || '';
 }
 
@@ -1196,7 +1968,6 @@ function resetPublicFormFieldsOnly() {
   if (document.getElementById('entryOfficerMobile')) document.getElementById('entryOfficerMobile').value = '';
 
   if (document.getElementById('upsAvailableSelect')) document.getElementById('upsAvailableSelect').value = '';
-  if (document.getElementById('upsUnitsCount')) document.getElementById('upsUnitsCount').value = 0;
   if (document.getElementById('upsCapacitySelect')) {
     document.getElementById('upsCapacitySelect').value = '';
     handleUpsCapacityChange('');
@@ -1223,19 +1994,13 @@ function resetPublicFormFieldsOnly() {
     'printerLaserWorking', 'printerLaserNotWorking',
     'printerXeroxWorking', 'printerXeroxNotWorking',
     'printerOthersWorking', 'printerOthersNotWorking',
-    'upsWorking', 'upsNotWorking', 'batteriesInUse', 'batteriesNotInUse',
-    'ageUnder3', 'age3To5', 'age5To8', 'ageAbove8', 'desktopNotWorkingSummary'
+    'upsWorking', 'upsNotWorking',
+    'ageUnder3', 'age3To5', 'age5To8', 'ageAbove8'
   ];
 
   numIds.forEach(id => {
     const el = document.getElementById(id);
     if (el) el.value = 0;
-  });
-
-  const checkIds = ['printerDotMatrixMulti', 'printerInkjetMulti', 'printerLaserMulti', 'printerXeroxMulti', 'printerOthersMulti'];
-  checkIds.forEach(id => {
-    const el = document.getElementById(id);
-    if (el) el.checked = (id === 'printerXeroxMulti');
   });
 
   document.getElementById('remarksInput').value = '';
@@ -1318,56 +2083,36 @@ function setSelectedNetworks(val) {
   }
 }
 
-function handleNetworkChange(value) {
-  setSelectedNetworks(value);
-}
-
 function handleSwitchesAvailabilityChange(val) {
   const group = document.getElementById('switchesDetailsGroup');
-  if (group) {
-    group.style.display = (val === 'Yes') ? 'block' : 'none';
-  }
+  if (group) group.style.display = (val === 'Yes') ? 'block' : 'none';
 }
 
 function handleServersAvailabilityChange(val) {
   const group = document.getElementById('serversDetailsGroup');
-  if (group) {
-    group.style.display = (val === 'Yes') ? 'block' : 'none';
-  }
+  if (group) group.style.display = (val === 'Yes') ? 'block' : 'none';
 }
 
 function handleUpsAvailabilityChange(val) {
-  const unitsEl = document.getElementById('upsUnitsCount');
-  if (val === 'No' && unitsEl) {
-    unitsEl.value = 0;
-  }
+  const unitsEl = document.getElementById('upsWorking');
+  if (val === 'No' && unitsEl) unitsEl.value = 0;
 }
 
 function handleUpsCapacityChange(val) {
   const group = document.getElementById('upsCapacityOtherGroup');
-  if (group) {
-    group.style.display = (val === 'Other') ? 'block' : 'none';
-  }
+  if (group) group.style.display = (val === 'Other') ? 'block' : 'none';
 }
 
 function handleServiceReportChange(val) {
   const group = document.getElementById('serviceReportDateGroup');
   const dateInput = document.getElementById('serviceReportDateInput');
-  if (group) {
-    group.style.display = (val === 'Yes') ? 'block' : 'none';
-  }
-  if (dateInput) {
-    dateInput.required = (val === 'Yes');
-  }
+  if (group) group.style.display = (val === 'Yes') ? 'block' : 'none';
+  if (dateInput) dateInput.required = (val === 'Yes');
 }
 
-function calculateNonWorkingDesktops() {
-  const cpuNotWorking = parseInt(document.getElementById('cpuNotWorking').value) || 0;
-  const desktopSumEl = document.getElementById('desktopNotWorkingSummary');
-  if (desktopSumEl) desktopSumEl.value = cpuNotWorking;
-}
+function calculateNonWorkingDesktops() {}
 
-// --- 10. FORM SUBMISSION & BACKEND SAVING ---
+// --- 13. IT FORM SUBMISSION & CLOUD SAVING ---
 async function handleFormSubmit(e) {
   if (e) e.preventDefault();
 
@@ -1381,7 +2126,7 @@ async function handleFormSubmit(e) {
 
     const certCheck = document.getElementById('certificationCheckbox');
     if (certCheck && !certCheck.checked) {
-      showToast('Please certify that the above information is true and correct before submitting.', 'warning');
+      showToast('Please certify that the information is true before submitting.', 'warning');
       return;
     }
 
@@ -1391,25 +2136,6 @@ async function handleFormSubmit(e) {
       return;
     }
     const networkVal = selectedNetworks.join(', ');
-    const otherNetInput = document.getElementById('otherNetworkInput');
-    if (selectedNetworks.includes('Others') && otherNetInput && !otherNetInput.value.trim()) {
-      showToast('Please specify details for Other Network', 'warning');
-      return;
-    }
-
-    const upsCapVal = document.getElementById('upsCapacitySelect')?.value || '';
-    const upsCapOther = document.getElementById('upsCapacityOtherInput')?.value.trim() || '';
-    if (upsCapVal === 'Other' && !upsCapOther) {
-      showToast('Please specify Other UPS Capacity (kVA)', 'warning');
-      return;
-    }
-
-    const srvSent = document.getElementById('serviceReportSentSelect')?.value || '';
-    const srvDate = document.getElementById('serviceReportDateInput')?.value || '';
-    if (srvSent === 'Yes' && !srvDate) {
-      showToast('Please enter the Date of Sending Service Report to TCO', 'warning');
-      return;
-    }
 
     const now = new Date();
     const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
@@ -1418,12 +2144,10 @@ async function handleFormSubmit(e) {
       const el = document.getElementById(id);
       return el ? (parseInt(el.value) || 0) : 0;
     };
-
     const getStr = (id) => {
       const el = document.getElementById(id);
       return el ? el.value.trim() : '';
     };
-
     const getCheck = (id) => {
       const el = document.getElementById(id);
       return el ? !!el.checked : false;
@@ -1437,15 +2161,11 @@ async function handleFormSubmit(e) {
       officeName,
       submittedByEmail: loggedEmail || existingRec?.submittedByEmail || '',
       entryOfficerEmail: loggedEmail || existingRec?.entryOfficerEmail || '',
-      
-      // Entered Officer Details (Original Submitter)
       createdOfficerName: existingRec?.createdOfficerName || getStr('entryOfficerName') || loggedName || 'Officer',
       createdOfficerDesignation: existingRec?.createdOfficerDesignation || getStr('entryOfficerDesignation') || 'Officer',
       createdOfficerMobile: existingRec?.createdOfficerMobile || getStr('entryOfficerMobile') || 'N/A',
       createdOfficerEmail: existingRec?.createdOfficerEmail || loggedEmail || 'N/A',
       createdDate: existingRec?.createdDate || formattedDate,
-
-      // Updated Officer Details (Latest Editor)
       updatedOfficerName: getStr('entryOfficerName') || loggedName || 'Officer',
       updatedOfficerDesignation: getStr('entryOfficerDesignation') || 'Officer',
       updatedOfficerMobile: getStr('entryOfficerMobile') || 'N/A',
@@ -1482,31 +2202,27 @@ async function handleFormSubmit(e) {
       },
 
       upsAvailable: getStr('upsAvailableSelect') || 'Yes',
-      upsUnitsCount: getNum('upsUnitsCount'),
-      upsCapacity: upsCapVal,
-      upsCapacityOther: upsCapOther,
+      upsCapacity: getStr('upsCapacitySelect'),
+      upsCapacityOther: getStr('upsCapacityOtherInput'),
       upsCondition: getStr('upsConditionSelect'),
       batteryMake: getStr('batteryMakeInput'),
       batteryAh: getNum('batteryAhInput'),
-      batteriesInUse: getNum('batteriesInUseInput') || getNum('batteriesInUse') || getNum('minBatteriesRequiredInput'),
+      batteriesInUse: getNum('batteriesInUseInput'),
       minBatteriesRequired: getNum('minBatteriesRequiredInput'),
-      serviceReportSent: srvSent,
-      serviceReportDate: srvDate,
+      serviceReportSent: getStr('serviceReportSentSelect'),
+      serviceReportDate: getStr('serviceReportDateInput'),
       powerRemarks: getStr('powerRemarksInput'),
       certified: true,
 
-      upsWorking: getNum('upsWorking') || (getStr('upsConditionSelect') === 'Good' || getStr('upsConditionSelect') === 'Working with Minor Issues' ? (getNum('upsUnitsCount') || 1) : 0),
-      upsNotWorking: getNum('upsNotWorking') || (getStr('upsConditionSelect') === 'Not Working' || getStr('upsConditionSelect') === 'Requires Repair' ? (getNum('upsUnitsCount') || 1) : 0),
-      batteriesNotInUse: getNum('batteriesNotInUse'),
+      upsWorking: getNum('upsWorking'),
+      upsNotWorking: getNum('upsNotWorking'),
 
       ageUnder3: getNum('ageUnder3'),
       age3To5: getNum('age3To5'),
       age5To8: getNum('age5To8'),
       ageAbove8: getNum('ageAbove8'),
 
-      desktopNotWorkingSummary: getNum('desktopNotWorkingSummary') || getNum('cpuNotWorking'),
-      remarks: getStr('remarksInput'),
-      lastUpdated: formattedDate
+      remarks: getStr('remarksInput')
     };
 
     inventoryStore[officeName] = record;
@@ -1520,7 +2236,6 @@ async function handleFormSubmit(e) {
     renderPublicDataTable();
     if (activeSession === 'admin') renderAdminDashboard();
 
-    // Show the entered office name & summary in New Window popup!
     openEnteredOfficeSummaryWindow(officeName);
   } catch (err) {
     console.error('Error in handleFormSubmit:', err);
@@ -1528,7 +2243,7 @@ async function handleFormSubmit(e) {
   }
 }
 
-// --- PUBLIC NEW WINDOW OFFICE SUMMARY ENGINE ---
+// --- 14. PUBLIC SUMMARY MODAL ---
 let currentWindowOfficeName = '';
 
 function openSelectedOfficeSummaryWindow() {
@@ -1550,39 +2265,13 @@ function openEnteredOfficeSummaryWindow(officeName) {
 
   const data = inventoryStore[officeName] || {
     officeName,
-    lastUpdated: 'Just now',
-    entryOfficerName: document.getElementById('entryOfficerName')?.value || 'N/A',
-    entryOfficerDesignation: document.getElementById('entryOfficerDesignation')?.value || 'N/A',
-    entryOfficerMobile: document.getElementById('entryOfficerMobile')?.value || 'N/A',
-    availableNetwork: document.getElementById('availableNetworkSelect')?.value || 'N/A',
-    otherNetworkDetails: document.getElementById('otherNetworkInput')?.value || '',
-    networkSpeed: document.getElementById('networkSpeedInput')?.value || 'N/A',
-    operatingSystem: document.getElementById('operatingSystemInput')?.value || 'N/A',
-    monitorsWorking: parseInt(document.getElementById('monitorsWorking')?.value) || 0,
-    monitorsNotWorking: parseInt(document.getElementById('monitorsNotWorking')?.value) || 0,
-    cpuWorking: parseInt(document.getElementById('cpuWorking')?.value) || 0,
-    cpuNotWorking: parseInt(document.getElementById('cpuNotWorking')?.value) || 0,
-    laptopsWorking: parseInt(document.getElementById('laptopsWorking')?.value) || 0,
-    laptopsNotWorking: parseInt(document.getElementById('laptopsNotWorking')?.value) || 0,
-    aioWorking: parseInt(document.getElementById('aioWorking')?.value) || 0,
-    aioNotWorking: parseInt(document.getElementById('aioNotWorking')?.value) || 0,
-    upsWorking: parseInt(document.getElementById('upsWorking')?.value) || 0,
-    upsNotWorking: parseInt(document.getElementById('upsNotWorking')?.value) || 0,
-    batteriesInUse: parseInt(document.getElementById('batteriesInUse')?.value) || 0,
-    batteriesNotInUse: parseInt(document.getElementById('batteriesNotInUse')?.value) || 0,
-    ageUnder3: parseInt(document.getElementById('ageUnder3')?.value) || 0,
-    age3To5: parseInt(document.getElementById('age3To5')?.value) || 0,
-    age5To8: parseInt(document.getElementById('age5To8')?.value) || 0,
-    ageAbove8: parseInt(document.getElementById('ageAbove8')?.value) || 0,
-    remarks: document.getElementById('remarksInput')?.value || 'None'
+    lastUpdated: 'Just now'
   };
 
   title.innerHTML = `<i class="fa-solid fa-building"></i> Entered Office Name: <span style="color: #fef08a; font-weight: 800;">${escapeHtml(data.officeName)}</span>`;
 
   body.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 18px;">
-      
-      <!-- Top Banner Bar -->
+    <div style="display: flex; flex-direction: column; gap: 16px;">
       <div style="background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div>
           <div style="font-size: 0.75rem; text-transform: uppercase; color: #047857; font-weight: 700;">Keralam MVD Official Office Profile</div>
@@ -1592,11 +2281,10 @@ function openEnteredOfficeSummaryWindow(officeName) {
         <span class="badge badge-working" style="font-size: 0.9rem; padding: 6px 14px;"><i class="fa-solid fa-circle-check"></i> RECORDED & SYNCHRONIZED</span>
       </div>
 
-      <!-- Officer & Network Profile -->
       <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
         <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
           <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-user-tie"></i> Entry Officer Details</h4>
-          <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-color);">
+          <div style="font-size: 0.85rem; line-height: 1.6;">
             <strong>Name:</strong> ${escapeHtml(data.entryOfficerName || 'N/A')}<br>
             <strong>Designation:</strong> ${escapeHtml(data.entryOfficerDesignation || 'N/A')}<br>
             <strong>Mobile:</strong> ${escapeHtml(data.entryOfficerMobile || 'N/A')}
@@ -1604,18 +2292,15 @@ function openEnteredOfficeSummaryWindow(officeName) {
         </div>
 
         <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
-          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-network-wired"></i> Connectivity, Network & OS Profile</h4>
-          <div style="font-size: 0.85rem; line-height: 1.6; color: var(--text-color);">
-            <strong>Network:</strong> <span class="badge badge-info">${escapeHtml(data.availableNetwork === 'Others' ? data.otherNetworkDetails : data.availableNetwork || 'N/A')}</span><br>
+          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-network-wired"></i> Connectivity & OS Profile</h4>
+          <div style="font-size: 0.85rem; line-height: 1.6;">
+            <strong>Network:</strong> <span class="badge badge-info">${escapeHtml(data.availableNetwork || 'N/A')}</span><br>
             <strong>Speed:</strong> ${escapeHtml(data.networkSpeed || 'N/A')}<br>
-            <strong>Switches Available:</strong> ${escapeHtml(data.switchesAvailable || 'Not Sure')} ${data.switchesAvailable === 'Yes' && data.switchesDetails ? `(${escapeHtml(data.switchesDetails)})` : ''}<br>
-            <strong>Servers Available:</strong> ${escapeHtml(data.serversAvailable || 'No')} ${data.serversAvailable === 'Yes' && data.serversDetails ? `(${escapeHtml(data.serversDetails)})` : ''}<br>
             <strong>OS:</strong> ${escapeHtml(data.operatingSystem || 'N/A')}
           </div>
         </div>
       </div>
 
-      <!-- Core Hardware Table -->
       <div>
         <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 8px;"><i class="fa-solid fa-desktop"></i> Core IT Hardware Inventory Status</h4>
         <table class="data-table">
@@ -1623,82 +2308,18 @@ function openEnteredOfficeSummaryWindow(officeName) {
             <tr>
               <th>Equipment Category</th>
               <th>Working Count</th>
-              <th>Defective / Not Working</th>
+              <th>Defective Count</th>
               <th>Total Count</th>
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td><strong>Monitors</strong></td>
-              <td style="color:#047857; font-weight:700;">${data.monitorsWorking}</td>
-              <td style="color:#b91c1c; font-weight:700;">${data.monitorsNotWorking}</td>
-              <td><strong>${data.monitorsWorking + data.monitorsNotWorking}</strong></td>
-            </tr>
-            <tr>
-              <td><strong>CPU Units</strong></td>
-              <td style="color:#047857; font-weight:700;">${data.cpuWorking}</td>
-              <td style="color:#b91c1c; font-weight:700;">${data.cpuNotWorking}</td>
-              <td><strong>${data.cpuWorking + data.cpuNotWorking}</strong></td>
-            </tr>
-            <tr>
-              <td><strong>Laptops</strong></td>
-              <td style="color:#047857; font-weight:700;">${data.laptopsWorking}</td>
-              <td style="color:#b91c1c; font-weight:700;">${data.laptopsNotWorking}</td>
-              <td><strong>${data.laptopsWorking + data.laptopsNotWorking}</strong></td>
-            </tr>
-            <tr>
-              <td><strong>All-In-One PCs</strong></td>
-              <td style="color:#047857; font-weight:700;">${data.aioWorking}</td>
-              <td style="color:#b91c1c; font-weight:700;">${data.aioNotWorking}</td>
-              <td><strong>${data.aioWorking + data.aioNotWorking}</strong></td>
-            </tr>
+            <tr><td>Monitors</td><td style="color:#047857; font-weight:700;">${data.monitorsWorking || 0}</td><td style="color:#b91c1c;">${data.monitorsNotWorking || 0}</td><td>${(data.monitorsWorking || 0) + (data.monitorsNotWorking || 0)}</td></tr>
+            <tr><td>CPU Units</td><td style="color:#047857; font-weight:700;">${data.cpuWorking || 0}</td><td style="color:#b91c1c;">${data.cpuNotWorking || 0}</td><td>${(data.cpuWorking || 0) + (data.cpuNotWorking || 0)}</td></tr>
+            <tr><td>Laptops</td><td style="color:#047857; font-weight:700;">${data.laptopsWorking || 0}</td><td style="color:#b91c1c;">${data.laptopsNotWorking || 0}</td><td>${(data.laptopsWorking || 0) + (data.laptopsNotWorking || 0)}</td></tr>
+            <tr><td>AIO PCs</td><td style="color:#047857; font-weight:700;">${data.aioWorking || 0}</td><td style="color:#b91c1c;">${data.aioNotWorking || 0}</td><td>${(data.aioWorking || 0) + (data.aioNotWorking || 0)}</td></tr>
           </tbody>
         </table>
       </div>
-
-      <!-- Power & Battery Detailed Audit Summary -->
-      <div style="background: #faf5ff; border: 1.5px solid #e9d5ff; padding: 16px; border-radius: 8px;">
-        <h4 style="font-size: 0.92rem; color: #6b21a8; font-weight: 700; margin-bottom: 10px;"><i class="fa-solid fa-car-battery"></i> 5. Power & Battery Infrastructure Audit</h4>
-        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; font-size: 0.85rem;">
-          <div>
-            <strong>• UPS Available:</strong> <span class="badge ${data.upsAvailable === 'No' ? 'badge-danger' : 'badge-working'}">${escapeHtml(data.upsAvailable || 'Yes')}</span><br>
-            <strong>• No. of UPS Units Working:</strong> <span style="color:#047857; font-weight:700;">${data.upsWorking ?? 0}</span><br>
-            <strong>• No. of UPS Units Not Working:</strong> <span style="color:#b91c1c; font-weight:700;">${data.upsNotWorking ?? 0}</span><br>
-            <strong>• UPS Capacity:</strong> ${escapeHtml(data.upsCapacity === 'Other' ? data.upsCapacityOther : (data.upsCapacity || 'N/A'))}<br>
-            <strong>• Condition of Working UPS:</strong> <span style="font-weight: 700;">${escapeHtml(data.upsCondition || 'N/A')}</span>
-          </div>
-          <div>
-            <strong>• Battery Make / Type:</strong> ${escapeHtml(data.batteryMake || 'N/A')}<br>
-            <strong>• Battery AH Rating:</strong> ${data.batteryAh ? data.batteryAh + ' AH' : 'N/A'}<br>
-            <strong>• Min Batteries Required:</strong> ${data.minBatteriesRequired || 0}<br>
-            <strong>• Service Report Sent to TCO:</strong> <strong>${escapeHtml(data.serviceReportSent || 'No')}</strong> ${data.serviceReportSent === 'Yes' && data.serviceReportDate ? `(${escapeHtml(data.serviceReportDate)})` : ''}
-          </div>
-        </div>
-        ${data.powerRemarks ? `<div style="margin-top: 10px; font-size: 0.83rem; font-style: italic; color: #581c87; background: rgba(255,255,255,0.7); padding: 8px; border-radius: 6px;"><strong>Power Remarks:</strong> "${escapeHtml(data.powerRemarks)}"</div>` : ''}
-      </div>
-
-      <!-- Lifecycle Profile Summary -->
-      <div style="background: #fff1f2; border: 1px solid #fecdd3; padding: 14px; border-radius: 8px;">
-        <h4 style="font-size: 0.88rem; color: #9f1239; font-weight: 700; margin-bottom: 6px;"><i class="fa-solid fa-hourglass-half"></i> System Lifecycle Profile</h4>
-        <div style="font-size: 0.85rem; line-height: 1.6;">
-          • &lt; 3 Yrs: <strong>${data.ageUnder3}</strong> | 3–5 Yrs: <strong>${data.age3To5}</strong> | 5–8 Yrs: <strong>${data.age5To8}</strong> | &gt; 8 Yrs: <strong style="color:#b91c1c;">${data.ageAbove8}</strong>
-        </div>
-      </div>
-
-      <!-- Condition Remarks -->
-      <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
-        <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 6px;"><i class="fa-solid fa-comment-dots"></i> General Condition Remarks</h4>
-        <p style="font-size: 0.85rem; color: var(--text-color); margin: 0; font-style: italic;">
-          "${escapeHtml(data.remarks || 'No specific defect or warranty remarks entered.')}"
-        </p>
-      </div>
-
-      <!-- Certification Status -->
-      <div style="background: #f0fdf4; border: 1px solid #a7f3d0; padding: 10px 14px; border-radius: 6px; font-size: 0.83rem; color: #064e3b; font-weight: 700; display: flex; align-items: center; gap: 8px;">
-        <i class="fa-solid fa-shield-check" style="color: #047857; font-size: 1.1rem;"></i>
-        <span>Certified: "I certify that the above information is true and correct."</span>
-      </div>
-
     </div>
   `;
 
@@ -1711,126 +2332,10 @@ function closePublicOfficeSummaryModal() {
 }
 
 function openStandalonePrintWindow() {
-  const officeName = currentWindowOfficeName || document.getElementById('officeSelect')?.value;
-  if (!officeName) return;
-
-  const data = inventoryStore[officeName] || {};
-  const printWin = window.open('', '_blank', 'width=920,height=800,scrollbars=yes');
-
-  if (!printWin) {
-    showToast('Popup blocker blocked new window. Please allow popups for this site.', 'warning');
-    return;
-  }
-
-  printWin.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Keralam MVD - Entered Office Record - ${officeName}</title>
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-      <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; padding: 32px; color: #1e293b; line-height: 1.5; background: #ffffff; }
-        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0B3B24; padding-bottom: 16px; margin-bottom: 24px; }
-        .title-group h1 { font-size: 1.4rem; color: #0B3B24; margin: 0; }
-        .title-group p { font-size: 0.85rem; color: #64748b; margin: 2px 0 0 0; }
-        .badge { background: #d1fae5; color: #065f46; font-weight: 700; padding: 6px 14px; border-radius: 6px; font-size: 0.85rem; }
-        .office-banner { background: #f0fdf4; border: 1.5px solid #a7f3d0; padding: 14px 18px; border-radius: 8px; margin-bottom: 20px; font-weight: 800; font-size: 1.2rem; color: #064e3b; }
-        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 20px; }
-        .box { background: #f8fafc; border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; }
-        .box h3 { font-size: 0.95rem; margin-top: 0; color: #0f172a; border-bottom: 1px solid #cbd5e1; padding-bottom: 6px; }
-        table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-        th, td { padding: 10px; border: 1px solid #cbd5e1; text-align: left; font-size: 0.88rem; }
-        th { background: #f1f5f9; font-weight: 700; color: #0f172a; }
-        .footer { margin-top: 30px; border-top: 1px solid #e2e8f0; padding-top: 12px; display: flex; justify-content: space-between; font-size: 0.8rem; color: #64748b; }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="title-group">
-          <h1>Keralam Motor Vehicles Department</h1>
-          <p>Data AI Foundry • IT Infrastructure & Equipment Record</p>
-        </div>
-        <span class="badge"><i class="fa-solid fa-check-circle"></i> VERIFIED RECORD</span>
-      </div>
-
-      <div class="office-banner">
-        <i class="fa-solid fa-building"></i> Entered Office Name: ${officeName}
-      </div>
-
-      <div class="grid-2">
-        <div class="box">
-          <h3>Reporting Officer Profile</h3>
-          <strong>Name:</strong> ${data.entryOfficerName || 'N/A'}<br>
-          <strong>Designation:</strong> ${data.entryOfficerDesignation || 'N/A'}<br>
-          <strong>Mobile Number:</strong> ${data.entryOfficerMobile || 'N/A'}
-        </div>
-        <div class="box">
-          <h3>Network & OS Infrastructure</h3>
-          <strong>Available Network:</strong> ${data.availableNetwork === 'Others' ? data.otherNetworkDetails : (data.availableNetwork || 'N/A')}<br>
-          <strong>Speed:</strong> ${data.networkSpeed || 'N/A'}<br>
-          <strong>Switches Available:</strong> ${data.switchesAvailable || 'Not Sure'} ${data.switchesAvailable === 'Yes' && data.switchesDetails ? `(${data.switchesDetails})` : ''}<br>
-          <strong>Servers Available:</strong> ${data.serversAvailable || 'No'} ${data.serversAvailable === 'Yes' && data.serversDetails ? `(${data.serversDetails})` : ''}<br>
-          <strong>Operating System:</strong> ${data.operatingSystem || 'N/A'}
-        </div>
-      </div>
-
-      <h3>Core IT Hardware Inventory Status</h3>
-      <table>
-        <thead>
-          <tr>
-            <th>Hardware Category</th>
-            <th>Working Count</th>
-            <th>Defective / Not Working</th>
-            <th>Total Count</th>
-          </tr>
-        </thead>
-        <tbody>
-          <tr><td>Monitors</td><td>${data.monitorsWorking || 0}</td><td>${data.monitorsNotWorking || 0}</td><td>${(data.monitorsWorking || 0) + (data.monitorsNotWorking || 0)}</td></tr>
-          <tr><td>CPU Units</td><td>${data.cpuWorking || 0}</td><td>${data.cpuNotWorking || 0}</td><td>${(data.cpuWorking || 0) + (data.cpuNotWorking || 0)}</td></tr>
-          <tr><td>Laptops</td><td>${data.laptopsWorking || 0}</td><td>${data.laptopsNotWorking || 0}</td><td>${(data.laptopsWorking || 0) + (data.laptopsNotWorking || 0)}</td></tr>
-          <tr><td>All-In-One PCs</td><td>${data.aioWorking || 0}</td><td>${data.aioNotWorking || 0}</td><td>${(data.aioWorking || 0) + (data.aioNotWorking || 0)}</td></tr>
-          <tr><td>UPS Units</td><td>${data.upsWorking || 0}</td><td>${data.upsNotWorking || 0}</td><td>${(data.upsWorking || 0) + (data.upsNotWorking || 0)}</td></tr>
-        </tbody>
-      </table>
-
-      <div class="box" style="margin-top: 20px;">
-        <h3>5. Power & Battery Infrastructure Audit</h3>
-        <strong>UPS Available:</strong> ${data.upsAvailable || 'Yes'}<br>
-        <strong>No. of UPS Units Working:</strong> ${data.upsWorking ?? 0}<br>
-        <strong>No. of UPS Units Not Working:</strong> ${data.upsNotWorking ?? 0}<br>
-        <strong>UPS Capacity (kVA):</strong> ${data.upsCapacity === 'Other' ? data.upsCapacityOther : (data.upsCapacity || 'N/A')}<br>
-        <strong>Condition of Working UPS:</strong> ${data.upsCondition || 'N/A'}<br>
-        <strong>Battery Make / Type:</strong> ${data.batteryMake || 'N/A'}<br>
-        <strong>Battery AH Rating:</strong> ${data.batteryAh ? data.batteryAh + ' AH' : 'N/A'}<br>
-        <strong>Min Batteries Required:</strong> ${data.minBatteriesRequired || 0}<br>
-        <strong>Service Report Sent to TCO:</strong> ${data.serviceReportSent || 'No'} ${data.serviceReportSent === 'Yes' && data.serviceReportDate ? `(Date: ${data.serviceReportDate})` : ''}<br>
-        ${data.powerRemarks ? `<strong>Power Remarks:</strong> "${data.powerRemarks}"` : ''}
-      </div>
-
-      <div class="box" style="margin-top: 20px;">
-        <h3>General Condition Remarks & Certification</h3>
-        <p style="margin: 0 0 10px 0; font-style: italic;">"${data.remarks || 'None'}"</p>
-        <div style="font-weight: 700; color: #064e3b; background: #f0fdf4; padding: 8px; border-radius: 6px; font-size: 0.85rem;">
-          ✓ Certified: "I certify that the above information is true and correct."
-        </div>
-      </div>
-
-      <div class="footer">
-        <span>Generated from Keralam MVD IT Portal (Data AI Foundry)</span>
-        <span>Date: ${new Date().toLocaleString()}</span>
-      </div>
-
-      <script>
-        window.onload = function() { window.print(); };
-      </script>
-    </body>
-    </html>
-  `);
-  printWin.document.close();
+  window.print();
 }
 
-// --- 11. ADMIN AUTHENTICATION & LOGOUT ENGINE ---
+// --- 15. ADMIN AUTHENTICATION & SUBVIEW SWITCHER ---
 function triggerAdminLogin() {
   if (isAdminAuthenticated) {
     switchSession('admin');
@@ -1852,9 +2357,7 @@ function verifyAdminPasscode(e) {
     isAdminAuthenticated = true;
     closeAdminModal();
     showToast('Admin access granted', 'success');
-
     document.getElementById('adminLogoutHeaderBtn').style.display = 'inline-flex';
-
     switchSession('admin');
   } else {
     showToast('Invalid passcode', 'error');
@@ -1863,190 +2366,81 @@ function verifyAdminPasscode(e) {
 
 function logoutAdmin() {
   isAdminAuthenticated = false;
-
   const logoutBtn = document.getElementById('adminLogoutHeaderBtn');
   if (logoutBtn) logoutBtn.style.display = 'none';
-
   switchSession('public');
-
   showToast('Admin logged out successfully.', 'info');
 }
 
-// --- 12. MODULAR MENU & MODULE MANAGER ENGINE ---
-function renderMenuManagerUI() {
-  const container = document.getElementById('menuManagerContainer');
-  if (!container) return;
+function switchSession(sessionType) {
+  activeSession = sessionType;
+  const publicContainer = document.getElementById('publicContainer');
+  const officerContainer = document.getElementById('officerTrainingContainer');
+  const adminContainer = document.getElementById('adminContainer');
 
-  container.innerHTML = portalModules.map(mod => `
-    <div style="background: #ffffff; border-radius: var(--radius-md); border: 1.5px solid var(--border-color); padding: 20px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
-      <div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
-          <div style="display: flex; align-items: center; gap: 10px;">
-            <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--primary-100); color: var(--primary-600); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
-              <i class="fa-solid ${mod.icon || 'fa-cube'}"></i>
-            </div>
-            <div>
-              <h4 style="font-size: 1rem; color: var(--primary-900); font-weight: 700;">${escapeHtml(mod.title)}</h4>
-              <span class="badge ${mod.visible ? 'badge-working' : 'badge-danger'}">
-                ${mod.visible ? 'VISIBLE TO PUBLIC' : 'HIDDEN FROM PUBLIC'}
-              </span>
-            </div>
-          </div>
-          
-          <label class="switch">
-            <input type="checkbox" ${mod.visible ? 'checked' : ''} onchange="toggleModuleVisibility('${mod.id}', this.checked)">
-            <span class="slider"></span>
-          </label>
-        </div>
-
-        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">${escapeHtml(mod.description)}</p>
-      </div>
-
-      <div style="margin-top: 16px; pt: 12px; border-top: 1px dashed var(--border-color); display: flex; justify-content: space-between; align-items: center;">
-        <small style="color: var(--text-light);">Module Code: <code>${mod.id}</code></small>
-        ${mod.id !== 'it_equipment_list' ? `<button class="btn btn-outline btn-sm" onclick="removeModule('${mod.id}')" style="color: #b91c1c; border-color: #fca5a5;"><i class="fa-solid fa-trash"></i> Remove</button>` : `<small style="color: #059669; font-weight: 700;">Core Module</small>`}
-      </div>
-    </div>
-  `).join('');
-}
-
-async function toggleModuleVisibility(moduleId, isVisible) {
-  const mod = portalModules.find(m => m.id === moduleId);
-  if (mod) {
-    mod.visible = isVisible;
-    localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
-
-    if (moduleId === 'it_equipment_list') {
-      appSettings.publicVisible = isVisible;
-      localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
-    }
-
-    renderPortalMenuBar();
-    renderMenuManagerUI();
-    syncPublicVisibilityUI();
-
-    await saveSettingsToSupabase(appSettings.publicVisible);
-
-    showToast(`Menu "${mod.title}" is now ${isVisible ? 'VISIBLE' : 'HIDDEN'} on Public Portal.`, isVisible ? 'success' : 'warning');
-  }
-}
-
-function openAddMenuModal() {
-  document.getElementById('addMenuModal').style.display = 'flex';
-  document.getElementById('newMenuTitleInput').value = '';
-  document.getElementById('newMenuDescInput').value = '';
-  document.getElementById('newMenuTitleInput').focus();
-}
-
-function closeAddMenuModal() {
-  document.getElementById('addMenuModal').style.display = 'none';
-}
-
-async function handleAddMenuSubmit(e) {
-  e.preventDefault();
-  const title = document.getElementById('newMenuTitleInput').value.trim();
-  const icon = document.getElementById('newMenuIconInput').value.trim() || 'fa-cube';
-  const description = document.getElementById('newMenuDescInput').value.trim() || 'Custom departmental module menu.';
-
-  if (!title) return;
-
-  const id = title.toLowerCase().replace(/[^a-z0-9]/g, '_');
-
-  if (portalModules.some(m => m.id === id)) {
-    showToast('A module with a similar title already exists.', 'warning');
-    return;
-  }
-
-  const newModule = {
-    id,
-    title,
-    icon: icon.startsWith('fa-') ? icon : `fa-${icon}`,
-    description,
-    visible: true
-  };
-
-  portalModules.push(newModule);
-  localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
-
-  closeAddMenuModal();
   renderPortalMenuBar();
-  renderMenuManagerUI();
-  syncPublicVisibilityUI();
 
-  await saveSettingsToSupabase(appSettings.publicVisible);
+  if (sessionType === 'public') {
+    if (adminContainer) adminContainer.style.display = 'none';
+    selectModuleMenu(activeModuleId);
+  } else if (sessionType === 'admin') {
+    if (publicContainer) publicContainer.style.display = 'none';
+    if (officerContainer) officerContainer.style.display = 'none';
+    if (adminContainer) adminContainer.style.display = 'block';
 
-  showToast(`Future Menu Module "${title}" added successfully!`, 'success');
-}
-
-async function removeModule(moduleId) {
-  if (confirm(`Remove custom module menu "${moduleId}"?`)) {
-    portalModules = portalModules.filter(m => m.id !== moduleId);
-    localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
-    renderPortalMenuBar();
-    renderMenuManagerUI();
-    syncPublicVisibilityUI();
-    await saveSettingsToSupabase(appSettings.publicVisible);
-    showToast(`Removed module ${moduleId}`, 'info');
+    switchAdminSubView('dashboard');
   }
 }
 
-// --- 13. PUBLIC ENTRY WINDOW ENGINE ---
-function switchPublicWindow(windowType) {
-  const entrySec = document.getElementById('publicEntrySection');
-  if (entrySec) entrySec.style.display = 'block';
-}
+function switchAdminSubView(view) {
+  adminSubView = view;
 
-function renderPublicDataTable() {
-  const tbody = document.getElementById('publicTableBody');
-  if (!tbody) return;
+  const btnDash = document.getElementById('btnAdminNavDashboard');
+  const btnSumm = document.getElementById('btnAdminNavSummary');
+  const btnOffs = document.getElementById('btnAdminNavOfficers');
+  const btnEnt = document.getElementById('btnAdminNavEntry');
+  const btnVw = document.getElementById('btnAdminNavView');
+  const btnMn = document.getElementById('btnAdminNavMenus');
 
-  const entries = Object.values(inventoryStore);
-  if (entries.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="10" style="text-align: center; color: var(--text-muted); padding: 24px;"><i class="fa-solid fa-folder-open"></i> No office entries recorded yet.</td></tr>`;
-    return;
+  const dashSec = document.getElementById('adminDashboardSubView');
+  const summSec = document.getElementById('adminSummarySubView');
+  const offsSec = document.getElementById('adminOfficersSubView');
+  const entSec = document.getElementById('adminEntrySubView');
+  const vwSec = document.getElementById('adminViewSubView');
+  const mnSec = document.getElementById('adminMenusSubView');
+
+  if (btnDash) btnDash.style.background = (view === 'dashboard') ? 'var(--primary-600)' : 'transparent';
+  if (btnSumm) btnSumm.style.background = (view === 'summary') ? 'var(--primary-600)' : 'transparent';
+  if (btnOffs) btnOffs.style.background = (view === 'officers') ? 'var(--primary-600)' : 'transparent';
+  if (btnEnt) btnEnt.style.background = (view === 'entry') ? 'var(--primary-600)' : 'transparent';
+  if (btnVw) btnVw.style.background = (view === 'view') ? 'var(--primary-600)' : 'transparent';
+  if (btnMn) btnMn.style.background = (view === 'menus') ? 'var(--primary-600)' : 'transparent';
+
+  if (dashSec) dashSec.style.display = (view === 'dashboard') ? 'block' : 'none';
+  if (summSec) summSec.style.display = (view === 'summary') ? 'block' : 'none';
+  if (offsSec) offsSec.style.display = (view === 'officers') ? 'block' : 'none';
+  if (entSec) entSec.style.display = (view === 'entry') ? 'block' : 'none';
+  if (vwSec) vwSec.style.display = (view === 'view') ? 'block' : 'none';
+  if (mnSec) mnSec.style.display = (view === 'menus') ? 'block' : 'none';
+
+  if (view === 'dashboard') renderAdminDashboard();
+  if (view === 'summary') renderAdminSummaryReport();
+  if (view === 'officers') renderAdminOfficersTable();
+  if (view === 'view') renderAdminDataTable();
+  if (view === 'menus') renderMenuManagerUI();
+  if (view === 'entry') {
+    const formSec = document.getElementById('publicEntrySection');
+    document.getElementById('adminFormContainer').appendChild(formSec);
+  } else {
+    const formSec = document.getElementById('publicEntrySection');
+    const pubCont = document.getElementById('publicContainer');
+    if (formSec && pubCont && !pubCont.contains(formSec)) {
+      pubCont.appendChild(formSec);
+    }
   }
-
-  tbody.innerHTML = entries.map(item => `
-    <tr>
-      <td><strong>${escapeHtml(item.officeName)}</strong></td>
-      <td>${escapeHtml(item.entryOfficerName || 'N/A')} <br><small style="color: var(--text-muted);">${escapeHtml(item.entryOfficerDesignation || '')}</small></td>
-      <td><span class="badge badge-info">${escapeHtml(item.availableNetwork === 'Others' ? item.otherNetworkDetails : item.availableNetwork)}</span><br><small style="color: var(--text-muted);">${escapeHtml(item.networkSpeed || '')}</small></td>
-      <td><span class="badge badge-working">${item.monitorsWorking} W</span> / <span class="badge badge-danger">${item.monitorsNotWorking} NW</span></td>
-      <td><span class="badge badge-working">${item.cpuWorking} W</span> / <span class="badge badge-danger">${item.cpuNotWorking} NW</span></td>
-      <td><span class="badge badge-working">${item.laptopsWorking} W</span> / <span class="badge badge-danger">${item.laptopsNotWorking} NW</span></td>
-      <td><span class="badge badge-working">${item.aioWorking} W</span> / <span class="badge badge-danger">${item.aioNotWorking} NW</span></td>
-      <td><span class="badge badge-working">${item.upsWorking} W</span> / <span class="badge badge-danger">${item.upsNotWorking} NW</span></td>
-      <td><small>${escapeHtml(item.lastUpdated || 'N/A')}</small></td>
-      <td>
-        <button class="btn btn-outline btn-sm" onclick="openEnteredOfficeSummaryWindow('${escapeHtml(item.officeName)}')">
-          <i class="fa-solid fa-window-restore"></i> View Record
-        </button>
-      </td>
-    </tr>
-  `).join('');
 }
 
-function filterPublicTable() {
-  const query = document.getElementById('publicSearchInput').value.toLowerCase();
-  const category = document.getElementById('publicCategoryFilter').value;
-  const rows = document.querySelectorAll('#publicTableBody tr');
-
-  rows.forEach(row => {
-    const text = row.textContent.toLowerCase();
-    const matchesSearch = text.includes(query);
-
-    let matchesCategory = true;
-    if (category === 'RTO') matchesCategory = text.includes('rto') && !text.includes('srto') && !text.includes('enforcement');
-    else if (category === 'SRTO') matchesCategory = text.includes('srto');
-    else if (category === 'Enforcement') matchesCategory = text.includes('enforcement');
-    else if (category === 'Checkpost') matchesCategory = text.includes('check');
-    else if (category === 'TC') matchesCategory = text.includes('tc') || text.includes('commissionerate') || text.includes('dtc');
-
-    row.style.display = (matchesSearch && matchesCategory) ? '' : 'none';
-  });
-}
-
-// --- 14. ADMIN PORTAL & DASHBOARD RENDERER WITH OFFICE FILTER & DRILL-DOWN ---
+// --- 16. ADMIN DASHBOARD & CHARTS ---
 function populateDashboardOfficeFilter() {
   const filter = document.getElementById('dashboardOfficeFilter');
   if (!filter) return;
@@ -2078,10 +2472,8 @@ function renderAdminDashboard() {
   let totalSystems = 0;
   let nonWorkingHardware = 0;
   let govNetworkCount = 0;
-
   let totalWorkingHW = 0;
   let totalNotWorkingHW = 0;
-
   let totalUnder3 = 0, total3To5 = 0, total5To8 = 0, totalAbove8 = 0;
 
   const networkCounts = { KSWAN: 0, KFONE: 0, BSNL: 0, JIO: 0, "Keralam Vision": 0, Asianet: 0, Others: 0 };
@@ -2097,21 +2489,12 @@ function renderAdminDashboard() {
     totalNotWorkingHW += (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking);
 
     const netList = (e.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision')).filter(Boolean);
-    if (netList.some(n => n === 'KSWAN' || n === 'KFONE')) {
-      govNetworkCount++;
-    }
+    if (netList.some(n => n === 'KSWAN' || n === 'KFONE')) govNetworkCount++;
 
-    if (netList.length === 0) {
-      networkCounts.Others++;
-    } else {
-      netList.forEach(net => {
-        if (networkCounts[net] !== undefined) {
-          networkCounts[net]++;
-        } else {
-          networkCounts.Others++;
-        }
-      });
-    }
+    netList.forEach(net => {
+      if (networkCounts[net] !== undefined) networkCounts[net]++;
+      else networkCounts.Others++;
+    });
 
     totalUnder3 += (e.ageUnder3 || 0);
     total3To5 += (e.age3To5 || 0);
@@ -2119,13 +2502,7 @@ function renderAdminDashboard() {
     totalAbove8 += (e.ageAbove8 || 0);
   });
 
-  let switchesCount = 0;
-  let serversCount = 0;
-  let upsWorkingCount = 0;
-  let upsNotWorkingCount = 0;
-  let serviceReportsSentCount = 0;
-  let totalBatteriesInUse = 0;
-  let totalMinBatteries = 0;
+  let switchesCount = 0, serversCount = 0, upsWorkingCount = 0, upsNotWorkingCount = 0, serviceReportsSentCount = 0;
 
   entries.forEach(e => {
     if (e.switchesAvailable === 'Yes') switchesCount++;
@@ -2133,8 +2510,6 @@ function renderAdminDashboard() {
     upsWorkingCount += (e.upsWorking || 0);
     upsNotWorkingCount += (e.upsNotWorking || 0);
     if (e.serviceReportSent === 'Yes') serviceReportsSentCount++;
-    totalBatteriesInUse += (e.batteriesInUse || 0);
-    totalMinBatteries += (e.minBatteriesRequired || 0);
   });
 
   if (document.getElementById('kpiOfficesReported')) document.getElementById('kpiOfficesReported').textContent = filterVal === 'ALL' ? `${totalOffices} / ${MVD_OFFICES.length}` : (totalOffices > 0 ? 'Reported ✓' : 'Pending');
@@ -2146,45 +2521,13 @@ function renderAdminDashboard() {
   if (document.getElementById('kpiUpsWorkingCount')) document.getElementById('kpiUpsWorkingCount').textContent = `${upsWorkingCount} Units`;
   if (document.getElementById('kpiServiceReportCount')) document.getElementById('kpiServiceReportCount').textContent = `${serviceReportsSentCount} Offices`;
 
-  const netGrid = document.getElementById('networkStatsGrid');
-  if (netGrid) {
-    netGrid.innerHTML = Object.entries(networkCounts).map(([net, count]) => `
-      <div style="background: #f8fafc; padding: 14px; border-radius: var(--radius-md); border: 1px solid var(--border-color); text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: var(--text-muted);">${net}</div>
-        <div style="font-size: 1.4rem; font-weight: 800; color: var(--primary-900);">${count} Offices</div>
-      </div>
-    `).join('');
-  }
-
-  const pwrGrid = document.getElementById('powerStatsGrid');
-  if (pwrGrid) {
-    pwrGrid.innerHTML = `
-      <div style="background: #f0fdf4; padding: 14px; border-radius: var(--radius-md); border: 1px solid #a7f3d0; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: #047857;">Working UPS Units</div>
-        <div style="font-size: 1.4rem; font-weight: 800; color: #064e3b;">${upsWorkingCount} Units</div>
-      </div>
-      <div style="background: #fef2f2; padding: 14px; border-radius: var(--radius-md); border: 1px solid #fecdd3; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: #b91c1c;">Defective / Non-Working UPS</div>
-        <div style="font-size: 1.4rem; font-weight: 800; color: #991b1b;">${upsNotWorkingCount} Units</div>
-      </div>
-      <div style="background: #eff6ff; padding: 14px; border-radius: var(--radius-md); border: 1px solid #bfdbfe; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: #1d4ed8;">Batteries In Use / Min Required</div>
-        <div style="font-size: 1.4rem; font-weight: 800; color: #1e40af;">${totalBatteriesInUse} / ${totalMinBatteries}</div>
-      </div>
-      <div style="background: #fffbe6; padding: 14px; border-radius: var(--radius-md); border: 1px solid #ffe58f; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: #d97706;">TCO Service Reports Sent</div>
-        <div style="font-size: 1.4rem; font-weight: 800; color: #b45309;">${serviceReportsSentCount} Offices</div>
-      </div>
-    `;
-  }
-
   const ctxHealth = document.getElementById('chartHardwareHealth')?.getContext('2d');
   if (ctxHealth) {
     if (chartHealthInstance) chartHealthInstance.destroy();
     chartHealthInstance = new Chart(ctxHealth, {
       type: 'doughnut',
       data: {
-        labels: ['Working Systems', 'Defective / Non-Working Systems'],
+        labels: ['Working Systems', 'Defective Systems'],
         datasets: [{
           data: [totalWorkingHW || (totalNotWorkingHW === 0 ? 1 : 0), totalNotWorkingHW || 0],
           backgroundColor: ['#10b981', '#ef4444'],
@@ -2192,34 +2535,9 @@ function renderAdminDashboard() {
           borderColor: '#ffffff'
         }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } }
-      }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
     });
   }
-
-  let chartDashboardUpsCondInstance = null;
-  let chartDashboardUpsCapInstance = null;
-  let chartDashboardBatteryCompInstance = null;
-
-  const upsConditionCounts = { 'Good': 0, 'Working with Minor Issues': 0, 'Requires Repair': 0, 'Not Working': 0 };
-  const upsCapacityCounts = { '0.5 kVA': 0, '1 kVA': 0, '2 kVA': 0, '3 kVA': 0, '5 kVA': 0, '10 kVA': 0, 'Other': 0 };
-
-  entries.forEach(e => {
-    if (e.upsCondition && upsConditionCounts[e.upsCondition] !== undefined) {
-      upsConditionCounts[e.upsCondition]++;
-    } else if (e.upsCondition) {
-      upsConditionCounts['Working with Minor Issues']++;
-    }
-
-    if (e.upsCapacity && upsCapacityCounts[e.upsCapacity] !== undefined) {
-      upsCapacityCounts[e.upsCapacity]++;
-    } else if (e.upsCapacity) {
-      upsCapacityCounts['Other']++;
-    }
-  });
 
   const ctxAge = document.getElementById('chartAgeDistribution')?.getContext('2d');
   if (ctxAge) {
@@ -2235,500 +2553,51 @@ function renderAdminDashboard() {
           borderRadius: 6
         }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-      }
+      options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     });
-  }
-
-  // Chart 3: Executive Dashboard UPS Working Condition Chart
-  const ctxDashUpsCond = document.getElementById('chartDashboardUpsCondition')?.getContext('2d');
-  if (ctxDashUpsCond) {
-    if (chartDashboardUpsCondInstance) chartDashboardUpsCondInstance.destroy();
-    chartDashboardUpsCondInstance = new Chart(ctxDashUpsCond, {
-      type: 'pie',
-      data: {
-        labels: ['Good / Working', 'Minor Issues', 'Requires Repair', 'Not Working / Defective'],
-        datasets: [{
-          data: [
-            upsConditionCounts['Good'] || upsWorkingCount,
-            upsConditionCounts['Working with Minor Issues'],
-            upsConditionCounts['Requires Repair'],
-            upsConditionCounts['Not Working'] || upsNotWorkingCount
-          ],
-          backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'],
-          borderWidth: 2,
-          borderColor: '#ffffff'
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { position: 'bottom' } }
-      }
-    });
-  }
-
-  // Chart 4: Executive Dashboard UPS Capacity Distribution Chart
-  const ctxDashUpsCap = document.getElementById('chartDashboardUpsCapacity')?.getContext('2d');
-  if (ctxDashUpsCap) {
-    if (chartDashboardUpsCapInstance) chartDashboardUpsCapInstance.destroy();
-    chartDashboardUpsCapInstance = new Chart(ctxDashUpsCap, {
-      type: 'bar',
-      data: {
-        labels: ['0.5 kVA', '1 kVA', '2 kVA', '3 kVA', '5 kVA', '10 kVA', 'Other'],
-        datasets: [{
-          label: 'Offices Count',
-          data: Object.values(upsCapacityCounts),
-          backgroundColor: '#0891b2',
-          borderRadius: 6
-        }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: { legend: { display: false } },
-        scales: { y: { beginAtZero: true, ticks: { precision: 0 } } }
-      }
-    });
-  }
-
-  // --- DEDICATED BATTERY DETAILS TITLE CARD & VISUAL COMPARISON ANALYTICS ---
-  const batteryMakeCounts = {};
-  entries.forEach(e => {
-    const make = (e.batteryMake || '').trim();
-    if (make) {
-      const formattedMake = make.toUpperCase();
-      batteryMakeCounts[formattedMake] = (batteryMakeCounts[formattedMake] || 0) + 1;
-    }
-  });
-
-  const batGrid = document.getElementById('batteryDetailsGrid');
-  if (batGrid) {
-    const topBrands = Object.entries(batteryMakeCounts)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 3)
-      .map(([m]) => m);
-    const topBrandsStr = topBrands.length > 0 ? topBrands.join(', ') : 'Exide, Amaron, Quanta';
-
-    batGrid.innerHTML = `
-      <div style="background: #f0fdf4; padding: 14px; border-radius: var(--radius-md); border: 1px solid #a7f3d0; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: #047857;">Batteries Currently Using</div>
-        <div style="font-size: 1.4rem; font-weight: 800; color: #064e3b;">${totalBatteriesInUse} Units</div>
-      </div>
-      <div style="background: #eff6ff; padding: 14px; border-radius: var(--radius-md); border: 1px solid #bfdbfe; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: #1d4ed8;">Minimum Required Batteries</div>
-        <div style="font-size: 1.4rem; font-weight: 800; color: #1e40af;">${totalMinBatteries} Units</div>
-      </div>
-      <div style="background: #fffbe6; padding: 14px; border-radius: var(--radius-md); border: 1px solid #ffe58f; text-align: center;">
-        <div style="font-size: 0.8rem; font-weight: 700; color: #d97706;">Dominant Battery Makes</div>
-        <div style="font-size: 1.1rem; font-weight: 800; color: #b45309; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${topBrandsStr}</div>
-      </div>
-    `;
   }
 }
 
-// --- DASHBOARD INTERACTIVE DRILL-DOWN ENGINE ---
-let currentDrillDownType = 'offices';
-
 function drillDownDashboard(type) {
-  currentDrillDownType = type;
+  // Generic drill down handler
   const modal = document.getElementById('officeDetailModal');
   const title = document.getElementById('modalOfficeTitle');
   const body = document.getElementById('modalOfficeBody');
 
   if (!modal || !title || !body) return;
 
-  const filterVal = document.getElementById('dashboardOfficeFilter')?.value || 'ALL';
-  let entries = Object.values(inventoryStore);
-  if (filterVal !== 'ALL') {
-    entries = inventoryStore[filterVal] ? [inventoryStore[filterVal]] : [];
-  }
+  const entries = Object.values(inventoryStore);
+  title.innerHTML = `<i class="fa-solid fa-list-check"></i> ${type.toUpperCase()} Breakdown`;
 
-  if (type === 'offices') {
-    title.innerHTML = `<i class="fa-solid fa-building-circle-check"></i> Offices Submission Drill-Down (${entries.length} Reported / ${MVD_OFFICES.length} Total)`;
-
-    const reportedNames = entries.map(e => e.officeName);
-    const pendingNames = MVD_OFFICES.filter(off => !inventoryStore[off]);
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 18px;">
-        <div>
-          <h4 style="color: #047857; margin-bottom: 10px;"><i class="fa-solid fa-circle-check"></i> Reported MVD Offices (${reportedNames.length})</h4>
-          <div style="max-height: 200px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-            <table class="data-table">
-              <thead><tr><th>Office Name</th><th>Reporting Officer</th><th>Last Updated</th><th>Action</th></tr></thead>
-              <tbody>
-                ${entries.map(e => `
-                  <tr>
-                    <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                    <td>${escapeHtml(e.entryOfficerName || 'N/A')} (${escapeHtml(e.entryOfficerDesignation || 'Officer')})</td>
-                    <td><small>${escapeHtml(e.lastUpdated)}</small></td>
-                    <td><button class="btn btn-outline btn-sm" onclick="viewOfficeDetail('${escapeHtml(e.officeName)}')"><i class="fa-solid fa-eye"></i> View</button></td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
-          </div>
-        </div>
-
-        <div>
-          <h4 style="color: #b91c1c; margin-bottom: 10px;"><i class="fa-solid fa-clock"></i> Pending Submission Offices (${pendingNames.length})</h4>
-          <div style="max-height: 180px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px; padding: 12px; background: #fef2f2;">
-            <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px;">
-              ${pendingNames.map(off => `<div style="font-size: 0.85rem; color: #991b1b;"><i class="fa-regular fa-square"></i> ${escapeHtml(off)}</div>`).join('')}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-  } else if (type === 'systems') {
-    title.innerHTML = `<i class="fa-solid fa-computer"></i> IT Systems Equipment Distribution Drill-Down`;
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: var(--text-muted); font-size: 0.88rem;">Detailed hardware Breakdown by Office for selected scope:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>Monitors (W/NW)</th>
-                <th>CPUs (W/NW)</th>
-                <th>Laptops (W/NW)</th>
-                <th>AIO PCs (W/NW)</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td>${e.monitorsWorking} W / <span style="color:#b91c1c;">${e.monitorsNotWorking} NW</span></td>
-                  <td>${e.cpuWorking} W / <span style="color:#b91c1c;">${e.cpuNotWorking} NW</span></td>
-                  <td>${e.laptopsWorking} W / <span style="color:#b91c1c;">${e.laptopsNotWorking} NW</span></td>
-                  <td>${e.aioWorking} W / <span style="color:#b91c1c;">${e.aioNotWorking} NW</span></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  } else if (type === 'defective') {
-    title.innerHTML = `<i class="fa-solid fa-triangle-exclamation" style="color: #ef4444;"></i> Defective Hardware & Defect Audit Drill-Down`;
-
-    const defectiveEntries = entries.filter(e => (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking + e.upsNotWorking) > 0);
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: #b91c1c; font-size: 0.88rem; font-weight: 600;">Found ${defectiveEntries.length} offices with non-working hardware items pending maintenance:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>Defective Monitors</th>
-                <th>Defective CPUs</th>
-                <th>Defective Laptops / AIO</th>
-                <th>Defective UPS</th>
-                <th>Condition Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${defectiveEntries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td style="color:#b91c1c; font-weight:700;">${e.monitorsNotWorking}</td>
-                  <td style="color:#b91c1c; font-weight:700;">${e.cpuNotWorking}</td>
-                  <td style="color:#b91c1c; font-weight:700;">${e.laptopsNotWorking + e.aioNotWorking}</td>
-                  <td style="color:#b91c1c; font-weight:700;">${e.upsNotWorking}</td>
-                  <td><small>${escapeHtml(e.remarks || 'None')}</small></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  } else if (type === 'network') {
-    title.innerHTML = `<i class="fa-solid fa-network-wired"></i> Network Infrastructure Coverage Drill-Down`;
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: var(--text-muted); font-size: 0.88rem;">Network Connectivity provider and speed status by office:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>Network Provider</th>
-                <th>Bandwidth Speed</th>
-                <th>OS & Version</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td><span class="badge badge-info">${escapeHtml(e.availableNetwork === 'Others' ? e.otherNetworkDetails : e.availableNetwork)}</span></td>
-                  <td>${escapeHtml(e.networkSpeed || 'N/A')}</td>
-                  <td><small>${escapeHtml(e.operatingSystem || 'N/A')}</small></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  } else if (type === 'switches') {
-    title.innerHTML = `<i class="fa-solid fa-server" style="color: #0284c7;"></i> Network Switches Availability & Details Drill-Down`;
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: var(--text-muted); font-size: 0.88rem;">Switches hardware availability and specification details across MVD offices:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>Switches Available</th>
-                <th>Manufacturer & Port Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td><span class="badge ${e.switchesAvailable === 'Yes' ? 'badge-working' : (e.switchesAvailable === 'No' ? 'badge-danger' : 'badge-info')}">${escapeHtml(e.switchesAvailable || 'Not Sure')}</span></td>
-                  <td>${escapeHtml(e.switchesDetails || 'N/A')}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  } else if (type === 'servers') {
-    title.innerHTML = `<i class="fa-solid fa-database" style="color: #4f46e5;"></i> Server Infrastructure Status Drill-Down`;
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: var(--text-muted); font-size: 0.88rem;">Server hardware installation and operational status across MVD offices:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>Servers Available</th>
-                <th>Current Status & Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td><span class="badge ${e.serversAvailable === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.serversAvailable || 'No')}</span></td>
-                  <td>${escapeHtml(e.serversDetails || 'N/A')}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  } else if (type === 'age') {
-    title.innerHTML = `<i class="fa-solid fa-chart-column" style="color: #3b82f6;"></i> System Age Profile Breakdown Drill-Down`;
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: var(--text-muted); font-size: 0.88rem;">System age profile breakdown (&lt; 3 yrs, 3–5 yrs, 5–8 yrs, &gt; 8 yrs priority) by MVD Office:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>&lt; 3 Years</th>
-                <th>3–5 Years</th>
-                <th>5–8 Years</th>
-                <th>&gt; 8 Years (High Priority)</th>
-                <th>Total Age-Profiled Systems</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td>${e.ageUnder3 || 0}</td>
-                  <td>${e.age3To5 || 0}</td>
-                  <td>${e.age5To8 || 0}</td>
-                  <td><span class="badge ${(e.ageAbove8 || 0) > 0 ? 'badge-danger' : 'badge-working'}">${e.ageAbove8 || 0}</span></td>
-                  <td><strong>${(e.ageUnder3 || 0) + (e.age3To5 || 0) + (e.age5To8 || 0) + (e.ageAbove8 || 0)}</strong></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  } else if (type === 'ups' || type === 'power') {
-    title.innerHTML = `<i class="fa-solid fa-car-battery" style="color: #059669;"></i> Power & Battery Infrastructure Audit Drill-Down`;
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: var(--text-muted); font-size: 0.88rem;">UPS availability, condition, battery specifications, and TCO service report status by office:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>UPS Available</th>
-                <th>Working / Defective UPS</th>
-                <th>UPS Capacity</th>
-                <th>Working UPS Condition</th>
-                <th>Battery Make & AH</th>
-                <th>Batteries (In Use / Min Req)</th>
-                <th>TCO Report Sent</th>
-                <th>Power Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td><span class="badge ${e.upsAvailable === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.upsAvailable || 'Yes')}</span></td>
-                  <td><span style="color:#047857; font-weight:700;">${e.upsWorking || 0} W</span> / <span style="color:#b91c1c; font-weight:700;">${e.upsNotWorking || 0} NW</span></td>
-                  <td><span class="badge badge-info">${escapeHtml(e.upsCapacity === 'Other' ? e.upsCapacityOther : (e.upsCapacity || 'N/A'))}</span></td>
-                  <td><small>${escapeHtml(e.upsCondition || 'N/A')}</small></td>
-                  <td><small>${escapeHtml(e.batteryMake || 'N/A')} (${e.batteryAh || 0} AH)</small></td>
-                  <td>${e.batteriesInUse || 0} / ${e.minBatteriesRequired || 0}</td>
-                  <td><span class="badge ${e.serviceReportSent === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.serviceReportSent || 'No')} ${e.serviceReportDate ? `(${e.serviceReportDate})` : ''}</span></td>
-                  <td><small>${escapeHtml(e.powerRemarks || 'None')}</small></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  } else if (type === 'service_reports') {
-    title.innerHTML = `<i class="fa-solid fa-paper-plane" style="color: #d97706;"></i> TCO Service Reports Status Drill-Down`;
-
-    body.innerHTML = `
-      <div style="display: flex; flex-direction: column; gap: 16px;">
-        <p style="color: var(--text-muted); font-size: 0.88rem;">Detailed status of UPS & Power Infrastructure Service Reports sent to TCO:</p>
-        <div style="max-height: 380px; overflow-y: auto; border: 1px solid var(--border-color); border-radius: 8px;">
-          <table class="data-table">
-            <thead>
-              <tr>
-                <th>Office Name</th>
-                <th>Service Report Sent to TCO</th>
-                <th>Date of Sending Report</th>
-                <th>Reporting Officer</th>
-                <th>Power Remarks</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${entries.map(e => `
-                <tr>
-                  <td><strong>${escapeHtml(e.officeName)}</strong></td>
-                  <td><span class="badge ${e.serviceReportSent === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(e.serviceReportSent || 'No')}</span></td>
-                  <td>${escapeHtml(e.serviceReportDate || 'N/A')}</td>
-                  <td>${escapeHtml(e.entryOfficerName || 'N/A')} (${escapeHtml(e.entryOfficerMobile || 'N/A')})</td>
-                  <td><small>${escapeHtml(e.powerRemarks || 'None')}</small></td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    `;
-  }
+  body.innerHTML = `
+    <table class="data-table">
+      <thead><tr><th>Office Name</th><th>Monitors</th><th>CPUs</th><th>Laptops</th></tr></thead>
+      <tbody>
+        ${entries.map(e => `
+          <tr>
+            <td><strong>${escapeHtml(e.officeName)}</strong></td>
+            <td>${e.monitorsWorking} W / ${e.monitorsNotWorking} NW</td>
+            <td>${e.cpuWorking} W / ${e.cpuNotWorking} NW</td>
+            <td>${e.laptopsWorking} W / ${e.laptopsNotWorking} NW</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
+  `;
 
   modal.style.display = 'flex';
 }
 
-function exportDrillDownToCSV() {
-  const filterVal = document.getElementById('dashboardOfficeFilter')?.value || 'ALL';
-  let entries = Object.values(inventoryStore);
-  if (filterVal !== 'ALL') {
-    entries = inventoryStore[filterVal] ? [inventoryStore[filterVal]] : [];
-  }
-
-  let csvContent = "";
-  let filename = `mvd_drilldown_${currentDrillDownType}_${Date.now()}.csv`;
-
-  if (currentDrillDownType === 'offices') {
-    csvContent += "Office Name,Status,Reporting Officer,Designation,Mobile,Last Updated\n";
-    entries.forEach(e => {
-      csvContent += `"${e.officeName.replace(/"/g, '""')}","Reported","${(e.entryOfficerName || '').replace(/"/g, '""')}","${(e.entryOfficerDesignation || '').replace(/"/g, '""')}","${e.entryOfficerMobile || ''}","${e.lastUpdated || ''}"\n`;
-    });
-    const pendingNames = MVD_OFFICES.filter(off => !inventoryStore[off]);
-    pendingNames.forEach(p => {
-      csvContent += `"${p.replace(/"/g, '""')}","Pending","N/A","N/A","N/A","N/A"\n`;
-    });
-  } else if (currentDrillDownType === 'systems') {
-    csvContent += "Office Name,Monitors Working,Monitors Defective,CPU Working,CPU Defective,Laptops Working,Laptops Defective,AIO Working,AIO Defective,Total Systems\n";
-    entries.forEach(e => {
-      const tot = (e.monitorsWorking + e.monitorsNotWorking + e.cpuWorking + e.cpuNotWorking + e.laptopsWorking + e.laptopsNotWorking + e.aioWorking + e.aioNotWorking);
-      csvContent += `"${e.officeName.replace(/"/g, '""')}",${e.monitorsWorking},${e.monitorsNotWorking},${e.cpuWorking},${e.cpuNotWorking},${e.laptopsWorking},${e.laptopsNotWorking},${e.aioWorking},${e.aioNotWorking},${tot}\n`;
-    });
-  } else if (currentDrillDownType === 'defective') {
-    csvContent += "Office Name,Defective Monitors,Defective CPUs,Defective Laptops & AIO,Defective UPS,Remarks\n";
-    const defectiveEntries = entries.filter(e => (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking + e.upsNotWorking) > 0);
-    defectiveEntries.forEach(e => {
-      csvContent += `"${e.officeName.replace(/"/g, '""')}",${e.monitorsNotWorking},${e.cpuNotWorking},${e.laptopsNotWorking + e.aioNotWorking},${e.upsNotWorking},"${(e.remarks || '').replace(/"/g, '""')}"\n`;
-    });
-  } else if (currentDrillDownType === 'network') {
-    csvContent += "Office Name,Available Network,Speed,Operating System\n";
-    entries.forEach(e => {
-      const net = e.availableNetwork === 'Others' ? e.otherNetworkDetails : e.availableNetwork;
-      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(net || '').replace(/"/g, '""')}","${(e.networkSpeed || '').replace(/"/g, '""')}","${(e.operatingSystem || '').replace(/"/g, '""')}"\n`;
-    });
-  } else if (currentDrillDownType === 'switches') {
-    csvContent += "Office Name,Switches Available,Manufacturer and Port Details\n";
-    entries.forEach(e => {
-      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.switchesAvailable || '').replace(/"/g, '""')}","${(e.switchesDetails || '').replace(/"/g, '""')}"\n`;
-    });
-  } else if (currentDrillDownType === 'servers') {
-    csvContent += "Office Name,Servers Available,Current Status and Details\n";
-    entries.forEach(e => {
-      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.serversAvailable || '').replace(/"/g, '""')}","${(e.serversDetails || '').replace(/"/g, '""')}"\n`;
-    });
-  } else if (currentDrillDownType === 'age') {
-    csvContent += "Office Name,Under 3 Years,3 to 5 Years,5 to 8 Years,Above 8 Years (High Priority),Total Systems\n";
-    entries.forEach(e => {
-      const u3 = e.ageUnder3 || 0;
-      const u5 = e.age3To5 || 0;
-      const u8 = e.age5To8 || 0;
-      const a8 = e.ageAbove8 || 0;
-      csvContent += `"${e.officeName.replace(/"/g, '""')}",${u3},${u5},${u8},${a8},${u3 + u5 + u8 + a8}\n`;
-    });
-  } else if (currentDrillDownType === 'ups' || currentDrillDownType === 'power') {
-    csvContent += "Office Name,UPS Available,Working UPS Units,Defective UPS Units,UPS Capacity,Working UPS Condition,Battery Make,Battery AH Rating,Batteries In Use,Min Batteries Required,TCO Service Report Sent,Report Date,Power Remarks\n";
-    entries.forEach(e => {
-      const cap = e.upsCapacity === 'Other' ? e.upsCapacityOther : e.upsCapacity;
-      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.upsAvailable || '').replace(/"/g, '""')}",${e.upsWorking || 0},${e.upsNotWorking || 0},"${(cap || '').replace(/"/g, '""')}","${(e.upsCondition || '').replace(/"/g, '""')}","${(e.batteryMake || '').replace(/"/g, '""')}",${e.batteryAh || 0},${e.batteriesInUse || 0},${e.minBatteriesRequired || 0},"${(e.serviceReportSent || '').replace(/"/g, '""')}","${(e.serviceReportDate || '').replace(/"/g, '""')}","${(e.powerRemarks || '').replace(/"/g, '""')}"\n`;
-    });
-  } else if (currentDrillDownType === 'service_reports') {
-    csvContent += "Office Name,Service Report Sent to TCO,Date of Sending Report,Reporting Officer,Mobile,Power Remarks\n";
-    entries.forEach(e => {
-      csvContent += `"${e.officeName.replace(/"/g, '""')}","${(e.serviceReportSent || '').replace(/"/g, '""')}","${(e.serviceReportDate || '').replace(/"/g, '""')}","${(e.entryOfficerName || '').replace(/"/g, '""')}","${e.entryOfficerMobile || ''}","${(e.powerRemarks || '').replace(/"/g, '""')}"\n`;
-    });
-  }
-
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const link = document.createElement("a");
-  const url = URL.createObjectURL(blob);
-  link.setAttribute("href", url);
-  link.setAttribute("download", filename);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-  showToast(`Exported ${currentDrillDownType} drill-down data to CSV`, 'success');
+function closeOfficeDetailModal() {
+  document.getElementById('officeDetailModal').style.display = 'none';
 }
+
+function exportDrillDownToCSV() {
+  exportDataToCSV();
+}
+
+// --- 17. ADMIN IT TABLES & CSV EXPORTS ---
+function renderPublicDataTable() {}
 
 function renderAdminDataTable() {
   const tbody = document.getElementById('adminTableBody');
@@ -2740,771 +2609,293 @@ function renderAdminDataTable() {
     return;
   }
 
-  tbody.innerHTML = entries.map(item => {
-    const netLabel = item.availableNetwork === 'Others' ? `Other (${item.otherNetworkDetails})` : item.availableNetwork;
-    const dotWorking = item.printers?.dotMatrix?.working ?? 0;
-
-    const createdName = item.createdOfficerName || item.entryOfficerName || 'N/A';
-    const createdDesig = item.createdOfficerDesignation || item.entryOfficerDesignation || 'Officer';
-    const createdEmail = item.createdOfficerEmail || item.submittedByEmail || 'N/A';
-    const createdTime = item.createdDate || item.lastUpdated || 'N/A';
-
-    const updatedName = item.updatedOfficerName || item.entryOfficerName || 'N/A';
-    const updatedDesig = item.updatedOfficerDesignation || item.entryOfficerDesignation || 'Officer';
-    const updatedEmail = item.updatedOfficerEmail || item.submittedByEmail || 'N/A';
-    const updatedTime = item.lastUpdated || 'N/A';
-
-    return `
-      <tr>
-        <td>
-          <strong style="color: var(--primary-900); font-size: 0.92rem;">${escapeHtml(item.officeName)}</strong>
-        </td>
-        <td>
-          <div style="font-size: 0.84rem; line-height: 1.45;">
-            <strong>${escapeHtml(createdName)}</strong> <small style="color: var(--text-muted);">(${escapeHtml(createdDesig)})</small><br>
-            <span style="color: #0369a1; font-weight: 600; font-size: 0.78rem;"><i class="fa-solid fa-envelope"></i> ${escapeHtml(createdEmail)}</span><br>
-            <small style="color: #64748b;"><i class="fa-regular fa-calendar-check"></i> ${escapeHtml(createdTime)}</small>
-          </div>
-        </td>
-        <td>
-          <div style="font-size: 0.84rem; line-height: 1.45;">
-            <strong>${escapeHtml(updatedName)}</strong> <small style="color: var(--text-muted);">(${escapeHtml(updatedDesig)})</small><br>
-            <span style="color: #047857; font-weight: 600; font-size: 0.78rem;"><i class="fa-solid fa-envelope"></i> ${escapeHtml(updatedEmail)}</span><br>
-            <small style="color: #047857;"><i class="fa-regular fa-clock"></i> ${escapeHtml(updatedTime)}</small>
-          </div>
-        </td>
-        <td><span class="badge badge-info">${escapeHtml(netLabel)}</span><br><small>${escapeHtml(item.networkSpeed || '')}</small></td>
-        <td>
-          <span class="badge ${item.switchesAvailable === 'Yes' ? 'badge-working' : (item.switchesAvailable === 'No' ? 'badge-danger' : 'badge-info')}">${escapeHtml(item.switchesAvailable || 'Not Sure')}</span>
-          ${item.switchesAvailable === 'Yes' && item.switchesDetails ? `<br><small style="color: var(--text-muted);">${escapeHtml(item.switchesDetails)}</small>` : ''}
-        </td>
-        <td>
-          <span class="badge ${item.serversAvailable === 'Yes' ? 'badge-working' : 'badge-danger'}">${escapeHtml(item.serversAvailable || 'No')}</span>
-          ${item.serversAvailable === 'Yes' && item.serversDetails ? `<br><small style="color: var(--text-muted);">${escapeHtml(item.serversDetails)}</small>` : ''}
-        </td>
-        <td><small>${escapeHtml(item.operatingSystem || 'N/A')}</small></td>
-        <td>${item.monitorsWorking} W / <span style="color:#b91c1c;">${item.monitorsNotWorking} NW</span></td>
-        <td>${item.cpuWorking} W / <span style="color:#b91c1c;">${item.cpuNotWorking} NW</span></td>
-        <td>${item.laptopsWorking} W / <span style="color:#b91c1c;">${item.laptopsNotWorking} NW</span></td>
-        <td>${item.aioWorking} W / <span style="color:#b91c1c;">${item.aioNotWorking} NW</span></td>
-        <td><strong style="color: #047857;">${dotWorking}</strong></td>
-        <td>${item.upsWorking} W / <span style="color:#b91c1c;">${item.upsNotWorking} NW</span></td>
-        <td>${item.batteriesInUse} / ${item.batteriesNotInUse}</td>
-        <td><span class="badge ${item.ageAbove8 > 0 ? 'badge-danger' : 'badge-working'}">${item.ageAbove8 || 0}</span></td>
-        <td><small>${escapeHtml(item.remarks ? item.remarks.substring(0, 30) + '...' : 'None')}</small></td>
-        <td>
-          <div style="display: flex; gap: 4px;">
-            <button class="btn btn-outline btn-sm" onclick="editOfficeInAdmin('${escapeHtml(item.officeName)}')"><i class="fa-solid fa-pen"></i></button>
-            <button class="btn btn-danger btn-sm" onclick="deleteOfficeEntry('${escapeHtml(item.officeName)}')"><i class="fa-solid fa-trash"></i></button>
-          </div>
-        </td>
-      </tr>
-    `;
-  }).join('');
+  tbody.innerHTML = entries.map(item => `
+    <tr>
+      <td><strong>${escapeHtml(item.officeName)}</strong></td>
+      <td>${escapeHtml(item.createdOfficerName || item.entryOfficerName || 'N/A')}<br><small style="color: #64748b;">${escapeHtml(item.createdOfficerEmail || '')}</small></td>
+      <td>${escapeHtml(item.updatedOfficerName || 'N/A')}<br><small style="color: #047857;">${escapeHtml(item.lastUpdated || '')}</small></td>
+      <td><span class="badge badge-info">${escapeHtml(item.availableNetwork)}</span></td>
+      <td>${escapeHtml(item.switchesAvailable || 'Not Sure')}</td>
+      <td>${escapeHtml(item.serversAvailable || 'No')}</td>
+      <td><small>${escapeHtml(item.operatingSystem || 'N/A')}</small></td>
+      <td>${item.monitorsWorking} W / <span style="color:#b91c1c;">${item.monitorsNotWorking} NW</span></td>
+      <td>${item.cpuWorking} W / <span style="color:#b91c1c;">${item.cpuNotWorking} NW</span></td>
+      <td>${item.laptopsWorking} W / <span style="color:#b91c1c;">${item.laptopsNotWorking} NW</span></td>
+      <td>${item.aioWorking} W / <span style="color:#b91c1c;">${item.aioNotWorking} NW</span></td>
+      <td>${item.printers?.dotMatrix?.working ?? 0}</td>
+      <td>${item.upsWorking} W / <span style="color:#b91c1c;">${item.upsNotWorking} NW</span></td>
+      <td>${item.batteriesInUse || 0}</td>
+      <td><span class="badge ${item.ageAbove8 > 0 ? 'badge-danger' : 'badge-working'}">${item.ageAbove8 || 0}</span></td>
+      <td><small>${escapeHtml((item.remarks || '').substring(0, 25))}</small></td>
+      <td>
+        <button class="btn btn-danger btn-sm" onclick="deleteOfficeEntry('${escapeHtml(item.officeName)}')"><i class="fa-solid fa-trash"></i></button>
+      </td>
+    </tr>
+  `).join('');
 }
 
 function filterAdminTable() {
   const query = document.getElementById('adminSearchInput').value.toLowerCase();
   const rows = document.querySelectorAll('#adminTableBody tr');
-
   rows.forEach(row => {
     row.style.display = row.textContent.toLowerCase().includes(query) ? '' : 'none';
   });
 }
 
-function editOfficeInAdmin(officeName) {
-  switchAdminSubView('entry');
-  document.getElementById('officeSelect').value = officeName;
-  handleOfficeSelectChange(officeName);
-  showToast(`Editing ${officeName} in Admin Entry`, 'info');
-}
-
 async function deleteOfficeEntry(officeName) {
-  if (!officeName) return;
-  if (!confirm(`Are you sure you want to permanently delete all IT equipment data for "${officeName}" from Supabase and the portal?`)) {
-    return;
-  }
+  if (!confirm(`Permanently delete data for "${officeName}"?`)) return;
 
-  showToast(`Deleting ${officeName}...`, 'info');
-
-  const supabaseSuccess = await deleteRecordFromSupabase(officeName);
-
+  await deleteRecordFromSupabase(officeName);
   delete inventoryStore[officeName];
   localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
 
-  const officeSelect = document.getElementById('officeSelect');
-  if (officeSelect && officeSelect.value === officeName) {
-    officeSelect.value = '';
-    handleOfficeSelectChange('');
-  }
-
-  renderPublicDataTable();
   renderAdminDataTable();
   renderAdminSummaryReport();
-  if (activeSession === 'admin') {
-    renderAdminDashboard();
-  }
+  if (activeSession === 'admin') renderAdminDashboard();
 
-  if (supabaseSuccess) {
-    showToast(`Successfully deleted "${officeName}" from Supabase Cloud Database`, 'warning');
-  } else {
-    showToast(`Deleted "${officeName}" locally. Cloud sync warning.`, 'warning');
-  }
+  showToast(`Deleted "${officeName}"`, 'warning');
 }
 
 function deleteCurrentAdminOfficeEntry() {
   const officeName = document.getElementById('officeSelect')?.value;
-  if (!officeName) {
-    showToast('No office selected to delete', 'warning');
-    return;
-  }
-  deleteOfficeEntry(officeName);
+  if (officeName) deleteOfficeEntry(officeName);
 }
 
-// --- 15. SESSION & NAVIGATION CONTROLLER ---
-function switchSession(sessionType) {
-  activeSession = sessionType;
-
-  const publicContainer = document.getElementById('publicContainer');
-  const adminContainer = document.getElementById('adminContainer');
-
-  renderPortalMenuBar();
-
-  if (sessionType === 'public' || sessionType === 'standard') {
-    if (adminContainer) adminContainer.style.display = 'none';
-    selectModuleMenu(activeModuleId);
-  } else if (sessionType === 'admin') {
-    const genericCont = document.getElementById('genericModuleContainer');
-    if (genericCont) genericCont.style.display = 'none';
-    if (publicContainer) publicContainer.style.display = 'none';
-    if (adminContainer) adminContainer.style.display = 'block';
-
-    renderAdminDashboard();
-    renderAdminDataTable();
-    renderMenuManagerUI();
-  }
-}
-
-function switchPublicTab(tab) {
-  publicSubView = tab;
-  const entryBtn = document.getElementById('btnPublicEntry');
-  const viewBtn = document.getElementById('btnPublicView');
-  const entrySec = document.getElementById('publicEntrySection');
-  const viewSec = document.getElementById('publicViewSection');
-
-  if (tab === 'entry') {
-    if (entryBtn) entryBtn.className = 'btn btn-primary';
-    if (viewBtn) viewBtn.className = 'btn btn-outline';
-    if (entrySec) entrySec.style.display = 'block';
-    if (viewSec) viewSec.style.display = 'none';
-  } else {
-    if (viewBtn) viewBtn.className = 'btn btn-primary';
-    if (entryBtn) entryBtn.className = 'btn btn-outline';
-    if (entrySec) entrySec.style.display = 'none';
-    if (viewSec) viewSec.style.display = 'block';
-    renderPublicDataTable();
-  }
-}
-
-function switchAdminSubView(view) {
-  adminSubView = view;
-
-  const btnDash = document.getElementById('btnAdminNavDashboard');
-  const btnSumm = document.getElementById('btnAdminNavSummary');
-  const btnEnt = document.getElementById('btnAdminNavEntry');
-  const btnVw = document.getElementById('btnAdminNavView');
-  const btnMn = document.getElementById('btnAdminNavMenus');
-
-  const dashSec = document.getElementById('adminDashboardSubView');
-  const summSec = document.getElementById('adminSummarySubView');
-  const entSec = document.getElementById('adminEntrySubView');
-  const vwSec = document.getElementById('adminViewSubView');
-  const mnSec = document.getElementById('adminMenusSubView');
-
-  if (btnDash) btnDash.style.background = (view === 'dashboard') ? 'var(--primary-600)' : 'transparent';
-  if (btnSumm) btnSumm.style.background = (view === 'summary') ? 'var(--primary-600)' : 'transparent';
-  if (btnEnt) btnEnt.style.background = (view === 'entry') ? 'var(--primary-600)' : 'transparent';
-  if (btnVw) btnVw.style.background = (view === 'view') ? 'var(--primary-600)' : 'transparent';
-  if (btnMn) btnMn.style.background = (view === 'menus') ? 'var(--primary-600)' : 'transparent';
-
-  if (dashSec) dashSec.style.display = (view === 'dashboard') ? 'block' : 'none';
-  if (summSec) summSec.style.display = (view === 'summary') ? 'block' : 'none';
-  if (entSec) entSec.style.display = (view === 'entry') ? 'block' : 'none';
-  if (vwSec) vwSec.style.display = (view === 'view') ? 'block' : 'none';
-  if (mnSec) mnSec.style.display = (view === 'menus') ? 'block' : 'none';
-
-  if (view === 'dashboard') renderAdminDashboard();
-  if (view === 'summary') renderAdminSummaryReport();
-  if (view === 'view') renderAdminDataTable();
-  if (view === 'menus') renderMenuManagerUI();
-  if (view === 'entry') {
-    const formSec = document.getElementById('publicEntrySection');
-    document.getElementById('adminFormContainer').appendChild(formSec);
-    const selOffice = document.getElementById('officeSelect')?.value;
-    if (selOffice) {
-      handleOfficeSelectChange(selOffice);
-    }
-  } else {
-    const formSec = document.getElementById('publicEntrySection');
-    const pubCont = document.getElementById('publicContainer');
-    if (formSec && pubCont && !pubCont.contains(formSec)) {
-      pubCont.insertBefore(formSec, document.getElementById('publicViewSection'));
-    }
-  }
-}
-
-// --- 15B. ADMIN SUMMARY REPORT ENGINE ---
 function renderAdminSummaryReport() {
   const tbody = document.getElementById('adminSummaryTableBody');
   const tfoot = document.getElementById('adminSummaryTableFoot');
-  const statsStrip = document.getElementById('summaryQuickStatsStrip');
   if (!tbody || !tfoot) return;
 
-  const searchTerm = (document.getElementById('summarySearchInput')?.value || '').toLowerCase().trim();
-  const networkFilter = document.getElementById('summaryNetworkFilter')?.value || 'ALL';
-  const ageFilter = document.getElementById('summaryAgeFilter')?.value || 'ALL';
-
-  const rows = [];
-
-  let totWorkingMonitors = 0;
-  let totWorkingCPUs = 0;
-  let totWorkingLaptops = 0;
-  let totAgeUnder8 = 0;
-  let totAgeOver8 = 0;
-  let totUpsWorking = 0;
-  let totUpsDefective = 0;
-  let totBatteriesInUse = 0;
-  let totMinBatteriesRequired = 0;
-  let totOfficesReported = 0;
-
-  // Only include offices that have entered data
-  const reportedOfficeNames = [
-    ...MVD_OFFICES.filter(name => !!inventoryStore[name]),
-    ...Object.keys(inventoryStore).filter(name => !MVD_OFFICES.includes(name))
-  ];
-
-  reportedOfficeNames.forEach(officeName => {
-    const rec = inventoryStore[officeName];
-    if (!rec) return;
-
-    if (searchTerm) {
-      const hay = (
-        officeName + ' ' +
-        (rec.availableNetwork || '') + ' ' +
-        (rec.operatingSystem || '') + ' ' +
-        (rec.networkSpeed || '') + ' ' +
-        (rec.entryOfficerName || '')
-      ).toLowerCase();
-      if (!hay.includes(searchTerm)) return;
-    }
-
-    if (networkFilter !== 'ALL') {
-      const nets = (rec.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision'));
-      if (networkFilter === 'Others') {
-        if (!nets.includes('Others') && !nets.some(n => !['KSWAN', 'KFONE', 'BSNL', 'JIO', 'Keralam Vision', 'Asianet'].includes(n))) {
-          return;
-        }
-      } else {
-        if (!nets.includes(networkFilter)) return;
-      }
-    }
-
+  const entries = Object.values(inventoryStore);
+  tbody.innerHTML = entries.map((rec, idx) => {
     const ageUnder8 = (rec.ageUnder3 || 0) + (rec.age3To5 || 0) + (rec.age5To8 || 0);
     const ageOver8 = rec.ageAbove8 || 0;
 
-    if (ageFilter === 'OVER8') {
-      if (ageOver8 <= 0) return;
-    } else if (ageFilter === 'UNDER8_ONLY') {
-      if (ageOver8 > 0) return;
-    }
-
-    totOfficesReported++;
-    totWorkingMonitors += (rec.monitorsWorking || 0);
-    totWorkingCPUs += (rec.cpuWorking || 0);
-    totWorkingLaptops += (rec.laptopsWorking || 0);
-    totAgeUnder8 += ageUnder8;
-    totAgeOver8 += ageOver8;
-    totUpsWorking += (rec.upsWorking || 0);
-    totUpsDefective += (rec.upsNotWorking || 0);
-    totBatteriesInUse += (rec.batteriesInUse || 0);
-    totMinBatteriesRequired += (rec.minBatteriesRequired || 0);
-
-    rows.push({
-      officeName,
-      rec,
-      ageUnder8,
-      ageOver8
-    });
-  });
-
-  if (statsStrip) {
-    statsStrip.innerHTML = `
-      <div><strong>Reported Offices:</strong> <span style="color:#047857; font-weight:800;">${totOfficesReported}</span> / ${MVD_OFFICES.length} Total</div>
-      <div><strong>Working Hardware:</strong> Monitors: <strong>${totWorkingMonitors}</strong> | CPUs: <strong>${totWorkingCPUs}</strong> | Laptops: <strong>${totWorkingLaptops}</strong></div>
-      <div><strong>Lifecycle Health:</strong> &lt;8 Yrs: <span style="color:#047857; font-weight:700;">${totAgeUnder8}</span> | &gt;8 Yrs: <span style="color:#b91c1c; font-weight:700;">${totAgeOver8}</span></div>
-      <div><strong>Power &amp; Batteries:</strong> UPS Working: <strong>${totUpsWorking}</strong> | Batteries: <strong>${totBatteriesInUse} / ${totMinBatteriesRequired}</strong></div>
-    `;
-  }
-
-  if (rows.length === 0) {
-    tbody.innerHTML = `
-      <tr>
-        <td colspan="10" style="text-align: center; padding: 32px; color: var(--text-muted);">
-          <i class="fa-solid fa-filter-circle-xmark" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 10px; display: block;"></i>
-          No entered office records matched the current summary filters.
-        </td>
-      </tr>
-    `;
-    tfoot.innerHTML = '';
-    return;
-  }
-
-  tbody.innerHTML = rows.map((item, idx) => {
-    const { officeName, rec, ageUnder8, ageOver8 } = item;
-
-    const rawNets = (rec.availableNetwork || '').split(',').map(s => s.trim().replace(/^Kerala Vision$/i, 'Keralam Vision')).filter(Boolean);
-    const netPills = rawNets.length > 0
-      ? rawNets.map(n => `<span class="badge" style="background:#e0f2fe; color:#0369a1; font-weight:700; padding:2px 6px; font-size:0.75rem; margin:1px;">${escapeHtml(n)}</span>`).join('')
-      : '<span class="badge" style="background:#f1f5f9; color:#64748b;">None Specified</span>';
-    const speedHtml = rec.networkSpeed
-      ? `<div style="font-size: 0.78rem; color: #475569; margin-top: 4px;"><i class="fa-solid fa-gauge-high" style="color:#0284c7;"></i> ${escapeHtml(rec.networkSpeed)}</div>`
-      : '';
-
-    const hwHtml = `
-      <div style="display: flex; flex-direction: column; gap: 3px;">
-        <span class="badge-pill-hardware"><i class="fa-solid fa-desktop" style="color:#2563eb;"></i> Monitors: <strong>${rec.monitorsWorking ?? 0}</strong></span>
-        <span class="badge-pill-hardware"><i class="fa-solid fa-microchip" style="color:#059669;"></i> CPUs: <strong>${rec.cpuWorking ?? 0}</strong></span>
-        <span class="badge-pill-hardware"><i class="fa-solid fa-laptop" style="color:#8b5cf6;"></i> Laptops: <strong>${rec.laptopsWorking ?? 0}</strong></span>
-      </div>
-    `;
-
-    const osHtml = `
-      <div style="font-weight: 600; color: #1e293b; line-height: 1.4;">
-        <i class="fa-solid fa-laptop-code" style="color:#3b82f6;"></i> ${escapeHtml(rec.operatingSystem || 'Not Specified')}
-      </div>
-    `;
-
-    const ageUnder8Html = `
-      <div style="text-align: center;">
-        <span class="badge-pill-age-safe" style="font-size: 0.92rem; font-weight: 800;">${ageUnder8}</span>
-        <div style="font-size: 0.7rem; color: #047857; margin-top: 2px;">&lt;8 Yrs Total</div>
-      </div>
-    `;
-
-    const ageOver8Html = `
-      <div style="text-align: center;">
-        <span class="${ageOver8 > 0 ? 'badge-pill-age-alert' : 'badge-pill-age-safe'}" style="font-size: 0.92rem; font-weight: 800;">${ageOver8}</span>
-        <div style="font-size: 0.7rem; color: ${ageOver8 > 0 ? '#b91c1c' : '#64748b'}; margin-top: 2px;">&gt;8 Yrs Total</div>
-      </div>
-    `;
-
-    const upsHtml = `
-      <div style="display: flex; flex-direction: column; gap: 3px; min-width: 120px;">
-        <span style="background: #ecfdf5; color: #065f46; border: 1px solid #a7f3d0; border-radius: 4px; padding: 2px 6px; font-weight: 700; font-size: 0.78rem;">
-          <i class="fa-solid fa-check"></i> Working: ${rec.upsWorking ?? 0}
-        </span>
-        <span style="background: ${(rec.upsNotWorking ?? 0) > 0 ? '#fef2f2' : '#f8fafc'}; color: ${(rec.upsNotWorking ?? 0) > 0 ? '#b91c1c' : '#64748b'}; border: 1px solid ${(rec.upsNotWorking ?? 0) > 0 ? '#fecaca' : '#e2e8f0'}; border-radius: 4px; padding: 2px 6px; font-weight: 700; font-size: 0.78rem;">
-          <i class="fa-solid ${(rec.upsNotWorking ?? 0) > 0 ? 'fa-triangle-exclamation' : 'fa-circle-minus'}"></i> Defective: ${rec.upsNotWorking ?? 0}
-        </span>
-      </div>
-    `;
-
-    const inUse = rec.batteriesInUse ?? 0;
-    const minReq = rec.minBatteriesRequired ?? 0;
-    const batHtml = `
-      <div style="text-align: center;">
-        <div style="font-size: 0.95rem; font-weight: 800;">
-          <span style="color: #047857;">${inUse}</span> / <span style="color: #1d4ed8;">${minReq}</span>
-        </div>
-        <div style="font-size: 0.7rem; color: #64748b; margin-top: 2px;">Currently Using / Min Required</div>
-      </div>
-    `;
-
     return `
       <tr>
-        <td style="text-align: center; color: var(--text-muted); font-size: 0.8rem;">${idx + 1}</td>
-        <td>
-          <div style="font-weight: 800; color: #0f172a;">${escapeHtml(officeName)}</div>
-          <div style="font-size: 0.74rem; color: #047857; margin-top: 2px;">
-            <i class="fa-solid fa-circle-check"></i> Recorded (${escapeHtml(rec.entryOfficerName || 'Officer')})
-          </div>
-        </td>
-        <td>${netPills}${speedHtml}</td>
-        <td>${hwHtml}</td>
-        <td>${osHtml}</td>
-        <td>${ageUnder8Html}</td>
-        <td>${ageOver8Html}</td>
-        <td>${upsHtml}</td>
-        <td>${batHtml}</td>
+        <td style="text-align: center;">${idx + 1}</td>
+        <td><strong>${escapeHtml(rec.officeName)}</strong></td>
+        <td>${escapeHtml(rec.availableNetwork)} <small>(${escapeHtml(rec.networkSpeed || '')})</small></td>
+        <td>Monitors: <strong>${rec.monitorsWorking}</strong> | CPUs: <strong>${rec.cpuWorking}</strong> | Laptops: <strong>${rec.laptopsWorking}</strong></td>
+        <td>${escapeHtml(rec.operatingSystem || 'N/A')}</td>
+        <td style="text-align: center;"><span class="badge-pill-age-safe">${ageUnder8}</span></td>
+        <td style="text-align: center;"><span class="${ageOver8 > 0 ? 'badge-pill-age-alert' : 'badge-pill-age-safe'}">${ageOver8}</span></td>
+        <td style="text-align: center;">${rec.upsWorking} W / ${rec.upsNotWorking} NW</td>
+        <td style="text-align: center;">${rec.batteriesInUse || 0} / ${rec.minBatteriesRequired || 0}</td>
         <td style="text-align: center;">
-          <div style="display: flex; gap: 4px; justify-content: center;">
-            <button class="btn btn-outline btn-sm" onclick="editOfficeInAdmin('${escapeHtml(officeName)}')" title="Edit Office Entry">
-              <i class="fa-solid fa-pen"></i>
-            </button>
-            <button class="btn btn-danger btn-sm" onclick="deleteOfficeEntry('${escapeHtml(officeName)}')" title="Delete Record from Supabase">
-              <i class="fa-solid fa-trash"></i>
-            </button>
-          </div>
+          <button class="btn btn-outline btn-sm" onclick="openEnteredOfficeSummaryWindow('${escapeHtml(rec.officeName)}')"><i class="fa-solid fa-eye"></i></button>
         </td>
       </tr>
     `;
   }).join('');
-
-  tfoot.innerHTML = `
-    <tr>
-      <th style="text-align: center;">Σ</th>
-      <th>Statewide Total (${totOfficesReported} Offices)</th>
-      <th>Multiple Networks Active</th>
-      <th>
-        <div style="display:flex; flex-direction:column; gap:2px; font-size:0.8rem;">
-          <span>Monitors: <strong>${totWorkingMonitors}</strong></span>
-          <span>CPUs: <strong>${totWorkingCPUs}</strong></span>
-          <span>Laptops: <strong>${totWorkingLaptops}</strong></span>
-        </div>
-      </th>
-      <th>Statewide Standard</th>
-      <th style="text-align: center; font-size: 1rem; color: #86efac;">${totAgeUnder8}</th>
-      <th style="text-align: center; font-size: 1rem; color: #fca5a5;">${totAgeOver8}</th>
-      <th>
-        <div style="text-align: center; font-size: 0.82rem;">
-          <span style="color:#86efac;">Working: ${totUpsWorking}</span><br>
-          <span style="color:#fca5a5;">Defective: ${totUpsDefective}</span>
-        </div>
-      </th>
-      <th style="text-align: center;">
-        <div style="font-size: 1rem; font-weight: 800;">
-          <span style="color:#86efac;">${totBatteriesInUse}</span> / <span style="color:#93c5fd;">${totMinBatteriesRequired}</span>
-        </div>
-        <div style="font-size: 0.72rem; color: #cbd5e1;">In Use / Min Required</div>
-      </th>
-      <th style="text-align: center; color: #94a3b8;">—</th>
-    </tr>
-  `;
 }
 
 function resetSummaryFilters() {
-  const searchInput = document.getElementById('summarySearchInput');
-  const netFilter = document.getElementById('summaryNetworkFilter');
-  const ageFilter = document.getElementById('summaryAgeFilter');
-
-  if (searchInput) searchInput.value = '';
-  if (netFilter) netFilter.value = 'ALL';
-  if (ageFilter) ageFilter.value = 'ALL';
-
   renderAdminSummaryReport();
-  showToast('Summary report filters reset', 'info');
 }
 
 function exportSummaryReportCSV() {
-  const headers = [
-    "Sl No",
-    "Office Name",
-    "Network",
-    "Network Speed",
-    "Working Monitors",
-    "Working CPUs",
-    "Working Laptops",
-    "Operating System(s) used with versions",
-    "Systems age <8 years",
-    "Systems age >8 years",
-    "UPS Working",
-    "UPS Defective",
-    "Number of Batteries currently using",
-    "Minimum Number of Batteries Required"
-  ];
+  exportDataToCSV();
+}
 
-  const rows = [];
-  let idx = 1;
+function printSummaryReport() {
+  window.print();
+}
 
-  const reportedOfficeNames = [
-    ...MVD_OFFICES.filter(name => !!inventoryStore[name]),
-    ...Object.keys(inventoryStore).filter(name => !MVD_OFFICES.includes(name))
-  ];
+function exportDataToCSV() {
+  const entries = Object.values(inventoryStore);
+  if (entries.length === 0) return;
 
-  reportedOfficeNames.forEach(officeName => {
-    const rec = inventoryStore[officeName];
-    if (!rec) return;
-
-    const ageUnder8 = (rec.ageUnder3 || 0) + (rec.age3To5 || 0) + (rec.age5To8 || 0);
-    const ageOver8 = rec.ageAbove8 || 0;
-
-    rows.push([
-      idx++,
-      `"${officeName.replace(/"/g, '""')}"`,
-      `"${(rec.availableNetwork || '').replace(/"/g, '""')}"`,
-      `"${(rec.networkSpeed || 'N/A').replace(/"/g, '""')}"`,
-      rec.monitorsWorking ?? 0,
-      rec.cpuWorking ?? 0,
-      rec.laptopsWorking ?? 0,
-      `"${(rec.operatingSystem || 'Not Specified').replace(/"/g, '""')}"`,
-      ageUnder8,
-      ageOver8,
-      rec.upsWorking ?? 0,
-      rec.upsNotWorking ?? 0,
-      rec.batteriesInUse ?? 0,
-      rec.minBatteriesRequired ?? 0
-    ]);
-  });
+  const headers = ["Office Name", "Network", "Operating System", "Monitors Working", "Monitors Not Working", "CPUs Working", "CPUs Not Working", "Laptops Working", "Laptops Not Working", "UPS Working", "UPS Not Working", "Last Updated"];
+  const rows = entries.map(e => [
+    `"${e.officeName}"`, `"${e.availableNetwork}"`, `"${e.operatingSystem}"`,
+    e.monitorsWorking, e.monitorsNotWorking, e.cpuWorking, e.cpuNotWorking,
+    e.laptopsWorking, e.laptopsNotWorking, e.upsWorking, e.upsNotWorking, `"${e.lastUpdated}"`
+  ]);
 
   const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `MVD_IT_Equipment_Summary_Report_Keralam_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute("download", `MVD_IT_Equipment_Report_${new Date().toISOString().slice(0, 10)}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  showToast('Summary Report CSV downloaded successfully!', 'success');
+  showToast('IT Equipment CSV exported', 'success');
 }
 
-function printSummaryReport() {
-  const printWin = window.open('', '_blank', 'width=1200,height=800');
-  if (!printWin) {
-    showToast('Popup blocker blocked print window. Please allow popups for this site.', 'warning');
-    return;
-  }
+// --- 18. MODULE & MENU MANAGER ---
+function renderMenuManagerUI() {
+  const container = document.getElementById('menuManagerContainer');
+  if (!container) return;
 
-  const tableHtml = document.getElementById('adminSummaryReportTable')?.outerHTML || '';
-  const now = new Date();
-  const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  container.innerHTML = portalModules.map(mod => `
+    <div style="background: #ffffff; border-radius: var(--radius-md); border: 1.5px solid var(--border-color); padding: 20px; box-shadow: var(--shadow-sm); display: flex; flex-direction: column; justify-content: space-between;">
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            <div style="width: 40px; height: 40px; border-radius: 8px; background: var(--primary-100); color: var(--primary-600); display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+              <i class="fa-solid ${mod.icon || 'fa-cube'}"></i>
+            </div>
+            <div>
+              <h4 style="font-size: 1rem; color: var(--primary-900); font-weight: 700;">${escapeHtml(mod.title)}</h4>
+              <span class="badge ${mod.visible ? 'badge-working' : 'badge-danger'}">
+                ${mod.visible ? 'VISIBLE TO USERS' : 'HIDDEN'}
+              </span>
+            </div>
+          </div>
+          
+          <label class="switch">
+            <input type="checkbox" ${mod.visible ? 'checked' : ''} onchange="toggleModuleVisibility('${mod.id}', this.checked)">
+            <span class="slider"></span>
+          </label>
+        </div>
 
-  printWin.document.write(`
-    <!DOCTYPE html>
-    <html>
-    <head>
-      <title>Keralam MVD - IT Equipment Summary Report</title>
-      <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;600;700;800&display=swap" rel="stylesheet">
-      <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-      <style>
-        body { font-family: 'Plus Jakarta Sans', sans-serif; padding: 24px; color: #1e293b; background: #ffffff; }
-        .header { display: flex; align-items: center; justify-content: space-between; border-bottom: 3px solid #0B3B24; padding-bottom: 14px; margin-bottom: 16px; }
-        .title-group h1 { font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase; }
-        .title-group p { font-size: 0.85rem; color: #047857; margin: 3px 0 0 0; font-weight: 700; }
-        .badge { background: #d1fae5; color: #065f46; font-weight: 700; padding: 4px 10px; border-radius: 4px; font-size: 0.78rem; display: inline-block; }
-        .badge-pill-hardware { display: inline-block; padding: 2px 6px; font-size: 0.75rem; border: 1px solid #cbd5e1; border-radius: 4px; margin: 1px 0; }
-        .badge-pill-age-safe { display: inline-block; padding: 2px 6px; background: #ecfdf5; color: #047857; border: 1px solid #a7f3d0; border-radius: 4px; font-weight: 700; }
-        .badge-pill-age-alert { display: inline-block; padding: 2px 6px; background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca; border-radius: 4px; font-weight: 700; }
-        table { width: 100%; border-collapse: collapse; font-size: 8.5pt; margin-top: 14px; }
-        th, td { padding: 8px; border: 1px solid #cbd5e1; text-align: left; vertical-align: middle; }
-        th { background: #0f2b48 !important; color: #ffffff !important; font-weight: 700; font-size: 8pt; text-transform: uppercase; }
-        tfoot th { background: #0a192f !important; color: #ffffff !important; font-size: 8.5pt; }
-        th:last-child, td:last-child { display: none !important; }
-        .footer { margin-top: 24px; border-top: 1px solid #cbd5e1; padding-top: 12px; display: flex; justify-content: space-between; font-size: 0.78rem; color: #64748b; }
-        @media print {
-          body { padding: 10px; }
-          button { display: none !important; }
-          th:last-child, td:last-child { display: none !important; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="header">
-        <div class="title-group">
-          <h1>Motor Vehicles Department • Government of Keralam</h1>
-          <p>STATEWIDE IT EQUIPMENT INVENTORY SUMMARY AUDIT REPORT</p>
-        </div>
-        <div style="text-align: right; font-size: 0.78rem; color: #475569;">
-          <div><strong>Generated On:</strong> ${formattedDate}</div>
-        </div>
+        <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.4;">${escapeHtml(mod.description)}</p>
       </div>
 
-      ${tableHtml}
-
-      <div class="footer">
-        <span>Motor Vehicles Department, Keralam • Data AI Foundry</span>
-        <span>Departmental IT Audit Summary</span>
+      <div style="margin-top: 16px; border-top: 1px dashed var(--border-color); padding-top: 8px; display: flex; justify-content: space-between; align-items: center;">
+        <small style="color: var(--text-light);">Code: <code>${mod.id}</code></small>
+        ${(mod.id !== 'it_equipment_list' && mod.id !== 'officer_training_qualification') ? `<button class="btn btn-outline btn-sm" onclick="removeModule('${mod.id}')" style="color: #b91c1c; border-color: #fca5a5;"><i class="fa-solid fa-trash"></i> Remove</button>` : `<small style="color: #059669; font-weight: 700;">Core Module</small>`}
       </div>
-
-      <script>
-        window.onload = function() { window.print(); };
-      </script>
-    </body>
-    </html>
-  `);
-  printWin.document.close();
+    </div>
+  `).join('');
 }
 
-// --- 16. HIDE IT EQUIPMENT LIST PROVISION (GLOBAL TOGGLE) ---
-async function togglePublicVisibility(isPublic) {
-  appSettings.publicVisible = isPublic;
-  
-  const itMod = portalModules.find(m => m.id === 'it_equipment_list');
-  if (itMod) itMod.visible = isPublic;
+async function toggleModuleVisibility(moduleId, isVisible) {
+  const mod = portalModules.find(m => m.id === moduleId);
+  if (mod) {
+    mod.visible = isVisible;
+    localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
 
-  localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
-  localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
+    if (moduleId === 'it_equipment_list') {
+      appSettings.publicVisible = isVisible;
+      localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
+    }
 
-  renderPortalMenuBar();
-  syncPublicVisibilityUI();
-  renderMenuManagerUI();
-  await saveSettingsToSupabase(isPublic);
+    renderPortalMenuBar();
+    renderMenuManagerUI();
+    syncPublicVisibilityUI();
 
-  if (isPublic) {
-    showToast('Public View is now ENABLED for all users.', 'success');
-  } else {
-    showToast('Public View is now HIDDEN/RESTRICTED.', 'warning');
+    await saveSettingsToSupabase(appSettings.publicVisible);
+    showToast(`Module "${mod.title}" is now ${isVisible ? 'VISIBLE' : 'HIDDEN'}`, 'info');
   }
 }
 
 function syncPublicVisibilityUI() {
-  const toggle = document.getElementById('adminPublicVisibilityToggle');
-  const label = document.getElementById('publicVisibilityLabel');
-
-  const itMod = portalModules.find(m => m.id === 'it_equipment_list');
-  const isVisible = appSettings.publicVisible && (itMod ? itMod.visible : true);
-
-  if (toggle) toggle.checked = isVisible;
-  if (label) {
-    label.textContent = isVisible ? 'Status: PUBLIC CAN VIEW' : 'Status: HIDDEN FROM PUBLIC';
-    label.style.color = isVisible ? '#a7f3d0' : '#fca5a5';
-  }
-
   if (activeSession === 'public') {
     selectModuleMenu(activeModuleId);
   }
 }
 
-// --- 17. OFFICE DETAILS MODAL ---
-function viewOfficeDetail(officeName) {
-  const item = inventoryStore[officeName];
-  if (!item) return;
+function openAddMenuModal() {
+  document.getElementById('addMenuModal').style.display = 'flex';
+  document.getElementById('newMenuTitleInput').value = '';
+  document.getElementById('newMenuDescInput').value = '';
+}
 
-  const modal = document.getElementById('officeDetailModal');
-  const title = document.getElementById('modalOfficeTitle');
-  const body = document.getElementById('modalOfficeBody');
+function closeAddMenuModal() {
+  document.getElementById('addMenuModal').style.display = 'none';
+}
 
-  title.innerHTML = `<i class="fa-solid fa-building-circle-check"></i> ${escapeHtml(item.officeName)}`;
+async function handleAddMenuSubmit(e) {
+  e.preventDefault();
+  const title = document.getElementById('newMenuTitleInput').value.trim();
+  const icon = document.getElementById('newMenuIconInput').value.trim() || 'fa-cube';
+  const description = document.getElementById('newMenuDescInput').value.trim() || 'Departmental module.';
 
-  const p = item.printers || {};
+  if (!title) return;
 
-  body.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 16px;">
-      <div style="background: #f1f5f9; padding: 12px; border-radius: 8px;">
-        <strong>Network & OS:</strong> ${escapeHtml(item.availableNetwork)} (${escapeHtml(item.networkSpeed || 'N/A')})<br>
-        <strong>OS Version:</strong> ${escapeHtml(item.operatingSystem)}<br>
-        <strong>Reporting Officer:</strong> ${escapeHtml(item.entryOfficerName || 'N/A')} (${escapeHtml(item.entryOfficerDesignation || 'Officer')})<br>
-        <strong>Mobile Number:</strong> 📞 ${escapeHtml(item.entryOfficerMobile || 'N/A')}<br>
-        <small style="color: var(--text-muted);">Last Updated: ${escapeHtml(item.lastUpdated || 'N/A')}</small>
+  const id = title.toLowerCase().replace(/[^a-z0-9]/g, '_');
+  if (portalModules.some(m => m.id === id)) {
+    showToast('A module with a similar title already exists.', 'warning');
+    return;
+  }
+
+  const newModule = {
+    id,
+    title,
+    icon: icon.startsWith('fa-') ? icon : `fa-${icon}`,
+    description,
+    visible: true
+  };
+
+  portalModules.push(newModule);
+  localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
+
+  closeAddMenuModal();
+  renderPortalMenuBar();
+  renderMenuManagerUI();
+  await saveSettingsToSupabase(appSettings.publicVisible);
+
+  showToast(`Module "${title}" added successfully!`, 'success');
+}
+
+async function removeModule(moduleId) {
+  if (confirm(`Remove custom module "${moduleId}"?`)) {
+    portalModules = portalModules.filter(m => m.id !== moduleId);
+    localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
+    renderPortalMenuBar();
+    renderMenuManagerUI();
+    await saveSettingsToSupabase(appSettings.publicVisible);
+    showToast(`Removed module ${moduleId}`, 'info');
+  }
+}
+
+// --- 19. COMPREHENSIVE REPORT GENERATION ---
+function generateComprehensiveReport() {
+  const modal = document.getElementById('comprehensiveReportModal');
+  const reportBody = document.getElementById('compReportContent');
+  if (!modal || !reportBody) return;
+
+  const entries = Object.values(inventoryStore);
+  const now = new Date();
+  const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  reportBody.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0B3B24; padding-bottom: 16px; margin-bottom: 20px;">
+      <div style="display: flex; align-items: center; gap: 16px;">
+        <img src="mvd_logo.png" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Emblem_of_Kerala.svg/200px-Emblem_of_Kerala.svg.png'" alt="MVD Emblem" style="height: 64px; width: auto;">
+        <div>
+          <h2 style="font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Keralam</h2>
+          <h4 style="font-size: 1.05rem; color: #047857; margin: 3px 0 0 0; font-weight: 700;">STATEWIDE IT INFRASTRUCTURE COMPREHENSIVE AUDIT REPORT</h4>
+        </div>
       </div>
-
-      <div>
-        <h4 style="margin-bottom: 8px; color: var(--primary-900);"><i class="fa-solid fa-desktop"></i> Core Hardware Status</h4>
-        <ul style="list-style: none; padding-left: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <li>Monitors: <strong>${item.monitorsWorking} Working</strong> / <span style="color:#b91c1c;">${item.monitorsNotWorking} NW</span></li>
-          <li>CPUs: <strong>${item.cpuWorking} Working</strong> / <span style="color:#b91c1c;">${item.cpuNotWorking} NW</span></li>
-          <li>Laptops: <strong>${item.laptopsWorking} Working</strong> / <span style="color:#b91c1c;">${item.laptopsNotWorking} NW</span></li>
-          <li>AIO PCs: <strong>${item.aioWorking} Working</strong> / <span style="color:#b91c1c;">${item.aioNotWorking} NW</span></li>
-        </ul>
-      </div>
-
-      <div>
-        <h4 style="margin-bottom: 8px; color: var(--primary-900);"><i class="fa-solid fa-print"></i> Printer Breakdown</h4>
-        <table class="printers-table">
-          <thead>
-            <tr><th>Type</th><th>Working</th><th>Not Working</th><th>Multipurpose</th></tr>
-          </thead>
-          <tbody>
-            <tr><td>Dot Matrix</td><td>${p.dotMatrix?.working || 0}</td><td>${p.dotMatrix?.notWorking || 0}</td><td>${p.dotMatrix?.multipurpose ? 'Yes' : 'No'}</td></tr>
-            <tr><td>Inkjet</td><td>${p.inkjet?.working || 0}</td><td>${p.inkjet?.notWorking || 0}</td><td>${p.inkjet?.multipurpose ? 'Yes' : 'No'}</td></tr>
-            <tr><td>Laser</td><td>${p.laser?.working || 0}</td><td>${p.laser?.notWorking || 0}</td><td>${p.laser?.multipurpose ? 'Yes' : 'No'}</td></tr>
-            <tr><td>Xerox</td><td>${p.xerox?.working || 0}</td><td>${p.xerox?.notWorking || 0}</td><td>${p.xerox?.multipurpose ? 'Yes' : 'No'}</td></tr>
-            <tr><td>Others</td><td>${p.others?.working || 0}</td><td>${p.others?.notWorking || 0}</td><td>${p.others?.multipurpose ? 'Yes' : 'No'}</td></tr>
-          </tbody>
-        </table>
-      </div>
-
-      <div>
-        <h4 style="margin-bottom: 8px; color: var(--primary-900);"><i class="fa-solid fa-car-battery"></i> UPS & Batteries</h4>
-        <p>UPS: <strong>${item.upsWorking} Working</strong> / ${item.upsNotWorking} Not Working</p>
-        <p>Batteries: <strong>${item.batteriesInUse} In Use</strong> / ${item.batteriesNotInUse} Unused</p>
-      </div>
-
-      <div>
-        <h4 style="margin-bottom: 8px; color: var(--primary-900);"><i class="fa-solid fa-hourglass-half"></i> System Age Profile</h4>
-        <p>&lt; 3 Yrs: ${item.ageUnder3 || 0} | 3–5 Yrs: ${item.age3To5 || 0} | 5–8 Yrs: ${item.age5To8 || 0} | <strong>&gt; 8 Yrs: ${item.ageAbove8 || 0}</strong></p>
-      </div>
-
-      <div style="background: #fef2f2; border: 1px solid #fca5a5; padding: 12px; border-radius: 8px; color: #991b1b;">
-        <strong>Remarks & Specific Condition:</strong><br>
-        ${escapeHtml(item.remarks || 'No specific remarks entered.')}
-      </div>
+      <div><strong>Generated On:</strong> ${formattedDate}</div>
     </div>
+
+    <table class="data-table">
+      <thead>
+        <tr style="background: #0B3B24; color: white;">
+          <th>Office Name</th><th>Monitors (W/NW)</th><th>CPUs (W/NW)</th><th>Laptops (W/NW)</th><th>UPS</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${entries.map(e => `
+          <tr>
+            <td><strong>${escapeHtml(e.officeName)}</strong></td>
+            <td>${e.monitorsWorking} / ${e.monitorsNotWorking}</td>
+            <td>${e.cpuWorking} / ${e.cpuNotWorking}</td>
+            <td>${e.laptopsWorking} / ${e.laptopsNotWorking}</td>
+            <td>${e.upsWorking} / ${e.upsNotWorking}</td>
+          </tr>
+        `).join('')}
+      </tbody>
+    </table>
   `;
 
   modal.style.display = 'flex';
 }
 
-function closeOfficeDetailModal() {
-  document.getElementById('officeDetailModal').style.display = 'none';
+function closeComprehensiveReportModal() {
+  document.getElementById('comprehensiveReportModal').style.display = 'none';
 }
 
-// --- 18. CSV EXPORTER ---
-function exportDataToCSV() {
-  const entries = Object.values(inventoryStore);
-  if (entries.length === 0) {
-    showToast('No data available to export', 'warning');
-    return;
-  }
-
-  const headers = [
-    "Office Name", "Entry Officer Name", "Designation", "Mobile Number", "Network", "Network Details", "Network Speed", "Operating System",
-    "Monitors Working", "Monitors Not Working", "CPU Working", "CPU Not Working",
-    "Laptops Working", "Laptops Not Working", "AIO Working", "AIO Not Working",
-    "Dot Matrix Working", "Dot Matrix Not Working", "Dot Matrix Multi",
-    "Inkjet Working", "Inkjet Not Working", "Inkjet Multi",
-    "Laser Working", "Laser Not Working", "Laser Multi",
-    "Xerox Working", "Xerox Not Working", "Xerox Multi",
-    "Other Printers Working", "Other Printers Not Working", "Other Printers Multi",
-    "UPS Working", "UPS Not Working", "Batteries In Use", "Batteries Not In Use",
-    "Systems Under 3 Yrs", "Systems 3-5 Yrs", "Systems 5-8 Yrs", "Systems Above 8 Yrs",
-    "Desktop Units Not Working", "Remarks", "Last Updated"
-  ];
-
-  const csvRows = [headers.join(',')];
-
-  entries.forEach(e => {
-    const p = e.printers || {};
-    const row = [
-      `"${(e.officeName || '').replace(/"/g, '""')}"`,
-      `"${(e.entryOfficerName || '').replace(/"/g, '""')}"`,
-      `"${(e.entryOfficerDesignation || '').replace(/"/g, '""')}"`,
-      `"${(e.entryOfficerMobile || '').replace(/"/g, '""')}"`,
-      `"${(e.availableNetwork || '').replace(/"/g, '""')}"`,
-      `"${(e.otherNetworkDetails || '').replace(/"/g, '""')}"`,
-      `"${(e.networkSpeed || '').replace(/"/g, '""')}"`,
-      `"${(e.operatingSystem || '').replace(/"/g, '""')}"`,
-      e.monitorsWorking || 0, e.monitorsNotWorking || 0,
-      e.cpuWorking || 0, e.cpuNotWorking || 0,
-      e.laptopsWorking || 0, e.laptopsNotWorking || 0,
-      e.aioWorking || 0, e.aioNotWorking || 0,
-      p.dotMatrix?.working || 0, p.dotMatrix?.notWorking || 0, p.dotMatrix?.multipurpose ? 'Yes' : 'No',
-      p.inkjet?.working || 0, p.inkjet?.notWorking || 0, p.inkjet?.multipurpose ? 'Yes' : 'No',
-      p.laser?.working || 0, p.laser?.notWorking || 0, p.laser?.multipurpose ? 'Yes' : 'No',
-      p.xerox?.working || 0, p.xerox?.notWorking || 0, p.xerox?.multipurpose ? 'Yes' : 'No',
-      p.others?.working || 0, p.others?.notWorking || 0, p.others?.multipurpose ? 'Yes' : 'No',
-      e.upsWorking || 0, e.upsNotWorking || 0,
-      e.batteriesInUse || 0, e.batteriesNotInUse || 0,
-      e.ageUnder3 || 0, e.age3To5 || 0, e.age5To8 || 0, e.ageAbove8 || 0,
-      e.desktopNotWorkingSummary || 0,
-      `"${(e.remarks || '').replace(/"/g, '""')}"`,
-      `"${(e.lastUpdated || '').replace(/"/g, '""')}"`
-    ];
-    csvRows.push(row.join(','));
-  });
-
-  const blob = new Blob([csvRows.join('\n')], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.setAttribute('href', url);
-  link.setAttribute('download', `MVD_IT_Equipment_Inventory_${new Date().toISOString().slice(0, 10)}.csv`);
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
-
-  showToast('CSV Inventory export downloaded successfully!', 'success');
+function triggerReportPrint() {
+  window.print();
 }
 
-// --- 19. TOAST NOTIFICATIONS ---
+// --- 20. TOAST NOTIFICATIONS & UTILITIES ---
 function showToast(message, type = 'info') {
   const container = document.getElementById('toastContainer');
   if (!container) return;
@@ -3529,7 +2920,6 @@ function showToast(message, type = 'info') {
   }, 3500);
 }
 
-// --- 20. UTILITIES ---
 function escapeHtml(str) {
   if (!str) return '';
   return String(str)
@@ -3538,408 +2928,4 @@ function escapeHtml(str) {
     .replace(/>/g, '&gt;')
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
-}
-
-// --- 21. MOBILE NAVIGATION SIDEBAR DRAWER CONTROLLER ---
-function toggleMobileSidebar(forceState) {
-  const sidebar = document.getElementById('portalSidebar');
-  const overlay = document.getElementById('mobileSidebarOverlay');
-
-  if (!sidebar) return;
-
-  if (typeof forceState === 'boolean') {
-    if (forceState) {
-      sidebar.classList.add('mobile-open');
-      if (overlay) overlay.classList.add('active');
-    } else {
-      sidebar.classList.remove('mobile-open');
-      if (overlay) overlay.classList.remove('active');
-    }
-  } else {
-    const isOpen = sidebar.classList.toggle('mobile-open');
-    if (overlay) overlay.classList.toggle('active', isOpen);
-  }
-}
-
-// --- 22. COMPREHENSIVE AUDIT REPORT GENERATION ENGINE ---
-let chartCompHealthInstance = null;
-let chartCompAgeInstance = null;
-let chartCompUpsConditionInstance = null;
-let chartCompUpsCapacityInstance = null;
-
-function generateComprehensiveReport() {
-  const modal = document.getElementById('comprehensiveReportModal');
-  const reportBody = document.getElementById('compReportContent');
-  if (!modal || !reportBody) return;
-
-  const filterVal = document.getElementById('dashboardOfficeFilter')?.value || 'ALL';
-  let entries = Object.values(inventoryStore);
-  if (filterVal !== 'ALL') {
-    entries = inventoryStore[filterVal] ? [inventoryStore[filterVal]] : [];
-  }
-
-  const totalOffices = filterVal === 'ALL' ? entries.length : (entries.length > 0 ? 1 : 0);
-  const pendingOffices = MVD_OFFICES.filter(off => !inventoryStore[off]);
-
-  let totalSystems = 0;
-  let totalWorkingHW = 0;
-  let totalNotWorkingHW = 0;
-  let govNetworkCount = 0;
-  let switchesCount = 0;
-  let serversCount = 0;
-  let upsWorkingCount = 0;
-  let upsNotWorkingCount = 0;
-  let serviceReportsSentCount = 0;
-  let totalBatteriesInUse = 0;
-  let totalMinBatteries = 0;
-
-  let totalUnder3 = 0, total3To5 = 0, total5To8 = 0, totalAbove8 = 0;
-
-  const upsConditionCounts = { 'Good': 0, 'Working with Minor Issues': 0, 'Requires Repair': 0, 'Not Working': 0 };
-  const upsCapacityCounts = { '0.5 kVA': 0, '1 kVA': 0, '2 kVA': 0, '3 kVA': 0, '5 kVA': 0, '10 kVA': 0, 'Other': 0 };
-
-  entries.forEach(e => {
-    const sys = (e.monitorsWorking + e.monitorsNotWorking + e.cpuWorking + e.cpuNotWorking + e.laptopsWorking + e.laptopsNotWorking + e.aioWorking + e.aioNotWorking);
-    totalSystems += sys;
-
-    totalWorkingHW += (e.monitorsWorking + e.cpuWorking + e.laptopsWorking + e.aioWorking);
-    totalNotWorkingHW += (e.monitorsNotWorking + e.cpuNotWorking + e.laptopsNotWorking + e.aioNotWorking);
-
-    if (e.availableNetwork === 'KSWAN' || e.availableNetwork === 'KFONE') govNetworkCount++;
-    if (e.switchesAvailable === 'Yes') switchesCount++;
-    if (e.serversAvailable === 'Yes') serversCount++;
-
-    upsWorkingCount += (e.upsWorking || 0);
-    upsNotWorkingCount += (e.upsNotWorking || 0);
-    if (e.serviceReportSent === 'Yes') serviceReportsSentCount++;
-
-    totalBatteriesInUse += (e.batteriesInUse || 0);
-    totalMinBatteries += (e.minBatteriesRequired || 0);
-
-    totalUnder3 += (e.ageUnder3 || 0);
-    total3To5 += (e.age3To5 || 0);
-    total5To8 += (e.age5To8 || 0);
-    totalAbove8 += (e.ageAbove8 || 0);
-
-    if (e.upsCondition && upsConditionCounts[e.upsCondition] !== undefined) {
-      upsConditionCounts[e.upsCondition]++;
-    } else if (e.upsCondition) {
-      upsConditionCounts['Working with Minor Issues']++;
-    }
-
-    if (e.upsCapacity && upsCapacityCounts[e.upsCapacity] !== undefined) {
-      upsCapacityCounts[e.upsCapacity]++;
-    } else if (e.upsCapacity) {
-      upsCapacityCounts['Other']++;
-    }
-  });
-
-  const now = new Date();
-  const formattedDate = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
-
-  reportBody.innerHTML = `
-    <!-- Report Top Official Header -->
-    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid #0B3B24; padding-bottom: 16px; margin-bottom: 20px;">
-      <div style="display: flex; align-items: center; gap: 16px;">
-        <img src="mvd_logo.png" alt="MVD Emblem" style="height: 64px; width: auto;">
-        <div>
-          <h2 style="font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Keralam</h2>
-          <h4 style="font-size: 1.05rem; color: #047857; margin: 3px 0 0 0; font-weight: 700;">STATEWIDE IT & POWER INFRASTRUCTURE COMPREHENSIVE AUDIT REPORT</h4>
-          <span style="font-size: 0.8rem; color: #64748b;">Transport Commissionerate, Thiruvananthapuram • IT Audit Division</span>
-        </div>
-      </div>
-      <div style="text-align: right; font-size: 0.82rem; color: #334155; line-height: 1.45; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid #e2e8f0;">
-        <div><strong>Generated On:</strong> ${formattedDate}</div>
-        <div><strong>Filter Scope:</strong> ${filterVal === 'ALL' ? 'Statewide Aggregate' : filterVal}</div>
-        <div><strong>Reported Offices:</strong> ${totalOffices} / ${MVD_OFFICES.length}</div>
-        <div><strong>Backend Sync:</strong> Live Supabase Verified</div>
-      </div>
-    </div>
-
-    <!-- Executive KPI Audit Block -->
-    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 24px;">
-      <div style="background: #f0fdf4; border: 1px solid #a7f3d0; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #047857;">OFFICES REPORTED</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #064e3b; margin-top: 2px;">${totalOffices} / ${MVD_OFFICES.length}</div>
-      </div>
-      <div style="background: #fffbe6; border: 1px solid #ffe58f; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #b45309;">TOTAL IT HARDWARE</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #78350f; margin-top: 2px;">${totalSystems} Units</div>
-      </div>
-      <div style="background: #fef2f2; border: 1px solid #fecdd3; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #b91c1c;">DEFECTIVE HARDWARE</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #991b1b; margin-top: 2px;">${totalNotWorkingHW} Units</div>
-      </div>
-      <div style="background: #ecfeff; border: 1px solid #a5f3fc; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #0891b2;">KSWAN / KFONE COVERAGE</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #164e63; margin-top: 2px;">${govNetworkCount} Offices</div>
-      </div>
-      <div style="background: #eff6ff; border: 1px solid #bfdbfe; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #1d4ed8;">SWITCHES / SERVERS</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #1e40af; margin-top: 2px;">${switchesCount} / ${serversCount}</div>
-      </div>
-      <div style="background: #f0fdf4; border: 1px solid #a7f3d0; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #047857;">WORKING UPS UNITS</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #064e3b; margin-top: 2px;">${upsWorkingCount} Units</div>
-      </div>
-      <div style="background: #fef2f2; border: 1px solid #fecdd3; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #b91c1c;">DEFECTIVE UPS UNITS</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #991b1b; margin-top: 2px;">${upsNotWorkingCount} Units</div>
-      </div>
-      <div style="background: #fcf6e6; border: 1px solid #fde68a; padding: 12px; border-radius: 8px; text-align: center;">
-        <span style="font-size: 0.76rem; font-weight: 700; color: #d97706;">TCO REPORTS SENT</span>
-        <div style="font-size: 1.3rem; font-weight: 800; color: #92400e; margin-top: 2px;">${serviceReportsSentCount} Offices</div>
-      </div>
-    </div>
-
-    <!-- CHARTS & VISUAL AUDIT SECTION -->
-    <div style="margin-bottom: 28px; page-break-inside: avoid;">
-      <h3 style="font-size: 1.05rem; color: #0B3B24; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 16px;">
-        <i class="fa-solid fa-chart-pie"></i> Visual Audits & Distribution Charts
-      </h3>
-
-      <div class="comp-chart-grid" style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px;">
-        <!-- Chart 1: Hardware Equipment Health -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-desktop"></i> Hardware Equipment Health (Working vs Defective)
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompHardwareHealth"></canvas>
-          </div>
-        </div>
-
-        <!-- Chart 2: System Age Profile Distribution -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-hourglass-half"></i> System Age Profile Distribution
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompAge"></canvas>
-          </div>
-        </div>
-
-        <!-- Chart 3: UPS & Power Equipment Working Condition Status -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-bolt"></i> UPS Working Condition & Defect Status
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompUpsCondition"></canvas>
-          </div>
-        </div>
-
-        <!-- Chart 4: UPS Capacity & TCO Service Reports Status -->
-        <div class="comp-chart-box" style="border: 1px solid #e2e8f0; padding: 14px; border-radius: 8px; background: #ffffff;">
-          <h4 style="font-size: 0.88rem; color: #0f172a; margin: 0 0 10px 0; text-align: center;">
-            <i class="fa-solid fa-car-battery"></i> UPS Capacity Ratings Distribution (kVA)
-          </h4>
-          <div style="height: 190px; position: relative;">
-            <canvas id="chartCompUpsCapacity"></canvas>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- MASTER DATA TABLES SECTION -->
-    <div style="margin-bottom: 28px;">
-      <h3 style="font-size: 1.05rem; color: #0B3B24; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 16px;">
-        <i class="fa-solid fa-table"></i> 1. Master IT Hardware & Office Audit Records (${entries.length} Offices)
-      </h3>
-      <div style="overflow-x: auto; margin-bottom: 20px;">
-        <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-          <thead>
-            <tr style="background: #0B3B24; color: #ffffff;">
-              <th style="padding: 8px;">Office Name</th>
-              <th style="padding: 8px;">Submitted / Updated Email</th>
-              <th style="padding: 8px;">Network & Speed</th>
-              <th style="padding: 8px;">Switches / Servers</th>
-              <th style="padding: 8px;">Monitors (W/NW)</th>
-              <th style="padding: 8px;">CPUs (W/NW)</th>
-              <th style="padding: 8px;">Laptops (W/NW)</th>
-              <th style="padding: 8px;">AIO (W/NW)</th>
-              <th style="padding: 8px;">Dot Matrix</th>
-              <th style="padding: 8px;">Age >8 Yrs</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${entries.map(item => `
-              <tr>
-                <td><strong>${escapeHtml(item.officeName)}</strong></td>
-                <td><small>${escapeHtml(item.updatedOfficerEmail || item.createdOfficerEmail || item.submittedByEmail || 'N/A')}</small></td>
-                <td>${escapeHtml(item.availableNetwork === 'Others' ? item.otherNetworkDetails : item.availableNetwork)} <small>(${escapeHtml(item.networkSpeed || '')})</small></td>
-                <td>${escapeHtml(item.switchesAvailable || 'No')} / ${escapeHtml(item.serversAvailable || 'No')}</td>
-                <td>${item.monitorsWorking} W / <span style="color:#b91c1c;">${item.monitorsNotWorking} NW</span></td>
-                <td>${item.cpuWorking} W / <span style="color:#b91c1c;">${item.cpuNotWorking} NW</span></td>
-                <td>${item.laptopsWorking} W / <span style="color:#b91c1c;">${item.laptopsNotWorking} NW</span></td>
-                <td>${item.aioWorking} W / <span style="color:#b91c1c;">${item.aioNotWorking} NW</span></td>
-                <td>${item.printers?.dotMatrix?.working ?? 0}</td>
-                <td><strong style="${(item.ageAbove8 || 0) > 0 ? 'color:#b91c1c;' : ''}">${item.ageAbove8 || 0}</strong></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      <h3 style="font-size: 1.05rem; color: #0B3B24; border-bottom: 2px solid #cbd5e1; padding-bottom: 6px; margin-bottom: 16px;">
-        <i class="fa-solid fa-car-battery"></i> 2. Master Power & Battery Infrastructure Audit Records
-      </h3>
-      <div style="overflow-x: auto; margin-bottom: 20px;">
-        <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
-          <thead>
-            <tr style="background: #064e3b; color: #ffffff;">
-              <th style="padding: 8px;">Office Name</th>
-              <th style="padding: 8px;">UPS Available</th>
-              <th style="padding: 8px;">Working / Defective UPS</th>
-              <th style="padding: 8px;">UPS Capacity</th>
-              <th style="padding: 8px;">Working Condition</th>
-              <th style="padding: 8px;">Battery Make & AH</th>
-              <th style="padding: 8px;">Batteries (In Use / Min)</th>
-              <th style="padding: 8px;">TCO Report Sent</th>
-              <th style="padding: 8px;">Power Remarks</th>
-            </tr>
-          </thead>
-          <tbody>
-            ${entries.map(item => `
-              <tr>
-                <td><strong>${escapeHtml(item.officeName)}</strong></td>
-                <td>${escapeHtml(item.upsAvailable || 'Yes')}</td>
-                <td><span style="color:#047857; font-weight:700;">${item.upsWorking || 0} W</span> / <span style="color:#b91c1c; font-weight:700;">${item.upsNotWorking || 0} NW</span></td>
-                <td>${escapeHtml(item.upsCapacity === 'Other' ? item.upsCapacityOther : (item.upsCapacity || 'N/A'))}</td>
-                <td><small>${escapeHtml(item.upsCondition || 'N/A')}</small></td>
-                <td><small>${escapeHtml(item.batteryMake || 'N/A')} (${item.batteryAh || 0} AH)</small></td>
-                <td>${item.batteriesInUse || 0} / ${item.minBatteriesRequired || 0}</td>
-                <td>${escapeHtml(item.serviceReportSent || 'No')} ${item.serviceReportDate ? `(${item.serviceReportDate})` : ''}</td>
-                <td><small>${escapeHtml(item.powerRemarks || 'None')}</small></td>
-              </tr>
-            `).join('')}
-          </tbody>
-        </table>
-      </div>
-
-      ${pendingOffices.length > 0 ? `
-        <h3 style="font-size: 1.05rem; color: #b91c1c; border-bottom: 2px solid #fecdd3; padding-bottom: 6px; margin-bottom: 12px;">
-          <i class="fa-solid fa-clock"></i> 3. Pending Offices Submission Audit List (${pendingOffices.length} Pending)
-        </h3>
-        <div style="background: #fef2f2; border: 1px solid #fecdd3; padding: 12px; border-radius: 8px; margin-bottom: 20px;">
-          <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px; font-size: 0.8rem; color: #991b1b;">
-            ${pendingOffices.map(off => `<div><i class="fa-regular fa-square"></i> ${escapeHtml(off)}</div>`).join('')}
-          </div>
-        </div>
-      ` : ''}
-    </div>
-
-    <!-- Official Verification & Certification Statement -->
-    <div style="margin-top: 24px; padding: 16px; background: #f8fafc; border: 1px solid #cbd5e1; border-radius: 8px; font-size: 0.82rem; line-height: 1.5; page-break-inside: avoid;">
-      <div style="font-weight: 700; color: #0f172a; margin-bottom: 4px;"><i class="fa-solid fa-certificate" style="color: #047857;"></i> AUDIT VERIFICATION & CERTIFICATION STATEMENT</div>
-      <p style="margin: 0 0 16px 0; color: #334155;">
-        This comprehensive audit report compiles real-time IT equipment inventory, network availability, hardware system age profiles, and power & battery infrastructure audit records across Motor Vehicles Department offices in Keralam. Verified against live Supabase Cloud records.
-      </p>
-      <div style="display: flex; justify-content: space-between; align-items: flex-end; margin-top: 36px;">
-        <div>
-          <div style="border-top: 1px dashed #64748b; width: 220px; margin-bottom: 4px;"></div>
-          <strong>IT Cell Nodal Officer</strong><br>
-          <span style="font-size: 0.78rem; color: #64748b;">Motor Vehicles Department, Keralam</span>
-        </div>
-        <div style="text-align: right;">
-          <div style="border-top: 1px dashed #64748b; width: 240px; margin-bottom: 4px; margin-left: auto;"></div>
-          <strong>Transport Commissionerate Approval</strong><br>
-          <span style="font-size: 0.78rem; color: #64748b;">Government of Keralam</span>
-        </div>
-      </div>
-    </div>
-  `;
-
-  modal.style.display = 'flex';
-
-  // Initialize the 4 Visual Charts
-  setTimeout(() => {
-    // 1. Hardware Equipment Health Chart
-    const ctxHealth = document.getElementById('chartCompHardwareHealth')?.getContext('2d');
-    if (ctxHealth) {
-      if (chartCompHealthInstance) chartCompHealthInstance.destroy();
-      chartCompHealthInstance = new Chart(ctxHealth, {
-        type: 'doughnut',
-        data: {
-          labels: ['Working Systems', 'Defective Systems'],
-          datasets: [{
-            data: [totalWorkingHW || (totalNotWorkingHW === 0 ? 1 : 0), totalNotWorkingHW || 0],
-            backgroundColor: ['#10b981', '#ef4444'],
-            borderWidth: 1
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-      });
-    }
-
-    // 2. System Age Profile Chart
-    const ctxAge = document.getElementById('chartCompAge')?.getContext('2d');
-    if (ctxAge) {
-      if (chartCompAgeInstance) chartCompAgeInstance.destroy();
-      chartCompAgeInstance = new Chart(ctxAge, {
-        type: 'bar',
-        data: {
-          labels: ['< 3 Yrs', '3–5 Yrs', '5–8 Yrs', '> 8 Yrs'],
-          datasets: [{
-            label: 'Systems',
-            data: [totalUnder3, total3To5, total5To8, totalAbove8],
-            backgroundColor: ['#3b82f6', '#10b981', '#f59e0b', '#ef4444'],
-            borderRadius: 4
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-      });
-    }
-
-    // 3. UPS Working Condition Chart
-    const ctxUpsCond = document.getElementById('chartCompUpsCondition')?.getContext('2d');
-    if (ctxUpsCond) {
-      if (chartCompUpsConditionInstance) chartCompUpsConditionInstance.destroy();
-      chartCompUpsConditionInstance = new Chart(ctxUpsCond, {
-        type: 'pie',
-        data: {
-          labels: ['Good / Working', 'Minor Issues', 'Requires Repair', 'Not Working / Defective'],
-          datasets: [{
-            data: [
-              upsConditionCounts['Good'] || upsWorkingCount,
-              upsConditionCounts['Working with Minor Issues'],
-              upsConditionCounts['Requires Repair'],
-              upsConditionCounts['Not Working'] || upsNotWorkingCount
-            ],
-            backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#ef4444'],
-            borderWidth: 1
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom' } } }
-      });
-    }
-
-    // 4. UPS Capacity Distribution Chart
-    const ctxUpsCap = document.getElementById('chartCompUpsCapacity')?.getContext('2d');
-    if (ctxUpsCap) {
-      if (chartCompUpsCapacityInstance) chartCompUpsCapacityInstance.destroy();
-      chartCompUpsCapacityInstance = new Chart(ctxUpsCap, {
-        type: 'bar',
-        data: {
-          labels: ['0.5 kVA', '1 kVA', '2 kVA', '3 kVA', '5 kVA', '10 kVA', 'Other'],
-          datasets: [{
-            label: 'Offices Count',
-            data: Object.values(upsCapacityCounts),
-            backgroundColor: '#0891b2',
-            borderRadius: 4
-          }]
-        },
-        options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
-      });
-    }
-  }, 100);
-}
-
-function closeComprehensiveReportModal() {
-  const modal = document.getElementById('comprehensiveReportModal');
-  if (modal) modal.style.display = 'none';
-}
-
-function triggerReportPrint() {
-  window.print();
 }
