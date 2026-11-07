@@ -456,6 +456,9 @@ function otLogAudit(action, profileOrReportRef, details) {
   otAuditLogs.unshift(entry);
   if (otAuditLogs.length > 500) otAuditLogs.pop();
   localStorage.setItem('mvd_ot_audit_logs', JSON.stringify(otAuditLogs));
+  if (typeof saveOfficerAuditLogToSupabase === 'function') {
+    saveOfficerAuditLogToSupabase(entry);
+  }
 }
 
 function otGetCurrentUser() {
@@ -1308,8 +1311,11 @@ function loadProfileForEditing(profileId) {
   }
 
   // Switch to Form Tab
+  if (typeof switchPortalModule === 'function') {
+    switchPortalModule('officer_training_qualification');
+  }
   switchOfficerSubTab('form');
-  document.getElementById('officerTrainingFormCard').scrollIntoView({ behavior: 'smooth' });
+  document.getElementById('officerTrainingFormCard')?.scrollIntoView({ behavior: 'smooth' });
   showToast(`Loaded profile for editing: ${profile.officerFullName}`, "info");
 }
 
@@ -2056,6 +2062,9 @@ function submitReportVerification(e) {
 
   otReportSnapshotsStore[officeCode] = snapshot;
   localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+  if (typeof saveOfficerReportToSupabase === 'function') {
+    saveOfficerReportToSupabase(snapshot);
+  }
 
   otLogAudit('VERIFY_REPORT', refNum, { office: officeCode, verifiedBy: vName, version: newVersion });
   closeVerificationModal();
@@ -2132,6 +2141,9 @@ function submitReportForwarding(e) {
 
   otReportSnapshotsStore[officeCode] = snapshot;
   localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+  if (typeof saveOfficerReportToSupabase === 'function') {
+    saveOfficerReportToSupabase(snapshot);
+  }
 
   otLogAudit('FORWARD_REPORT', snapshot.referenceNumber, { outwardNo, forwardDate: fwdDate });
   closeForwardingModal();
@@ -2202,19 +2214,29 @@ function renderAuditLogTable() {
 
 // Sub-Tab Switcher within Officer Training Module
 function switchOfficerSubTab(tabName) {
+  if (tabName === 'directory' || tabName === 'roles') {
+    if (typeof switchAdminSubView === 'function') {
+      switchAdminSubView(tabName);
+    }
+    return;
+  }
+
   otActiveSubTab = tabName;
   document.querySelectorAll('.ot-subtab-btn').forEach(b => {
     b.classList.toggle('active', b.dataset.tab === tabName);
   });
 
-  document.getElementById('otTabContentForm').style.display = tabName === 'form' ? 'block' : 'none';
-  document.getElementById('otTabContentDirectory').style.display = tabName === 'directory' ? 'block' : 'none';
-  document.getElementById('otTabContentReport').style.display = tabName === 'report' ? 'block' : 'none';
-  document.getElementById('otTabContentRoles').style.display = tabName === 'roles' ? 'block' : 'none';
+  const formEl = document.getElementById('otTabContentForm');
+  const repEl = document.getElementById('otTabContentReport');
+  const dirEl = document.getElementById('otTabContentDirectory');
+  const rolesEl = document.getElementById('otTabContentRoles');
 
-  if (tabName === 'directory') renderAdminOfficersDirectory();
+  if (formEl) formEl.style.display = tabName === 'form' ? 'block' : 'none';
+  if (repEl) repEl.style.display = tabName === 'report' ? 'block' : 'none';
+  if (dirEl) dirEl.style.display = tabName === 'directory' ? 'block' : 'none';
+  if (rolesEl) rolesEl.style.display = tabName === 'roles' ? 'block' : 'none';
+
   if (tabName === 'report') renderOfficeSummaryReport();
-  if (tabName === 'roles') renderAuditLogTable();
 }
 
 // --- 15. SUPABASE BACKEND PERSISTENCE ---
@@ -2223,61 +2245,189 @@ async function syncOfficerProfilesWithSupabase() {
   if (!window.supabaseClient) return;
 
   try {
-    const { data, error } = await window.supabaseClient
-      .from('officer_qualifications')
+    // 1. Primary: sync from officer_profiles
+    let { data, error } = await window.supabaseClient
+      .from('officer_profiles')
       .select('*');
 
     if (!error && data && data.length > 0) {
-      // Map Supabase rows to client schema if fields exist
       const mapped = data.map(row => ({
-        id: row.id,
-        officerFullName: row.officer_name,
-        pen: row.officer_pen,
-        designation: row.officer_designation,
-        officeCode: row.office_name ? (row.office_name.split(' ')[0] || "KL01") : "KL01",
-        officeName: row.office_name || "MVD Office",
-        generalEducation: "Plus Two",
-        generalEducationOther: "",
-        technicalQualification: row.educational_qualification || "B.Tech",
-        technicalQualificationOther: row.qualification_other || "",
-        institution: row.training_institutes || "",
-        passingYear: row.recent_training_year || 2018,
-        grade: "First Class",
-        additionalQualifications: [],
-        specializedSkills: row.specialization ? [row.specialization] : [],
+        id: row.id || ('off_' + row.pen),
+        officerFullName: row.officer_full_name,
+        pen: row.pen,
+        designation: row.current_designation,
+        officeCode: row.office_code,
+        officeName: row.office_name,
+        generalEducation: row.general_education || "Plus Two",
+        generalEducationOther: row.general_education_other || "",
+        technicalQualification: row.technical_qualification || "B.Tech",
+        technicalQualificationOther: row.technical_qualification_other || "",
+        institution: row.institution || "",
+        passingYear: row.passing_year || 2020,
+        grade: row.class_grade || "",
+        additionalQualifications: Array.isArray(row.additional_qualifications) ? row.additional_qualifications : [],
+        specializedSkills: Array.isArray(row.specialized_skills) ? row.specialized_skills : [],
         customSkills: "",
-        trainingHistory: row.training_details ? [{
-          id: "tr_" + row.id,
-          attended: row.training_attended || "Departmental Course",
-          conductedBy: row.training_institutes || "MVD",
-          durationValue: 1,
-          durationUnit: "Weeks",
-          monthYear: "2024-01"
-        }] : [],
+        trainingHistory: Array.isArray(row.training_history) ? row.training_history : [],
         enteredBy: {
-          fullName: row.entry_officer_name || "Reporting Officer",
-          designation: row.entry_officer_designation || "Officer",
-          mobile: row.entry_officer_mobile || "9447000000",
-          userId: "cloud@mvd.keralam.gov.in",
-          timestamp: row.created_at || new Date().toISOString()
+          fullName: row.entered_by_name || "Reporting Officer",
+          designation: row.entered_by_designation || "Officer",
+          mobile: row.entered_by_mobile || "9447000000",
+          userId: row.entered_by_user_id || "",
+          timestamp: row.entered_by_timestamp || row.created_at || new Date().toISOString()
         },
-        status: "submitted",
+        status: row.status || "submitted",
         createdAt: row.created_at || new Date().toISOString(),
         updatedAt: row.updated_at || new Date().toISOString(),
-        version: 1
+        version: row.version || 1
       }));
 
-      // Merge avoiding duplicates by PEN
+      // Merge into otProfilesStore by PEN
       mapped.forEach(m => {
-        if (!otProfilesStore.some(p => p.pen === m.pen)) {
+        const existingIdx = otProfilesStore.findIndex(p => p.pen === m.pen);
+        if (existingIdx >= 0) {
+          otProfilesStore[existingIdx] = m;
+        } else {
           otProfilesStore.push(m);
         }
       });
       localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
       renderAdminOfficersDirectory();
+    } else {
+      // Fallback: sync from legacy officer_qualifications
+      const legacyRes = await window.supabaseClient
+        .from('officer_qualifications')
+        .select('*');
+      if (!legacyRes.error && legacyRes.data && legacyRes.data.length > 0) {
+        const mappedLegacy = legacyRes.data.map(row => ({
+          id: row.id,
+          officerFullName: row.officer_name,
+          pen: row.officer_pen,
+          designation: row.officer_designation,
+          officeCode: row.office_name ? (row.office_name.split(' ')[0] || "KL01") : "KL01",
+          officeName: row.office_name || "MVD Office",
+          generalEducation: "Plus Two",
+          generalEducationOther: "",
+          technicalQualification: row.educational_qualification || "B.Tech",
+          technicalQualificationOther: row.qualification_other || "",
+          institution: row.training_institutes || "",
+          passingYear: row.recent_training_year || 2018,
+          grade: "First Class",
+          additionalQualifications: [],
+          specializedSkills: row.specialization ? [row.specialization] : [],
+          customSkills: "",
+          trainingHistory: row.training_details ? [{
+            id: "tr_" + row.id,
+            attended: row.training_attended || "Departmental Course",
+            conductedBy: row.training_institutes || "MVD",
+            durationValue: 1,
+            durationUnit: "Weeks",
+            monthYear: "2024-01"
+          }] : [],
+          enteredBy: {
+            fullName: row.entry_officer_name || "Reporting Officer",
+            designation: row.entry_officer_designation || "Officer",
+            mobile: row.entry_officer_mobile || "9447000000",
+            userId: "cloud@mvd.keralam.gov.in",
+            timestamp: row.created_at || new Date().toISOString()
+          },
+          status: "submitted",
+          createdAt: row.created_at || new Date().toISOString(),
+          updatedAt: row.updated_at || new Date().toISOString(),
+          version: 1
+        }));
+        mappedLegacy.forEach(m => {
+          if (!otProfilesStore.some(p => p.pen === m.pen)) {
+            otProfilesStore.push(m);
+          }
+        });
+        localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+        renderAdminOfficersDirectory();
+      }
     }
+
+    // 2. Sync report versions
+    await syncOfficerReportsWithSupabase();
+
+    // 3. Sync audit logs
+    await syncOfficerAuditLogsWithSupabase();
+
   } catch (err) {
-    console.warn("Officer Supabase sync error (using local storage):", err);
+    console.warn("Officer Supabase sync error (using local storage fallback):", err);
+  }
+}
+
+async function syncOfficerReportsWithSupabase() {
+  if (!window.supabaseClient) return;
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('office_report_versions')
+      .select('*');
+
+    if (!error && data && data.length > 0) {
+      data.forEach(r => {
+        otReportSnapshotsStore[r.office_code] = {
+          officeCode: r.office_code,
+          officeName: r.office_name,
+          referenceNumber: r.reference_number,
+          version: r.version,
+          cutoffTimestamp: r.cutoff_timestamp,
+          verifiedAt: r.verified_at,
+          isVerified: r.is_verified,
+          reverificationRequired: r.reverification_required,
+          isForwarded: r.is_forwarded,
+          verifiedBy: {
+            name: r.verified_by_name || "",
+            designation: r.verified_by_designation || ""
+          },
+          verifiedRemarks: r.verification_remarks || "",
+          dispatchDetails: r.is_forwarded ? {
+            outwardNo: r.outward_number || "",
+            forwardDate: r.forward_date || "",
+            remarks: r.forwarding_remarks || "",
+            userName: r.dispatched_by_name || ""
+          } : null,
+          includedOfficerPenList: r.included_officer_pens || [],
+          totalOfficersCount: (r.included_officer_pens || []).length,
+          historicalCopies: []
+        };
+      });
+      localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+    }
+  } catch (e) {
+    console.warn("Could not sync report versions:", e);
+  }
+}
+
+async function syncOfficerAuditLogsWithSupabase() {
+  if (!window.supabaseClient) return;
+  try {
+    const { data, error } = await window.supabaseClient
+      .from('officer_audit_logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(100);
+
+    if (!error && data && data.length > 0) {
+      data.forEach(log => {
+        if (!otAuditLogs.some(l => l.id === log.id)) {
+          otAuditLogs.push({
+            id: log.id,
+            action: log.action,
+            reference: log.reference,
+            userRole: log.user_role,
+            userName: log.user_name,
+            userEmail: log.user_email,
+            timestamp: log.timestamp,
+            details: log.changed_fields || {}
+          });
+        }
+      });
+      otAuditLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      localStorage.setItem('mvd_ot_audit_logs', JSON.stringify(otAuditLogs));
+    }
+  } catch (e) {
+    console.warn("Could not sync audit logs:", e);
   }
 }
 
@@ -2285,7 +2435,44 @@ async function saveOfficerQualificationToSupabase(record) {
   if (!window.supabaseClient) return;
 
   try {
-    const payload = {
+    // 1. Save to officer_profiles
+    const profilePayload = {
+      id: record.id || ('off_' + record.pen),
+      officer_full_name: record.officerFullName,
+      pen: record.pen,
+      current_designation: record.designation,
+      office_code: record.officeCode,
+      office_name: record.officeName,
+      general_education: record.generalEducation || 'Plus Two',
+      general_education_other: record.generalEducationOther || null,
+      technical_qualification: record.technicalQualification || 'B.Tech',
+      technical_qualification_other: record.technicalQualificationOther || null,
+      institution: record.institution || null,
+      passing_year: record.passingYear ? parseInt(record.passingYear) : null,
+      class_grade: record.grade || null,
+      additional_qualifications: record.additionalQualifications || [],
+      specialized_skills: record.specializedSkills || [],
+      training_history: record.trainingHistory || [],
+      entered_by_name: record.enteredBy?.fullName || 'Reporting Officer',
+      entered_by_designation: record.enteredBy?.designation || 'Officer',
+      entered_by_mobile: record.enteredBy?.mobile || '9447000000',
+      entered_by_user_id: record.enteredBy?.userId || null,
+      entered_by_timestamp: record.enteredBy?.timestamp || new Date().toISOString(),
+      status: record.status || 'submitted',
+      version: record.version || 1,
+      updated_at: new Date().toISOString()
+    };
+
+    const { error: profileError } = await window.supabaseClient
+      .from('officer_profiles')
+      .upsert(profilePayload, { onConflict: 'pen' });
+
+    if (profileError) {
+      console.warn("Could not upsert to officer_profiles:", profileError);
+    }
+
+    // 2. Also save to legacy officer_qualifications for compatibility
+    const legacyPayload = {
       office_name: `${record.officeCode} ${record.officeName}`,
       entry_officer_name: record.enteredBy?.fullName,
       entry_officer_designation: record.enteredBy?.designation,
@@ -2308,10 +2495,10 @@ async function saveOfficerQualificationToSupabase(record) {
 
     await window.supabaseClient
       .from('officer_qualifications')
-      .upsert(payload, { onConflict: 'officer_pen' });
+      .upsert(legacyPayload, { onConflict: 'officer_pen' });
 
   } catch (e) {
-    console.warn("Could not upsert to Supabase:", e);
+    console.warn("Could not upsert officer to Supabase:", e);
   }
 }
 
@@ -2321,12 +2508,74 @@ async function deleteOfficerQualificationFromSupabase(profileId) {
     const p = otProfilesStore.find(x => x.id === profileId);
     if (p && p.pen) {
       await window.supabaseClient
+        .from('officer_profiles')
+        .delete()
+        .eq('pen', p.pen);
+
+      await window.supabaseClient
         .from('officer_qualifications')
         .delete()
         .eq('officer_pen', p.pen);
     }
   } catch (e) {
     console.warn("Supabase delete failed:", e);
+  }
+}
+
+async function saveOfficerReportToSupabase(snapshot) {
+  if (!window.supabaseClient || !snapshot) return;
+  try {
+    const payload = {
+      id: "rep_" + snapshot.officeCode + "_v" + snapshot.version,
+      reference_number: snapshot.referenceNumber,
+      version: snapshot.version,
+      office_code: snapshot.officeCode,
+      office_name: snapshot.officeName,
+      cutoff_timestamp: snapshot.cutoffTimestamp,
+      is_verified: !!snapshot.isVerified,
+      reverification_required: !!snapshot.reverificationRequired,
+      verified_by_name: snapshot.verifiedBy?.name || null,
+      verified_by_designation: snapshot.verifiedBy?.designation || null,
+      verified_at: snapshot.verifiedAt || null,
+      verification_remarks: snapshot.verifiedRemarks || null,
+      is_forwarded: !!snapshot.isForwarded,
+      outward_number: snapshot.dispatchDetails?.outwardNo || null,
+      forward_date: snapshot.dispatchDetails?.forwardDate || null,
+      forwarding_remarks: snapshot.dispatchDetails?.remarks || null,
+      dispatched_by_name: snapshot.dispatchDetails?.userName || null,
+      dispatched_at: snapshot.dispatchDetails?.timestamp || null,
+      included_officer_pens: snapshot.includedOfficerPenList || [],
+      summary_counts: { totalOfficersCount: snapshot.totalOfficersCount || 0 },
+      updated_at: new Date().toISOString()
+    };
+
+    await window.supabaseClient
+      .from('office_report_versions')
+      .upsert(payload, { onConflict: 'reference_number' });
+  } catch (e) {
+    console.warn("Could not save report version to Supabase:", e);
+  }
+}
+
+async function saveOfficerAuditLogToSupabase(entry) {
+  if (!window.supabaseClient || !entry) return;
+  try {
+    const payload = {
+      id: entry.id,
+      action: entry.action,
+      reference: entry.reference || '',
+      user_role: entry.userRole,
+      user_name: entry.userName || null,
+      user_email: entry.userEmail || null,
+      timestamp: entry.timestamp || new Date().toISOString(),
+      changed_fields: entry.details || {}
+    };
+
+    await window.supabaseClient
+      .from('officer_audit_logs')
+      .insert(payload);
+  } catch (e) {
+    // Fails silently if table not yet created
   }
 }
 

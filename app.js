@@ -617,7 +617,7 @@ function selectModuleMenu(moduleId) {
           initOfficerTrainingModule();
         }
         if (typeof switchOfficerSubTab === 'function') {
-          switchOfficerSubTab('directory');
+          switchOfficerSubTab('form');
         }
       }
       showToast(`Navigated to Officer Training & Qualification Module`, 'info');
@@ -2398,6 +2398,8 @@ function switchAdminSubView(view) {
   const btnDash = document.getElementById('btnAdminNavDashboard');
   const btnSumm = document.getElementById('btnAdminNavSummary');
   const btnOffs = document.getElementById('btnAdminNavOfficers');
+  const btnDir = document.getElementById('btnAdminNavDirectory');
+  const btnRoles = document.getElementById('btnAdminNavRoles');
   const btnEnt = document.getElementById('btnAdminNavEntry');
   const btnVw = document.getElementById('btnAdminNavView');
   const btnMn = document.getElementById('btnAdminNavMenus');
@@ -2405,6 +2407,8 @@ function switchAdminSubView(view) {
   const dashSec = document.getElementById('adminDashboardSubView');
   const summSec = document.getElementById('adminSummarySubView');
   const offsSec = document.getElementById('adminOfficersSubView');
+  const dirSec = document.getElementById('adminDirectorySubView');
+  const rolesSec = document.getElementById('adminRolesSubView');
   const entSec = document.getElementById('adminEntrySubView');
   const vwSec = document.getElementById('adminViewSubView');
   const mnSec = document.getElementById('adminMenusSubView');
@@ -2412,6 +2416,8 @@ function switchAdminSubView(view) {
   if (btnDash) btnDash.style.background = (view === 'dashboard') ? 'var(--primary-600)' : 'transparent';
   if (btnSumm) btnSumm.style.background = (view === 'summary') ? 'var(--primary-600)' : 'transparent';
   if (btnOffs) btnOffs.style.background = (view === 'officers') ? 'var(--primary-600)' : 'transparent';
+  if (btnDir) btnDir.style.background = (view === 'directory') ? 'var(--primary-600)' : 'transparent';
+  if (btnRoles) btnRoles.style.background = (view === 'roles') ? 'var(--primary-600)' : 'transparent';
   if (btnEnt) btnEnt.style.background = (view === 'entry') ? 'var(--primary-600)' : 'transparent';
   if (btnVw) btnVw.style.background = (view === 'view') ? 'var(--primary-600)' : 'transparent';
   if (btnMn) btnMn.style.background = (view === 'menus') ? 'var(--primary-600)' : 'transparent';
@@ -2419,6 +2425,8 @@ function switchAdminSubView(view) {
   if (dashSec) dashSec.style.display = (view === 'dashboard') ? 'block' : 'none';
   if (summSec) summSec.style.display = (view === 'summary') ? 'block' : 'none';
   if (offsSec) offsSec.style.display = (view === 'officers') ? 'block' : 'none';
+  if (dirSec) dirSec.style.display = (view === 'directory') ? 'block' : 'none';
+  if (rolesSec) rolesSec.style.display = (view === 'roles') ? 'block' : 'none';
   if (entSec) entSec.style.display = (view === 'entry') ? 'block' : 'none';
   if (vwSec) vwSec.style.display = (view === 'view') ? 'block' : 'none';
   if (mnSec) mnSec.style.display = (view === 'menus') ? 'block' : 'none';
@@ -2426,6 +2434,15 @@ function switchAdminSubView(view) {
   if (view === 'dashboard') renderAdminDashboard();
   if (view === 'summary') renderAdminSummaryReport();
   if (view === 'officers') renderAdminOfficersTable();
+  if (view === 'directory') {
+    if (typeof initOfficerTrainingModule === 'function') initOfficerTrainingModule();
+    if (typeof renderAdminOfficersDirectory === 'function') renderAdminOfficersDirectory();
+  }
+  if (view === 'roles') {
+    if (typeof initOfficerTrainingModule === 'function') initOfficerTrainingModule();
+    if (typeof renderRoleSwitcherUI === 'function') renderRoleSwitcherUI();
+    if (typeof renderAuditLogTable === 'function') renderAuditLogTable();
+  }
   if (view === 'view') renderAdminDataTable();
   if (view === 'menus') renderMenuManagerUI();
   if (view === 'entry') {

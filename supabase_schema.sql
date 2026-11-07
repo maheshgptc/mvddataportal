@@ -346,3 +346,22 @@ DROP POLICY IF EXISTS "Allow public read of app settings" ON mvd_app_settings;
 DROP POLICY IF EXISTS "Allow public update of app settings" ON mvd_app_settings;
 CREATE POLICY "Allow public read of app settings" ON mvd_app_settings FOR SELECT USING (true);
 CREATE POLICY "Allow public update of app settings" ON mvd_app_settings FOR ALL USING (true);
+
+-- ----------------------------------------------------------------------------
+-- Explicit Table Grants for PostgREST Data API Access
+-- ----------------------------------------------------------------------------
+GRANT ALL ON TABLE public.mvd_it_equipment TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.mvd_offices_master TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.officer_profiles TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.officer_additional_qualifications TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.officer_specialized_skills TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.officer_training_records TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.office_report_versions TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.officer_audit_logs TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.officer_qualifications TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.mvd_app_settings TO anon, authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
+-- Reload PostgREST Schema Cache
+-- ----------------------------------------------------------------------------
+NOTIFY pgrst, 'reload schema';

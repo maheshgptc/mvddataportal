@@ -647,14 +647,8 @@
             <button type="button" class="ot-subtab-btn active" data-tab="form" onclick="switchOfficerSubTab('form')">
               <i class="fa-solid fa-file-pen"></i> Profile Data Entry
             </button>
-            <button type="button" class="ot-subtab-btn" data-tab="directory" onclick="switchOfficerSubTab('directory')">
-              <i class="fa-solid fa-address-book"></i> Officer Directory &amp; Search
-            </button>
             <button type="button" class="ot-subtab-btn" data-tab="report" onclick="switchOfficerSubTab('report')">
               <i class="fa-solid fa-file-shield"></i> Office-wise Summary Report &amp; Verification
-            </button>
-            <button type="button" class="ot-subtab-btn" data-tab="roles" onclick="switchOfficerSubTab('roles')">
-              <i class="fa-solid fa-user-gear"></i> Role Permissions &amp; Audit Log
             </button>
           </div>
 
@@ -949,165 +943,6 @@
           </div>
 
           <!-- ====================================================================
-               SUBTAB 2: ADMINISTRATIVE DIRECTORY & FILTER LISTING
-               ==================================================================== -->
-          <div id="otTabContentDirectory" style="display: none;">
-            <div class="card-section">
-              <div class="section-header">
-                <div>
-                  <h3 class="section-title" style="margin: 0;">
-                    <i class="fa-solid fa-address-book" style="color: #0284c7;"></i> Officer Profiles Directory
-                  </h3>
-                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
-                    Filter and inspect submitted profiles and drafts across MVD offices.
-                  </p>
-                </div>
-
-                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
-                  <span id="otDirResultCount" class="badge badge-info" style="font-size: 0.85rem; padding: 6px 12px;">0 Officers</span>
-                  <button type="button" class="btn btn-primary btn-sm" onclick="exportOfficersDirectoryDualCSV()">
-                    <i class="fa-solid fa-file-csv"></i> Export Linked CSVs
-                  </button>
-                </div>
-              </div>
-
-              <!-- 7 Filters Bar -->
-              <div style="padding: 16px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 20px;">
-                <div class="form-grid-4">
-                  <!-- Search by Name or PEN -->
-                  <div class="form-group">
-                    <label><i class="fa-solid fa-magnifying-glass"></i> Search Name / PEN</label>
-                    <input type="text" id="otDirSearchInput" class="form-control" placeholder="Search by name or PEN..." oninput="renderAdminOfficersDirectory()">
-                  </div>
-
-                  <!-- Office Filter -->
-                  <div class="form-group">
-                    <label><i class="fa-solid fa-building"></i> Filter Office</label>
-                    <select id="otDirOfficeFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All MVD Offices (Statewide) --</option>
-                    </select>
-                  </div>
-
-                  <!-- Designation Filter -->
-                  <div class="form-group">
-                    <label><i class="fa-solid fa-user-shield"></i> Designation</label>
-                    <select id="otDirDesignationFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All Designations --</option>
-                      <option value="RTO">RTO</option>
-                      <option value="Joint RTO">Joint RTO</option>
-                      <option value="MVI">MVI</option>
-                      <option value="AMVI">AMVI</option>
-                    </select>
-                  </div>
-
-                  <!-- Technical Qualification Filter -->
-                  <div class="form-group">
-                    <label><i class="fa-solid fa-award"></i> Technical Qualification</label>
-                    <select id="otDirTechQualFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All Technical Qualifications --</option>
-                      <option value="PhD with Postdoctoral Research">PhD with Postdoctoral Research</option>
-                      <option value="PhD">PhD</option>
-                      <option value="M.Tech">M.Tech</option>
-                      <option value="B.Tech">B.Tech</option>
-                      <option value="Diploma">Diploma</option>
-                      <option value="Others">Others</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div class="form-grid-4" style="margin-top: 12px;">
-                  <!-- Additional Qualification Filter -->
-                  <div class="form-group">
-                    <label><i class="fa-solid fa-certificate"></i> Additional Qualification</label>
-                    <select id="otDirAddQualFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All Additional Qualifications --</option>
-                      <option value="LLB">LLB</option>
-                      <option value="LLM (Constitutional Law)">LLM (Constitutional Law)</option>
-                      <option value="MBA (Public Policy)">MBA (Public Policy)</option>
-                      <option value="PGDeG (e-Governance)">PGDeG (e-Governance)</option>
-                      <option value="Safety Engineering">Safety Engineering</option>
-                      <option value="Safety Engineering Diploma">Safety Engineering Diploma</option>
-                      <option value="PG Diploma in Cyber Law">PG Diploma in Cyber Law</option>
-                      <option value="MCA (Computer Applications)">MCA</option>
-                      <option value="B.Sc. Computer Science">B.Sc. Computer Science</option>
-                      <option value="Certified Data Analyst">Certified Data Analyst</option>
-                    </select>
-                  </div>
-
-                  <!-- Status Filter (Draft vs Submitted) -->
-                  <div class="form-group">
-                    <label><i class="fa-solid fa-filter"></i> Record Status</label>
-                    <select id="otDirStatusFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All Records (Draft &amp; Submitted) --</option>
-                      <option value="submitted">Submitted Only</option>
-                      <option value="draft">Drafts Only</option>
-                    </select>
-                  </div>
-
-                  <!-- Specialized Skill Filter -->
-                  <div class="form-group">
-                    <label><i class="fa-solid fa-star"></i> Specialized Skill</label>
-                    <select id="otDirSkillFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All Specialized Skills --</option>
-                      <option value="Legal & Prosecution">Legal &amp; Prosecution</option>
-                      <option value="Accident Investigation">Accident Investigation</option>
-                      <option value="IT & Software">IT &amp; Software</option>
-                      <option value="AIS Standards & Homologation">AIS Standards &amp; Homologation</option>
-                      <option value="EV Architecture">EV Architecture</option>
-                      <option value="Data Analytics">Data Analytics</option>
-                      <option value="Radar & Speed Enforcement">Radar &amp; Speed Enforcement</option>
-                      <option value="MV Act & Statutory Rules">MV Act &amp; Statutory Rules</option>
-                      <option value="Vehicle Fitness Inspection">Vehicle Fitness Inspection</option>
-                      <option value="Policy Drafting">Policy Drafting</option>
-                    </select>
-                  </div>
-
-                  <!-- Training Year Filter -->
-                  <div class="form-group">
-                    <label><i class="fa-regular fa-calendar"></i> Training Year</label>
-                    <select id="otDirTrainingYearFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All Training Years --</option>
-                      <option value="2026">2026</option>
-                      <option value="2025">2025</option>
-                      <option value="2024">2024</option>
-                      <option value="2023">2023</option>
-                      <option value="2022">2022</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
-                  <button type="button" class="btn btn-secondary btn-sm" onclick="resetAdminDirectoryFilters()">
-                    <i class="fa-solid fa-rotate-left"></i> Reset Directory Filters
-                  </button>
-                </div>
-              </div>
-
-              <!-- Directory Table -->
-              <div class="data-table-container">
-                <table class="data-table" id="otDirTable">
-                  <thead>
-                    <tr>
-                      <th style="width: 40px; text-align: center;">#</th>
-                      <th style="min-width: 170px;">Officer Name &amp; PEN</th>
-                      <th>Designation</th>
-                      <th>Office</th>
-                      <th>Technical Qualification</th>
-                      <th>Additional Qualifications</th>
-                      <th>Specialized Skills</th>
-                      <th>Status</th>
-                      <th style="width: 120px; text-align: center;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="otDirTableBody">
-                    <!-- Populated dynamically -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
-
-          <!-- ====================================================================
                SUBTAB 3: OFFICE-WISE SUMMARY REPORT & VERIFICATION WORKFLOW
                ==================================================================== -->
           <div id="otTabContentReport" style="display: none;">
@@ -1328,76 +1163,7 @@
             </div>
           </div>
 
-          <!-- ====================================================================
-               SUBTAB 4: ROLE ACCESS CONTROL & AUDIT TRAIL
-               ==================================================================== -->
-          <div id="otTabContentRoles" style="display: none;">
-            <div class="card-section">
-              <div class="section-header">
-                <div>
-                  <h3 class="section-title" style="margin: 0;">
-                    <i class="fa-solid fa-user-gear"></i> Role Permissions &amp; Access Control Simulation
-                  </h3>
-                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
-                    Switch between departmental roles to test server-enforced access boundaries.
-                  </p>
-                </div>
-              </div>
 
-              <!-- Role Switcher Buttons -->
-              <div class="ot-role-switcher-box" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 18px; margin-bottom: 24px;">
-                <label style="font-weight: 700; color: #0f172a; margin-bottom: 10px; display: block;">
-                  Select Simulated Portal User Role:
-                </label>
-                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                  <button type="button" class="ot-role-btn" data-role="data_entry" onclick="switchRoleSimulator('data_entry')">
-                    <i class="fa-solid fa-user-pen"></i> Authorised Office Data Entry User
-                  </button>
-                  <button type="button" class="ot-role-btn active" data-role="head_of_office" onclick="switchRoleSimulator('head_of_office')">
-                    <i class="fa-solid fa-user-tie"></i> Head of Office / Officer Holding Charge
-                  </button>
-                  <button type="button" class="ot-role-btn" data-role="dispatch_user" onclick="switchRoleSimulator('dispatch_user')">
-                    <i class="fa-solid fa-paper-plane"></i> Authorised Office Dispatch User
-                  </button>
-                  <button type="button" class="ot-role-btn" data-role="admin" onclick="switchRoleSimulator('admin')">
-                    <i class="fa-solid fa-shield-halved"></i> Department Administrator / Commissionerate
-                  </button>
-                </div>
-
-                <div style="margin-top: 14px; font-size: 0.84rem; line-height: 1.5; color: #475569; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                  <strong>Active Permissions Matrix:</strong><br>
-                  • <strong>Data Entry:</strong> Create/update profiles, save drafts, prepare office report drafts.<br>
-                  • <strong>Head of Office:</strong> Full office access, verify report with statutory certification, authorize forwarding.<br>
-                  • <strong>Dispatch User:</strong> Record outward/dispatch numbers and dates for verified reports.<br>
-                  • <strong>Commissionerate Administrator:</strong> Statewide multi-office inspection, filtering, global exports.
-                </div>
-              </div>
-
-              <!-- Comprehensive Audit Trail Table -->
-              <div class="section-header" style="margin-top: 20px;">
-                <h4 style="font-size: 1rem; font-weight: 700; color: var(--primary-900);">
-                  <i class="fa-solid fa-clock-rotate-left"></i> Module Audit Trail (Asia/Kolkata Time)
-                </h4>
-              </div>
-
-              <div class="data-table-container">
-                <table class="data-table" id="otAuditLogTable">
-                  <thead>
-                    <tr>
-                      <th style="width: 40px; text-align: center;">#</th>
-                      <th>Timestamp (IST)</th>
-                      <th>Action Performed</th>
-                      <th>Profile / Report Reference</th>
-                      <th>Authenticated User &amp; Role</th>
-                    </tr>
-                  </thead>
-                  <tbody id="otAuditLogTableBody">
-                    <!-- Populated via JS -->
-                  </tbody>
-                </table>
-              </div>
-            </div>
-          </div>
 
         </div>
 
@@ -1597,6 +1363,12 @@
               </button>
               <button class="btn btn-outline" id="btnAdminNavOfficers" onclick="switchAdminSubView('officers')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-user-graduate"></i> Officer Qualifications
+              </button>
+              <button class="btn btn-outline" id="btnAdminNavDirectory" onclick="switchAdminSubView('directory')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
+                <i class="fa-solid fa-address-book"></i> Officer Directory &amp; Search
+              </button>
+              <button class="btn btn-outline" id="btnAdminNavRoles" onclick="switchAdminSubView('roles')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
+                <i class="fa-solid fa-user-gear"></i> Role Permissions &amp; Audit Log
               </button>
               <button class="btn btn-outline" id="btnAdminNavEntry" onclick="switchAdminSubView('entry')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-plus-circle"></i> Direct IT Entry
@@ -1909,6 +1681,244 @@
               </div>
             </div>
 
+          </div>
+
+          <!-- ADMIN OFFICER DIRECTORY & SEARCH SUBVIEW -->
+          <div id="adminDirectorySubView" style="display: none;">
+          <!-- ====================================================================
+               SUBTAB 2: ADMINISTRATIVE DIRECTORY & FILTER LISTING
+               ==================================================================== -->
+          <div id="otTabContentDirectory" style="display: block;">
+            <div class="card-section">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title" style="margin: 0;">
+                    <i class="fa-solid fa-address-book" style="color: #0284c7;"></i> Officer Profiles Directory
+                  </h3>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                    Filter and inspect submitted profiles and drafts across MVD offices.
+                  </p>
+                </div>
+
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                  <span id="otDirResultCount" class="badge badge-info" style="font-size: 0.85rem; padding: 6px 12px;">0 Officers</span>
+                  <button type="button" class="btn btn-primary btn-sm" onclick="exportOfficersDirectoryDualCSV()">
+                    <i class="fa-solid fa-file-csv"></i> Export Linked CSVs
+                  </button>
+                </div>
+              </div>
+
+              <!-- 7 Filters Bar -->
+              <div style="padding: 16px; background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; margin-bottom: 20px;">
+                <div class="form-grid-4">
+                  <!-- Search by Name or PEN -->
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-magnifying-glass"></i> Search Name / PEN</label>
+                    <input type="text" id="otDirSearchInput" class="form-control" placeholder="Search by name or PEN..." oninput="renderAdminOfficersDirectory()">
+                  </div>
+
+                  <!-- Office Filter -->
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-building"></i> Filter Office</label>
+                    <select id="otDirOfficeFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
+                      <option value="ALL">-- All MVD Offices (Statewide) --</option>
+                    </select>
+                  </div>
+
+                  <!-- Designation Filter -->
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-user-shield"></i> Designation</label>
+                    <select id="otDirDesignationFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
+                      <option value="ALL">-- All Designations --</option>
+                      <option value="RTO">RTO</option>
+                      <option value="Joint RTO">Joint RTO</option>
+                      <option value="MVI">MVI</option>
+                      <option value="AMVI">AMVI</option>
+                    </select>
+                  </div>
+
+                  <!-- Technical Qualification Filter -->
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-award"></i> Technical Qualification</label>
+                    <select id="otDirTechQualFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
+                      <option value="ALL">-- All Technical Qualifications --</option>
+                      <option value="PhD with Postdoctoral Research">PhD with Postdoctoral Research</option>
+                      <option value="PhD">PhD</option>
+                      <option value="M.Tech">M.Tech</option>
+                      <option value="B.Tech">B.Tech</option>
+                      <option value="Diploma">Diploma</option>
+                      <option value="Others">Others</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="form-grid-4" style="margin-top: 12px;">
+                  <!-- Additional Qualification Filter -->
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-certificate"></i> Additional Qualification</label>
+                    <select id="otDirAddQualFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
+                      <option value="ALL">-- All Additional Qualifications --</option>
+                      <option value="LLB">LLB</option>
+                      <option value="LLM (Constitutional Law)">LLM (Constitutional Law)</option>
+                      <option value="MBA (Public Policy)">MBA (Public Policy)</option>
+                      <option value="PGDeG (e-Governance)">PGDeG (e-Governance)</option>
+                      <option value="Safety Engineering">Safety Engineering</option>
+                      <option value="Safety Engineering Diploma">Safety Engineering Diploma</option>
+                      <option value="PG Diploma in Cyber Law">PG Diploma in Cyber Law</option>
+                      <option value="MCA (Computer Applications)">MCA</option>
+                      <option value="B.Sc. Computer Science">B.Sc. Computer Science</option>
+                      <option value="Certified Data Analyst">Certified Data Analyst</option>
+                    </select>
+                  </div>
+
+                  <!-- Status Filter (Draft vs Submitted) -->
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-filter"></i> Record Status</label>
+                    <select id="otDirStatusFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
+                      <option value="ALL">-- All Records (Draft &amp; Submitted) --</option>
+                      <option value="submitted">Submitted Only</option>
+                      <option value="draft">Drafts Only</option>
+                    </select>
+                  </div>
+
+                  <!-- Specialized Skill Filter -->
+                  <div class="form-group">
+                    <label><i class="fa-solid fa-star"></i> Specialized Skill</label>
+                    <select id="otDirSkillFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
+                      <option value="ALL">-- All Specialized Skills --</option>
+                      <option value="Legal & Prosecution">Legal &amp; Prosecution</option>
+                      <option value="Accident Investigation">Accident Investigation</option>
+                      <option value="IT & Software">IT &amp; Software</option>
+                      <option value="AIS Standards & Homologation">AIS Standards &amp; Homologation</option>
+                      <option value="EV Architecture">EV Architecture</option>
+                      <option value="Data Analytics">Data Analytics</option>
+                      <option value="Radar & Speed Enforcement">Radar &amp; Speed Enforcement</option>
+                      <option value="MV Act & Statutory Rules">MV Act &amp; Statutory Rules</option>
+                      <option value="Vehicle Fitness Inspection">Vehicle Fitness Inspection</option>
+                      <option value="Policy Drafting">Policy Drafting</option>
+                    </select>
+                  </div>
+
+                  <!-- Training Year Filter -->
+                  <div class="form-group">
+                    <label><i class="fa-regular fa-calendar"></i> Training Year</label>
+                    <select id="otDirTrainingYearFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
+                      <option value="ALL">-- All Training Years --</option>
+                      <option value="2026">2026</option>
+                      <option value="2025">2025</option>
+                      <option value="2024">2024</option>
+                      <option value="2023">2023</option>
+                      <option value="2022">2022</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div style="display: flex; justify-content: flex-end; margin-top: 12px;">
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="resetAdminDirectoryFilters()">
+                    <i class="fa-solid fa-rotate-left"></i> Reset Directory Filters
+                  </button>
+                </div>
+              </div>
+
+              <!-- Directory Table -->
+              <div class="data-table-container">
+                <table class="data-table" id="otDirTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px; text-align: center;">#</th>
+                      <th style="min-width: 170px;">Officer Name &amp; PEN</th>
+                      <th>Designation</th>
+                      <th>Office</th>
+                      <th>Technical Qualification</th>
+                      <th>Additional Qualifications</th>
+                      <th>Specialized Skills</th>
+                      <th>Status</th>
+                      <th style="width: 120px; text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="otDirTableBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+
+
+          </div>
+
+          <!-- ADMIN ROLE PERMISSIONS & AUDIT LOG SUBVIEW -->
+          <div id="adminRolesSubView" style="display: none;">
+          <!-- ====================================================================
+               SUBTAB 4: ROLE ACCESS CONTROL & AUDIT TRAIL
+               ==================================================================== -->
+          <div id="otTabContentRoles" style="display: block;">
+            <div class="card-section">
+              <div class="section-header">
+                <div>
+                  <h3 class="section-title" style="margin: 0;">
+                    <i class="fa-solid fa-user-gear"></i> Role Permissions &amp; Access Control Simulation
+                  </h3>
+                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                    Switch between departmental roles to test server-enforced access boundaries.
+                  </p>
+                </div>
+              </div>
+
+              <!-- Role Switcher Buttons -->
+              <div class="ot-role-switcher-box" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 18px; margin-bottom: 24px;">
+                <label style="font-weight: 700; color: #0f172a; margin-bottom: 10px; display: block;">
+                  Select Simulated Portal User Role:
+                </label>
+                <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                  <button type="button" class="ot-role-btn" data-role="data_entry" onclick="switchRoleSimulator('data_entry')">
+                    <i class="fa-solid fa-user-pen"></i> Authorised Office Data Entry User
+                  </button>
+                  <button type="button" class="ot-role-btn active" data-role="head_of_office" onclick="switchRoleSimulator('head_of_office')">
+                    <i class="fa-solid fa-user-tie"></i> Head of Office / Officer Holding Charge
+                  </button>
+                  <button type="button" class="ot-role-btn" data-role="dispatch_user" onclick="switchRoleSimulator('dispatch_user')">
+                    <i class="fa-solid fa-paper-plane"></i> Authorised Office Dispatch User
+                  </button>
+                  <button type="button" class="ot-role-btn" data-role="admin" onclick="switchRoleSimulator('admin')">
+                    <i class="fa-solid fa-shield-halved"></i> Department Administrator / Commissionerate
+                  </button>
+                </div>
+
+                <div style="margin-top: 14px; font-size: 0.84rem; line-height: 1.5; color: #475569; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                  <strong>Active Permissions Matrix:</strong><br>
+                  • <strong>Data Entry:</strong> Create/update profiles, save drafts, prepare office report drafts.<br>
+                  • <strong>Head of Office:</strong> Full office access, verify report with statutory certification, authorize forwarding.<br>
+                  • <strong>Dispatch User:</strong> Record outward/dispatch numbers and dates for verified reports.<br>
+                  • <strong>Commissionerate Administrator:</strong> Statewide multi-office inspection, filtering, global exports.
+                </div>
+              </div>
+
+              <!-- Comprehensive Audit Trail Table -->
+              <div class="section-header" style="margin-top: 20px;">
+                <h4 style="font-size: 1rem; font-weight: 700; color: var(--primary-900);">
+                  <i class="fa-solid fa-clock-rotate-left"></i> Module Audit Trail (Asia/Kolkata Time)
+                </h4>
+              </div>
+
+              <div class="data-table-container">
+                <table class="data-table" id="otAuditLogTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 40px; text-align: center;">#</th>
+                      <th>Timestamp (IST)</th>
+                      <th>Action Performed</th>
+                      <th>Profile / Report Reference</th>
+                      <th>Authenticated User &amp; Role</th>
+                    </tr>
+                  </thead>
+                  <tbody id="otAuditLogTableBody">
+                    <!-- Populated via JS -->
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
           </div>
 
           <!-- ADMIN DIRECT ENTRY SUBVIEW -->
