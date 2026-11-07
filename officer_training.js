@@ -514,9 +514,17 @@ function initOfficerTrainingModule() {
   if (officeSelect && !officeSelect.value) {
     officeSelect.value = user.assignedOfficeCode;
   }
+  const officeSearchInput = document.getElementById('otOfficeSearchInput');
+  if (officeSearchInput && officeSelect && officeSelect.value) {
+    const opt = officeSelect.querySelector(`option[value="${officeSelect.value}"]`);
+    if (opt) officeSearchInput.value = opt.textContent;
+  }
 
   // Load from Supabase in background
   syncOfficerProfilesWithSupabase();
+
+  // Subscribe to live Realtime updates from Supabase
+  subscribeToRealtimeOfficerProfiles();
 }
 
 // Window beforeunload prompt if unsaved changes exist
@@ -573,6 +581,8 @@ function handleOfficeSearchFilter(inputEl, targetSelectId) {
 
   const optgroups = sel.querySelectorAll('optgroup');
   let matchCount = 0;
+  let exactMatchOpt = null;
+  let firstMatchOpt = null;
 
   optgroups.forEach(group => {
     let groupHasMatch = false;
@@ -580,15 +590,82 @@ function handleOfficeSearchFilter(inputEl, targetSelectId) {
     options.forEach(opt => {
       const text = opt.textContent.toLowerCase();
       const code = opt.value.toLowerCase();
-      const matches = !q || text.includes(q) || code.includes(q);
+      const cleanCode = code.replace(/[^a-z0-9]/g, '');
+      const cleanQ = q.replace(/[^a-z0-9]/g, '');
+      const matches = !q || text.includes(q) || code.includes(q) || cleanCode.includes(cleanQ);
       opt.style.display = matches ? '' : 'none';
-      if (matches) {
+      if (matches && opt.value) {
         groupHasMatch = true;
         matchCount++;
+        if (!firstMatchOpt) firstMatchOpt = opt;
+        if (code === q || cleanCode === cleanQ || text === q) {
+          exactMatchOpt = opt;
+        }
       }
     });
     group.style.display = groupHasMatch ? '' : 'none';
   });
+
+  // If user typed an exact code match (e.g. KL01, KLE01, TCO), auto-select it immediately
+  if (exactMatchOpt) {
+    sel.value = exactMatchOpt.value;
+    clearFieldError(targetSelectId);
+    clearFieldError(inputEl.id);
+    markFormDirty(true);
+  }
+}
+
+function handleOfficeSearchBlur(inputEl, targetSelectId) {
+  const q = (inputEl.value || "").toLowerCase().trim();
+  const sel = document.getElementById(targetSelectId);
+  if (!sel || !q) return;
+
+  // If already selected and matches visible option, update text and return
+  if (sel.value) {
+    const selectedOpt = sel.options[sel.selectedIndex];
+    if (selectedOpt && selectedOpt.style.display !== 'none' && selectedOpt.value) {
+      inputEl.value = selectedOpt.textContent;
+      clearFieldError(targetSelectId);
+      clearFieldError(inputEl.id);
+      return;
+    }
+  }
+
+  // Auto-pick first visible matching option
+  const visibleOptions = Array.from(sel.querySelectorAll('option')).filter(o => o.value && o.style.display !== 'none');
+  if (visibleOptions.length > 0) {
+    sel.value = visibleOptions[0].value;
+    inputEl.value = visibleOptions[0].textContent;
+    clearFieldError(targetSelectId);
+    clearFieldError(inputEl.id);
+    markFormDirty(true);
+  } else {
+    // Check against ALL_MVD_OFFICES
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+    const m = ALL_MVD_OFFICES.find(o => 
+      o.code.toLowerCase() === q || 
+      o.code.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanQ ||
+      o.name.toLowerCase().includes(q) || 
+      `${o.code} ${o.name}`.toLowerCase().includes(q)
+    );
+    if (m) {
+      sel.value = m.code;
+      inputEl.value = `${m.code} — ${m.name}`;
+      clearFieldError(targetSelectId);
+      clearFieldError(inputEl.id);
+      markFormDirty(true);
+    }
+  }
+}
+
+function handleOfficeSelectPicked(sel) {
+  const sInput = document.getElementById('otOfficeSearchInput');
+  if (sInput && sel.selectedIndex >= 0) {
+    sInput.value = sel.options[sel.selectedIndex]?.value ? sel.options[sel.selectedIndex].text : '';
+  }
+  clearFieldError(sel.id);
+  if (sInput) clearFieldError(sInput.id);
+  markFormDirty(true);
 }
 
 // --- 7. DYNAMIC FORM RENDERING (ADDITIONAL QUALIFICATIONS & SKILLS) ---
@@ -938,7 +1015,26 @@ function extractOfficerFormData(status = 'submitted') {
   const rawPen = (document.getElementById('otPen')?.value || "").trim();
   const pen = otSanitizePEN(rawPen);
   const designation = document.getElementById('otDesignationSelect')?.value || "";
-  const officeCode = document.getElementById('otMainOfficeSelect')?.value || "";
+  let officeCode = document.getElementById('otMainOfficeSelect')?.value || "";
+  if (!officeCode) {
+    const sInput = document.getElementById('otOfficeSearchInput');
+    const q = (sInput?.value || "").toLowerCase().trim();
+    if (q) {
+      const cleanQ = q.replace(/[^a-z0-9]/g, '');
+      const match = ALL_MVD_OFFICES.find(o => 
+        o.code.toLowerCase() === q || 
+        o.code.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanQ ||
+        o.name.toLowerCase().includes(q) || 
+        `${o.code} ${o.name}`.toLowerCase().includes(q)
+      );
+      if (match) {
+        officeCode = match.code;
+        const sel = document.getElementById('otMainOfficeSelect');
+        if (sel) sel.value = match.code;
+        if (sInput) sInput.value = `${match.code} — ${match.name}`;
+      }
+    }
+  }
   const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode);
   const officeName = officeObj ? officeObj.name : "";
 
@@ -1128,11 +1224,33 @@ async function handleSaveDraft() {
     return;
   }
 
-  saveOfficerRecordToStore(data);
-  markFormDirty(false);
-  otLogAudit('SAVE_DRAFT', data.pen, { officer: data.officerFullName, office: data.officeCode });
-  showToast(`Draft saved successfully for PEN: ${data.pen}`, "success");
-  await saveOfficerQualificationToSupabase(data);
+  const draftBtn = document.getElementById('otBtnSaveDraft');
+  const origBtnContent = draftBtn ? draftBtn.innerHTML : '';
+  if (draftBtn) {
+    draftBtn.disabled = true;
+    draftBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+  }
+
+  try {
+    saveOfficerRecordToStore(data);
+    markFormDirty(false);
+    otLogAudit('SAVE_DRAFT', data.pen, { officer: data.officerFullName, office: data.officeCode });
+
+    const result = await saveOfficerQualificationToSupabase(data);
+    if (result && result.success) {
+      showToast(`Draft for PEN: ${data.pen} saved to Supabase in real time!`, "success");
+    } else {
+      showToast(`Draft saved locally for PEN: ${data.pen}`, "info");
+    }
+  } catch (err) {
+    console.warn("Draft save error:", err);
+    showToast(`Draft saved locally for PEN: ${data.pen}`, "info");
+  } finally {
+    if (draftBtn) {
+      draftBtn.disabled = false;
+      draftBtn.innerHTML = origBtnContent;
+    }
+  }
 }
 
 async function handleProfileSubmit(e) {
@@ -1147,20 +1265,44 @@ async function handleProfileSubmit(e) {
     return;
   }
 
-  // Check if office has an existing verified report: if so, mark that report for reverification
-  triggerReverificationCheck(data.officeCode);
+  const submitBtn = document.getElementById('otBtnSubmitProfile');
+  const origBtnContent = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Supabase...';
+  }
 
-  saveOfficerRecordToStore(data);
-  markFormDirty(false);
-  otLogAudit(otEditingProfileId ? 'UPDATE_PROFILE' : 'CREATE_PROFILE', data.pen, { officer: data.officerFullName, designation: data.designation, office: data.officeCode });
-  showToast(`Officer Profile for "${data.officerFullName}" (PEN: ${data.pen}) submitted successfully!`, "success");
+  try {
+    // Check if office has an existing verified report: if so, mark that report for reverification
+    triggerReverificationCheck(data.officeCode);
 
-  await saveOfficerQualificationToSupabase(data);
+    saveOfficerRecordToStore(data);
+    markFormDirty(false);
+    otLogAudit(otEditingProfileId ? 'UPDATE_PROFILE' : 'CREATE_PROFILE', data.pen, { officer: data.officerFullName, designation: data.designation, office: data.officeCode });
 
-  // Refresh directory and office tables
-  renderAdminOfficersDirectory();
-  renderOfficeSummaryReport();
-  resetOfficerForm();
+    const result = await saveOfficerQualificationToSupabase(data);
+
+    if (result && result.success) {
+      showToast(`Officer Profile for "${data.officerFullName}" (PEN: ${data.pen}) saved to Supabase in real time!`, "success");
+    } else {
+      const errMsg = result?.error?.message || "Sync warning";
+      showToast(`Saved locally, but Supabase returned error: ${errMsg}`, "warning");
+      console.warn("Supabase save error:", result?.error);
+    }
+
+    // Refresh directory and office tables
+    renderAdminOfficersDirectory();
+    renderOfficeSummaryReport();
+    resetOfficerForm();
+  } catch (err) {
+    console.error("Profile submit error:", err);
+    showToast(`Submission error: ${err.message}`, "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnContent;
+    }
+  }
 }
 
 function saveOfficerRecordToStore(profile) {
@@ -1203,6 +1345,13 @@ function resetOfficerForm() {
 
   renderStagedTrainingTable();
   prefillEnteredByDetails();
+
+  const sInput = document.getElementById('otOfficeSearchInput');
+  if (sInput) sInput.value = '';
+  const sel = document.getElementById('otMainOfficeSelect');
+  if (sel) {
+    sel.querySelectorAll('option, optgroup').forEach(el => el.style.display = '');
+  }
 }
 
 function cancelOfficerEdit() {
@@ -1232,6 +1381,11 @@ function loadProfileForEditing(profileId) {
   document.getElementById('otPen').value = profile.pen || "";
   document.getElementById('otDesignationSelect').value = profile.designation || "";
   document.getElementById('otMainOfficeSelect').value = profile.officeCode || "";
+  const sInput = document.getElementById('otOfficeSearchInput');
+  if (sInput) {
+    const selOpt = document.getElementById('otMainOfficeSelect')?.querySelector(`option[value="${profile.officeCode}"]`);
+    sInput.value = selOpt ? selOpt.textContent : (profile.officeCode ? `${profile.officeCode} — ${profile.officeName || ''}` : '');
+  }
 
   // Section 2
   document.getElementById('otGenEdSelect').value = profile.generalEducation || "";
@@ -1598,7 +1752,7 @@ async function deleteOfficerProfile(profileId) {
   otLogAudit('DELETE_PROFILE', p.pen, { officer: p.officerFullName, office: p.officeCode });
   showToast(`Deleted profile for PEN: ${p.pen}`, "info");
 
-  await deleteOfficerQualificationFromSupabase(profileId);
+  await deleteOfficerQualificationFromSupabase(profileId, p.pen);
   renderAdminOfficersDirectory();
   renderOfficeSummaryReport();
 }
@@ -2239,14 +2393,109 @@ function switchOfficerSubTab(tabName) {
   if (tabName === 'report') renderOfficeSummaryReport();
 }
 
-// --- 15. SUPABASE BACKEND PERSISTENCE ---
+// --- 15. SUPABASE BACKEND PERSISTENCE & REALTIME SYNCHRONIZATION ---
+
+function getSupabaseClient() {
+  if (window.supabaseClient) return window.supabaseClient;
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    window.supabaseClient = supabaseClient;
+    return supabaseClient;
+  }
+  if (window.supabase && typeof window.supabase.createClient === 'function') {
+    try {
+      window.supabaseClient = window.supabase.createClient(
+        'https://mghdekancxfqtnfoyfkj.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1naGRla2FuY3hmcXRuZm95ZmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NjY5MzksImV4cCI6MjEwMDQ0MjkzOX0.wb9ZdBEKQSgmbd-vUFsbnSh3iHFYmAPW4Ywgb8vf4V0'
+      );
+      return window.supabaseClient;
+    } catch (e) {
+      console.warn("Could not instantiate Supabase client:", e);
+    }
+  }
+  return null;
+}
+
+let otRealtimeSubscribed = false;
+function subscribeToRealtimeOfficerProfiles() {
+  if (otRealtimeSubscribed) return;
+  const client = getSupabaseClient();
+  if (!client || typeof client.channel !== 'function') return;
+
+  try {
+    const channel = client.channel('realtime_officer_profiles');
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'officer_profiles' },
+      (payload) => {
+        console.log("Supabase Realtime event for officer_profiles:", payload);
+        const { eventType, new: newRec, old: oldRec } = payload;
+        if (eventType === 'DELETE') {
+          const targetPen = oldRec?.pen;
+          const targetId = oldRec?.id;
+          if (targetPen || targetId) {
+            otProfilesStore = otProfilesStore.filter(p => (targetPen ? p.pen !== targetPen : true) && (targetId ? p.id !== targetId : true));
+            localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+            renderAdminOfficersDirectory();
+            renderOfficeSummaryReport();
+          }
+        } else if (newRec && newRec.pen) {
+          const mapped = {
+            id: newRec.id || ('off_' + newRec.pen),
+            officerFullName: newRec.officer_full_name,
+            pen: newRec.pen,
+            designation: newRec.current_designation,
+            officeCode: newRec.office_code,
+            officeName: newRec.office_name,
+            generalEducation: newRec.general_education || "Plus Two",
+            generalEducationOther: newRec.general_education_other || "",
+            technicalQualification: newRec.technical_qualification || "B.Tech",
+            technicalQualificationOther: newRec.technical_qualification_other || "",
+            institution: newRec.institution || "",
+            passingYear: newRec.passing_year || 2020,
+            grade: newRec.class_grade || "",
+            additionalQualifications: Array.isArray(newRec.additional_qualifications) ? newRec.additional_qualifications : [],
+            specializedSkills: Array.isArray(newRec.specialized_skills) ? newRec.specialized_skills : [],
+            customSkills: "",
+            trainingHistory: Array.isArray(newRec.training_history) ? newRec.training_history : [],
+            enteredBy: {
+              fullName: newRec.entered_by_name || "Reporting Officer",
+              designation: newRec.entered_by_designation || "Officer",
+              mobile: newRec.entered_by_mobile || "9447000000",
+              userId: newRec.entered_by_user_id || "",
+              timestamp: newRec.entered_by_timestamp || newRec.created_at || new Date().toISOString()
+            },
+            status: newRec.status || "submitted",
+            createdAt: newRec.created_at || new Date().toISOString(),
+            updatedAt: newRec.updated_at || new Date().toISOString(),
+            version: newRec.version || 1
+          };
+          const existingIdx = otProfilesStore.findIndex(p => p.pen === mapped.pen);
+          if (existingIdx >= 0) {
+            otProfilesStore[existingIdx] = mapped;
+          } else {
+            otProfilesStore.unshift(mapped);
+          }
+          localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+          renderAdminOfficersDirectory();
+          renderOfficeSummaryReport();
+        }
+      }
+    ).subscribe((status) => {
+      console.log("Supabase Realtime Officer Profiles subscription status:", status);
+      if (status === 'SUBSCRIBED') otRealtimeSubscribed = true;
+    });
+  } catch (err) {
+    console.warn("Could not subscribe to officer profiles realtime:", err);
+  }
+}
 
 async function syncOfficerProfilesWithSupabase() {
-  if (!window.supabaseClient) return;
+  const client = getSupabaseClient();
+  if (!client) return;
 
   try {
     // 1. Primary: sync from officer_profiles
-    let { data, error } = await window.supabaseClient
+    let { data, error } = await client
       .from('officer_profiles')
       .select('*');
 
@@ -2295,7 +2544,7 @@ async function syncOfficerProfilesWithSupabase() {
       renderAdminOfficersDirectory();
     } else {
       // Fallback: sync from legacy officer_qualifications
-      const legacyRes = await window.supabaseClient
+      const legacyRes = await client
         .from('officer_qualifications')
         .select('*');
       if (!legacyRes.error && legacyRes.data && legacyRes.data.length > 0) {
@@ -2358,9 +2607,10 @@ async function syncOfficerProfilesWithSupabase() {
 }
 
 async function syncOfficerReportsWithSupabase() {
-  if (!window.supabaseClient) return;
+  const client = getSupabaseClient();
+  if (!client) return;
   try {
-    const { data, error } = await window.supabaseClient
+    const { data, error } = await client
       .from('office_report_versions')
       .select('*');
 
@@ -2400,9 +2650,10 @@ async function syncOfficerReportsWithSupabase() {
 }
 
 async function syncOfficerAuditLogsWithSupabase() {
-  if (!window.supabaseClient) return;
+  const client = getSupabaseClient();
+  if (!client) return;
   try {
-    const { data, error } = await window.supabaseClient
+    const { data, error } = await client
       .from('officer_audit_logs')
       .select('*')
       .order('timestamp', { ascending: false })
@@ -2432,7 +2683,11 @@ async function syncOfficerAuditLogsWithSupabase() {
 }
 
 async function saveOfficerQualificationToSupabase(record) {
-  if (!window.supabaseClient) return;
+  const client = getSupabaseClient();
+  if (!client) {
+    console.warn("Supabase client not initialized.");
+    return { success: false, error: new Error("Database client not available") };
+  }
 
   try {
     // 1. Save to officer_profiles
@@ -2463,59 +2718,68 @@ async function saveOfficerQualificationToSupabase(record) {
       updated_at: new Date().toISOString()
     };
 
-    const { error: profileError } = await window.supabaseClient
+    const { data: upsertData, error: profileError } = await client
       .from('officer_profiles')
-      .upsert(profilePayload, { onConflict: 'pen' });
+      .upsert(profilePayload, { onConflict: 'pen' })
+      .select();
 
     if (profileError) {
-      console.warn("Could not upsert to officer_profiles:", profileError);
+      console.error("Could not upsert to officer_profiles:", profileError);
+      return { success: false, error: profileError };
     }
 
     // 2. Also save to legacy officer_qualifications for compatibility
-    const legacyPayload = {
-      office_name: `${record.officeCode} ${record.officeName}`,
-      entry_officer_name: record.enteredBy?.fullName,
-      entry_officer_designation: record.enteredBy?.designation,
-      entry_officer_mobile: record.enteredBy?.mobile,
-      officer_name: record.officerFullName,
-      officer_pen: record.pen,
-      officer_designation: record.designation,
-      officer_mobile: record.enteredBy?.mobile,
-      officer_email: record.enteredBy?.userId,
-      educational_qualification: record.technicalQualification,
-      qualification_other: record.technicalQualificationOther,
-      specialization: (record.specializedSkills || []).join(', '),
-      technical_certifications: (record.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', '),
-      training_attended: (record.trainingHistory || []).map(t => t.attended).join('; '),
-      training_institutes: (record.trainingHistory || []).map(t => t.conductedBy).join('; '),
-      recent_training_year: record.passingYear || 2024,
-      training_details: JSON.stringify(record.trainingHistory || []),
-      updated_at: new Date().toISOString()
-    };
+    try {
+      const legacyPayload = {
+        office_name: `${record.officeCode} ${record.officeName}`,
+        entry_officer_name: record.enteredBy?.fullName,
+        entry_officer_designation: record.enteredBy?.designation,
+        entry_officer_mobile: record.enteredBy?.mobile,
+        officer_name: record.officerFullName,
+        officer_pen: record.pen,
+        officer_designation: record.designation,
+        officer_mobile: record.enteredBy?.mobile,
+        officer_email: record.enteredBy?.userId,
+        educational_qualification: record.technicalQualification,
+        qualification_other: record.technicalQualificationOther,
+        specialization: (record.specializedSkills || []).join(', '),
+        technical_certifications: (record.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', '),
+        training_attended: (record.trainingHistory || []).map(t => t.attended).join('; '),
+        training_institutes: (record.trainingHistory || []).map(t => t.conductedBy).join('; '),
+        recent_training_year: record.passingYear || 2024,
+        training_details: JSON.stringify(record.trainingHistory || []),
+        updated_at: new Date().toISOString()
+      };
 
-    await window.supabaseClient
-      .from('officer_qualifications')
-      .upsert(legacyPayload, { onConflict: 'officer_pen' });
+      await client
+        .from('officer_qualifications')
+        .upsert(legacyPayload, { onConflict: 'officer_pen' });
+    } catch (legErr) {
+      console.warn("Legacy officer_qualifications sync warning (ignored):", legErr);
+    }
 
+    return { success: true, data: profilePayload };
   } catch (e) {
-    console.warn("Could not upsert officer to Supabase:", e);
+    console.error("Could not upsert officer to Supabase:", e);
+    return { success: false, error: e };
   }
 }
 
-async function deleteOfficerQualificationFromSupabase(profileId) {
-  if (!window.supabaseClient) return;
+async function deleteOfficerQualificationFromSupabase(profileId, explicitPen) {
+  const client = getSupabaseClient();
+  if (!client) return;
   try {
-    const p = otProfilesStore.find(x => x.id === profileId);
-    if (p && p.pen) {
-      await window.supabaseClient
+    const pen = explicitPen || otProfilesStore.find(x => x.id === profileId)?.pen;
+    if (pen) {
+      await client
         .from('officer_profiles')
         .delete()
-        .eq('pen', p.pen);
+        .eq('pen', pen);
 
-      await window.supabaseClient
+      await client
         .from('officer_qualifications')
         .delete()
-        .eq('officer_pen', p.pen);
+        .eq('officer_pen', pen);
     }
   } catch (e) {
     console.warn("Supabase delete failed:", e);
@@ -2523,7 +2787,8 @@ async function deleteOfficerQualificationFromSupabase(profileId) {
 }
 
 async function saveOfficerReportToSupabase(snapshot) {
-  if (!window.supabaseClient || !snapshot) return;
+  const client = getSupabaseClient();
+  if (!client || !snapshot) return;
   try {
     const payload = {
       id: "rep_" + snapshot.officeCode + "_v" + snapshot.version,
@@ -2549,7 +2814,7 @@ async function saveOfficerReportToSupabase(snapshot) {
       updated_at: new Date().toISOString()
     };
 
-    await window.supabaseClient
+    await client
       .from('office_report_versions')
       .upsert(payload, { onConflict: 'reference_number' });
   } catch (e) {
@@ -2558,7 +2823,8 @@ async function saveOfficerReportToSupabase(snapshot) {
 }
 
 async function saveOfficerAuditLogToSupabase(entry) {
-  if (!window.supabaseClient || !entry) return;
+  const client = getSupabaseClient();
+  if (!client || !entry) return;
   try {
     const payload = {
       id: entry.id,
@@ -2571,7 +2837,7 @@ async function saveOfficerAuditLogToSupabase(entry) {
       changed_fields: entry.details || {}
     };
 
-    await window.supabaseClient
+    await client
       .from('officer_audit_logs')
       .insert(payload);
   } catch (e) {

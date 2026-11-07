@@ -11,10 +11,13 @@ let supabaseClient = null;
 if (window.supabase && typeof window.supabase.createClient === 'function') {
   try {
     supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    window.supabaseClient = supabaseClient;
     console.log("Supabase client initialized successfully.");
   } catch (err) {
     console.warn("Failed to initialize Supabase client, running in local mode:", err);
   }
+} else if (window.supabaseClient) {
+  supabaseClient = window.supabaseClient;
 }
 
 // --- 2. PRESET MVD OFFICES DATABASE ---
@@ -566,6 +569,7 @@ document.addEventListener('DOMContentLoaded', () => {
   // Load from Supabase on launch
   syncWithSupabaseBackend();
   syncOfficerQualificationsFromSupabase();
+  subscribeToRealtimeITEquipment();
 
   // Initial UI Render
   renderPublicDataTable();
@@ -695,6 +699,105 @@ function renderGenericModuleView(mod) {
 
 // --- 8. SUPABASE SYNC ENGINES ---
 
+function mapDbRowToInventoryRecord(row) {
+  return {
+    officeName: row.office_name,
+    availableNetwork: row.network_provider || '',
+    otherNetworkDetails: row.network_provider_other || '',
+    networkSpeed: row.network_speed || '',
+    switchesAvailable: row.switches_available || 'Not Sure',
+    switchesDetails: row.switches_details || '',
+    serversAvailable: row.servers_available || 'No',
+    serversDetails: row.servers_details || '',
+    operatingSystem: row.os_with_version || '',
+    monitorsWorking: row.monitors_working ?? 0,
+    monitorsNotWorking: row.monitors_not_working ?? 0,
+    cpuWorking: row.cpu_working ?? 0,
+    cpuNotWorking: row.cpu_not_working ?? 0,
+    laptopsWorking: row.laptops_working ?? 0,
+    laptopsNotWorking: row.laptops_not_working ?? 0,
+    aioWorking: row.aio_working ?? 0,
+    aioNotWorking: row.aio_not_working ?? 0,
+    printers: row.printers_data || {},
+    upsWorking: row.ups_working ?? 0,
+    upsNotWorking: row.ups_not_working ?? 0,
+    upsAvailable: row.ups_available || 'Yes',
+    upsUnitsCount: row.ups_units_count ?? 0,
+    upsCapacity: row.ups_capacity || '',
+    upsCapacityOther: row.ups_capacity_other || '',
+    upsCondition: row.ups_condition || '',
+    batteryMake: row.battery_make || '',
+    batteryAh: row.battery_ah ?? 0,
+    minBatteriesRequired: row.min_batteries_required ?? 0,
+    serviceReportSent: row.service_report_sent || '',
+    serviceReportDate: row.service_report_date || '',
+    powerRemarks: row.power_remarks || '',
+    certified: row.certified ?? true,
+    batteriesInUse: row.batteries_in_use ?? 0,
+    batteriesNotInUse: row.batteries_not_in_use ?? 0,
+    ageUnder3: row.systems_under_3yrs ?? 0,
+    age3To5: row.systems_3_to_5yrs ?? 0,
+    age5To8: row.systems_5_to_8yrs ?? 0,
+    ageAbove8: row.systems_above_8yrs ?? 0,
+    desktopNotWorkingSummary: row.desktop_units_not_working ?? 0,
+    remarks: row.remarks || '',
+    entryOfficerName: row.entry_officer_name || '',
+    entryOfficerDesignation: row.entry_officer_designation || '',
+    entryOfficerMobile: row.entry_officer_mobile || '',
+    submittedByEmail: row.submitted_by_email || '',
+    createdOfficerName: row.created_officer_name || row.entry_officer_name || '',
+    createdOfficerDesignation: row.created_officer_designation || row.entry_officer_designation || '',
+    createdOfficerMobile: row.created_officer_mobile || row.entry_officer_mobile || '',
+    createdOfficerEmail: row.created_officer_email || row.submitted_by_email || '',
+    createdDate: row.created_date || (row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'),
+    updatedOfficerName: row.updated_officer_name || row.entry_officer_name || '',
+    updatedOfficerDesignation: row.updated_officer_designation || row.entry_officer_designation || '',
+    updatedOfficerMobile: row.updated_officer_mobile || row.entry_officer_mobile || '',
+    updatedOfficerEmail: row.updated_officer_email || row.submitted_by_email || '',
+    lastUpdated: row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'
+  };
+}
+
+let itRealtimeSubscribed = false;
+function subscribeToRealtimeITEquipment() {
+  if (itRealtimeSubscribed) return;
+  if (!supabaseClient || typeof supabaseClient.channel !== 'function') return;
+
+  try {
+    const channel = supabaseClient.channel('realtime_mvd_it_equipment');
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'mvd_it_equipment' },
+      (payload) => {
+        console.log("Supabase Realtime event for mvd_it_equipment:", payload);
+        const { eventType, new: newRec, old: oldRec } = payload;
+        if (eventType === 'DELETE') {
+          if (oldRec && oldRec.office_name) {
+            delete inventoryStore[oldRec.office_name];
+          } else if (oldRec && oldRec.id) {
+            Object.keys(inventoryStore).forEach(k => {
+              if (inventoryStore[k].id === oldRec.id) delete inventoryStore[k];
+            });
+          }
+        } else if (newRec && newRec.office_name) {
+          inventoryStore[newRec.office_name] = mapDbRowToInventoryRecord(newRec);
+        }
+        localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
+        renderPublicDataTable();
+        renderAdminDataTable();
+        if (typeof renderAdminDashboard === 'function' && activeSession === 'admin') {
+          renderAdminDashboard();
+        }
+      }
+    ).subscribe((status) => {
+      console.log("Supabase Realtime IT Equipment subscription status:", status);
+      if (status === 'SUBSCRIBED') itRealtimeSubscribed = true;
+    });
+  } catch (err) {
+    console.warn("Could not subscribe to IT equipment realtime:", err);
+  }
+}
+
 // A. IT Equipment Sync
 async function syncWithSupabaseBackend() {
   if (!supabaseClient) return;
@@ -709,62 +812,7 @@ async function syncWithSupabaseBackend() {
     if (equipData) {
       const freshStore = {};
       equipData.forEach(row => {
-        freshStore[row.office_name] = {
-          officeName: row.office_name,
-          availableNetwork: row.network_provider || '',
-          otherNetworkDetails: row.network_provider_other || '',
-          networkSpeed: row.network_speed || '',
-          switchesAvailable: row.switches_available || 'Not Sure',
-          switchesDetails: row.switches_details || '',
-          serversAvailable: row.servers_available || 'No',
-          serversDetails: row.servers_details || '',
-          operatingSystem: row.os_with_version || '',
-          monitorsWorking: row.monitors_working ?? 0,
-          monitorsNotWorking: row.monitors_not_working ?? 0,
-          cpuWorking: row.cpu_working ?? 0,
-          cpuNotWorking: row.cpu_not_working ?? 0,
-          laptopsWorking: row.laptops_working ?? 0,
-          laptopsNotWorking: row.laptops_not_working ?? 0,
-          aioWorking: row.aio_working ?? 0,
-          aioNotWorking: row.aio_not_working ?? 0,
-          printers: row.printers_data || {},
-          upsWorking: row.ups_working ?? 0,
-          upsNotWorking: row.ups_not_working ?? 0,
-          upsAvailable: row.ups_available || 'Yes',
-          upsUnitsCount: row.ups_units_count ?? 0,
-          upsCapacity: row.ups_capacity || '',
-          upsCapacityOther: row.ups_capacity_other || '',
-          upsCondition: row.ups_condition || '',
-          batteryMake: row.battery_make || '',
-          batteryAh: row.battery_ah ?? 0,
-          minBatteriesRequired: row.min_batteries_required ?? 0,
-          serviceReportSent: row.service_report_sent || '',
-          serviceReportDate: row.service_report_date || '',
-          powerRemarks: row.power_remarks || '',
-          certified: row.certified ?? true,
-          batteriesInUse: row.batteries_in_use ?? 0,
-          batteriesNotInUse: row.batteries_not_in_use ?? 0,
-          ageUnder3: row.systems_under_3yrs ?? 0,
-          age3To5: row.systems_3_to_5yrs ?? 0,
-          age5To8: row.systems_5_to_8yrs ?? 0,
-          ageAbove8: row.systems_above_8yrs ?? 0,
-          desktopNotWorkingSummary: row.desktop_units_not_working ?? 0,
-          remarks: row.remarks || '',
-          entryOfficerName: row.entry_officer_name || '',
-          entryOfficerDesignation: row.entry_officer_designation || '',
-          entryOfficerMobile: row.entry_officer_mobile || '',
-          submittedByEmail: row.submitted_by_email || '',
-          createdOfficerName: row.created_officer_name || row.entry_officer_name || '',
-          createdOfficerDesignation: row.created_officer_designation || row.entry_officer_designation || '',
-          createdOfficerMobile: row.created_officer_mobile || row.entry_officer_mobile || '',
-          createdOfficerEmail: row.created_officer_email || row.submitted_by_email || '',
-          createdDate: row.created_date || (row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'),
-          updatedOfficerName: row.updated_officer_name || row.entry_officer_name || '',
-          updatedOfficerDesignation: row.updated_officer_designation || row.entry_officer_designation || '',
-          updatedOfficerMobile: row.updated_officer_mobile || row.entry_officer_mobile || '',
-          updatedOfficerEmail: row.updated_officer_email || row.submitted_by_email || '',
-          lastUpdated: row.updated_at ? new Date(row.updated_at).toLocaleString('en-IN') : 'N/A'
-        };
+        freshStore[row.office_name] = mapDbRowToInventoryRecord(row);
       });
 
       inventoryStore = freshStore;
@@ -919,7 +967,7 @@ async function deleteOfficerQualificationFromSupabase(officerId) {
 
 // C. IT Equipment Save and Delete
 async function saveRecordToSupabase(record) {
-  if (!supabaseClient) return;
+  if (!supabaseClient) return { success: false, error: new Error('Supabase client not initialized') };
 
   try {
     const dbPayload = {
@@ -986,8 +1034,10 @@ async function saveRecordToSupabase(record) {
       .upsert(dbPayload, { onConflict: 'office_name' });
 
     if (error) throw error;
+    return { success: true };
   } catch (err) {
     console.error("Error saving record to Supabase:", err);
+    return { success: false, error: err };
   }
 }
 
@@ -2228,9 +2278,12 @@ async function handleFormSubmit(e) {
     inventoryStore[officeName] = record;
     localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
 
-    await saveRecordToSupabase(record);
-
-    showToast(`IT Equipment details for "${officeName}" saved successfully!`, 'success');
+    const sbRes = await saveRecordToSupabase(record);
+    if (sbRes && sbRes.success) {
+      showToast(`IT Equipment details for "${officeName}" saved to Supabase in real time!`, 'success');
+    } else {
+      showToast(`Saved locally. Supabase notice: ${sbRes?.error?.message || 'Check connection'}`, 'warning');
+    }
 
     renderAdminDataTable();
     renderPublicDataTable();

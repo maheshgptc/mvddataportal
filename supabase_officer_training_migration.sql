@@ -236,3 +236,36 @@ GRANT ALL ON TABLE public.officer_qualifications TO anon, authenticated, service
 -- 11. Reload PostgREST Schema Cache
 NOTIFY pgrst, 'reload schema';
 
+-- 12. Enable Supabase Realtime Replication for Live Multi-Device Sync
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'officer_profiles'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.officer_profiles;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'office_report_versions'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.office_report_versions;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'officer_audit_logs'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.officer_audit_logs;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'officer_qualifications'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.officer_qualifications;
+  END IF;
+END $$;
+
+

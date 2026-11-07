@@ -723,9 +723,9 @@
                     <label for="otMainOfficeSelect"><i class="fa-solid fa-building"></i> Office Name (Code — Office Name) <span class="req-star">*</span></label>
                     <div class="office-search-field">
                       <i class="fa-solid fa-magnifying-glass"></i>
-                      <input type="text" class="form-control" placeholder="Search office by code or name..." oninput="handleOfficeSearchFilter(this, 'otMainOfficeSelect')">
+                      <input type="text" id="otOfficeSearchInput" class="form-control" placeholder="Search office by code or name..." oninput="handleOfficeSearchFilter(this, 'otMainOfficeSelect')" onblur="handleOfficeSearchBlur(this, 'otMainOfficeSelect')" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleOfficeSearchBlur(this, 'otMainOfficeSelect');}">
                     </div>
-                    <select id="otMainOfficeSelect" class="form-control" required onchange="markFormDirty(true)" style="margin-top: 4px;">
+                    <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)" style="margin-top: 4px;">
                       <option value="">-- Select Office (Code — Office Name) --</option>
                     </select>
                     <div class="field-error" id="err_otMainOfficeSelect"></div>
@@ -927,13 +927,13 @@
                   <button type="button" class="btn btn-secondary" onclick="resetOfficerForm()">
                     <i class="fa-solid fa-xmark"></i> Cancel
                   </button>
-                  <button type="button" class="btn btn-outline" onclick="handleSaveDraft()" style="font-weight: 700; border-color: #cbd5e1;">
+                  <button type="button" id="otBtnSaveDraft" class="btn btn-outline" onclick="handleSaveDraft()" style="font-weight: 700; border-color: #cbd5e1;">
                     <i class="fa-solid fa-file-arrow-down"></i> Save Draft
                   </button>
                   <button type="button" class="btn btn-outline" onclick="handleProfilePreview()" style="font-weight: 700;">
                     <i class="fa-solid fa-eye"></i> Preview Profile
                   </button>
-                  <button type="submit" class="btn btn-primary btn-lg" style="background: #0B3B24; border-color: #062C1A;">
+                  <button type="submit" id="otBtnSubmitProfile" class="btn btn-primary btn-lg" style="background: #0B3B24; border-color: #062C1A;">
                     <i class="fa-solid fa-check"></i> Submit Profile
                   </button>
                 </div>
