@@ -923,16 +923,22 @@ async function saveOfficerQualificationToSupabase(record) {
   }
 }
 
-async function deleteOfficerQualificationFromSupabase(officerId) {
+async function deleteOfficerQualificationFromSupabase(officerId, explicitPen) {
+  if (typeof window.deleteOfficerFromSupabase === 'function') {
+    return await window.deleteOfficerFromSupabase(officerId, explicitPen);
+  }
   if (!supabaseClient) return true;
 
   try {
-    const { error } = await supabaseClient
-      .from('officer_qualifications')
-      .delete()
-      .eq('id', officerId);
-
-    if (error) throw error;
+    const pen = explicitPen || officerId;
+    if (pen) {
+      await supabaseClient.from('officer_profiles').delete().eq('pen', pen);
+      await supabaseClient.from('officer_qualifications').delete().eq('officer_pen', pen);
+    }
+    if (officerId) {
+      await supabaseClient.from('officer_profiles').delete().eq('id', officerId);
+      await supabaseClient.from('officer_qualifications').delete().eq('id', officerId);
+    }
     return true;
   } catch (err) {
     console.error("Error deleting officer from Supabase:", err);
@@ -1403,24 +1409,82 @@ function resetOfficerForm() {
 }
 
 async function deleteOfficerRecord(officerId) {
-  const off = officersStore.find(o => o.id === officerId);
+  if (typeof window.deleteOfficerProfile === 'function') {
+    return await window.deleteOfficerProfile(officerId);
+  }
+
+  const off = officersStore.find(o => o.id === officerId || o.officer_pen === officerId);
   const name = off ? off.officer_name : 'this officer';
+  const pen = off ? off.officer_pen : officerId;
 
-  if (!confirm(`Are you sure you want to delete profile of "${name}"?`)) return;
+  if (!confirm(`Are you sure you want to permanently delete profile of "${name}"?`)) return;
 
-  officersStore = officersStore.filter(o => o.id !== officerId);
+  officersStore = officersStore.filter(o => o.id !== officerId && o.officer_pen !== officerId);
   localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
 
-  await deleteOfficerQualificationFromSupabase(officerId);
+  if (typeof otProfilesStore !== 'undefined') {
+    otProfilesStore = otProfilesStore.filter(p => p.id !== officerId && p.pen !== pen);
+    localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+  }
+
+  if (typeof window.deleteOfficerFromSupabase === 'function') {
+    await window.deleteOfficerFromSupabase(officerId, pen);
+  } else {
+    await deleteOfficerQualificationFromSupabase(officerId, pen);
+  }
 
   const selOffice = document.getElementById('otOfficeSelect')?.value;
-  renderOfficeOfficersTable(selOffice);
+  if (typeof renderOfficeOfficersTable === 'function') renderOfficeOfficersTable(selOffice);
   renderAdminOfficersTable();
 
   showToast(`Deleted officer profile for "${name}"`, 'warning');
 }
 
 // --- 11. ADMIN OFFICER TRAINING CONSOLE & REPORTING ---
+
+function getCombinedOfficersList() {
+  const map = new Map();
+
+  // 1. From officersStore in app.js
+  if (Array.isArray(officersStore)) {
+    officersStore.forEach(o => {
+      const key = o.officer_pen || o.id;
+      if (key) map.set(key, o);
+    });
+  }
+
+  // 2. From otProfilesStore in officer_training.js
+  if (typeof otProfilesStore !== 'undefined' && Array.isArray(otProfilesStore)) {
+    otProfilesStore.forEach(p => {
+      const key = p.pen || p.id;
+      if (!key) return;
+      const offObj = {
+        id: p.id,
+        office_name: p.officeName ? `${p.officeCode} ${p.officeName}` : (p.officeCode || 'MVD Office'),
+        officer_name: p.officerFullName,
+        officer_pen: p.pen,
+        officer_designation: p.designation,
+        educational_qualification: p.technicalQualification || p.generalEducation || 'Plus Two',
+        qualification_other: p.technicalQualificationOther || '',
+        specialization: (p.specializedSkills || []).join(', ') || 'General',
+        technical_certifications: (p.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', ') || 'None',
+        training_attended: (p.trainingHistory || []).map(t => t.attended).join('; ') || 'None',
+        training_institutes: (p.trainingHistory || []).map(t => t.conductedBy).join('; ') || 'MVD',
+        recent_training_year: p.passingYear || 2024,
+        training_details: JSON.stringify(p.trainingHistory || []),
+        officer_mobile: p.enteredBy?.mobile || '',
+        officer_email: p.enteredBy?.userId || '',
+        entry_officer_name: p.enteredBy?.fullName || '',
+        entry_officer_designation: p.enteredBy?.designation || '',
+        entry_officer_mobile: p.enteredBy?.mobile || '',
+        created_at: p.updatedAt || new Date().toISOString()
+      };
+      map.set(key, offObj);
+    });
+  }
+
+  return Array.from(map.values());
+}
 
 function renderAdminOfficersTable() {
   const tbody = document.getElementById('adminOfficersTableBody');
@@ -1430,7 +1494,9 @@ function renderAdminOfficersTable() {
   const desigFilter = document.getElementById('adminOfficerDesignationFilter')?.value || 'ALL';
   const qualFilter = document.getElementById('adminOfficerQualificationFilter')?.value || 'ALL';
 
-  let filtered = officersStore.filter(off => {
+  const allOfficers = getCombinedOfficersList();
+
+  let filtered = allOfficers.filter(off => {
     if (searchTerm) {
       const hay = (
         (off.office_name || '') + ' ' +
@@ -1447,20 +1513,21 @@ function renderAdminOfficersTable() {
     }
 
     if (qualFilter !== 'ALL') {
-      if (qualFilter === 'PHD' && !off.educational_qualification.includes('PHD')) return false;
-      if (qualFilter === 'M.Tech' && !off.educational_qualification.includes('M.Tech')) return false;
-      if (qualFilter === 'B.Tech' && !off.educational_qualification.includes('B.Tech')) return false;
-      if (qualFilter === 'Diploma' && !off.educational_qualification.includes('Diploma')) return false;
-      if (qualFilter === 'MCA / M.Sc / MBA' && !off.educational_qualification.includes('MCA')) return false;
-      if (qualFilter === 'BCA / B.Sc / B.Com / BA' && !off.educational_qualification.includes('BCA')) return false;
-      if (qualFilter === 'LLB / LLM' && !off.educational_qualification.includes('LL')) return false;
+      const eq = off.educational_qualification || '';
+      if (qualFilter === 'PHD' && !eq.includes('PHD')) return false;
+      if (qualFilter === 'M.Tech' && !eq.includes('M.Tech')) return false;
+      if (qualFilter === 'B.Tech' && !eq.includes('B.Tech')) return false;
+      if (qualFilter === 'Diploma' && !eq.includes('Diploma')) return false;
+      if (qualFilter === 'MCA / M.Sc / MBA' && !eq.includes('MCA')) return false;
+      if (qualFilter === 'BCA / B.Sc / B.Com / BA' && !eq.includes('BCA')) return false;
+      if (qualFilter === 'LLB / LLM' && !eq.includes('LL')) return false;
     }
 
     return true;
   });
 
   // Calculate Officer KPIs
-  const totalOfficers = officersStore.length;
+  const totalOfficers = allOfficers.length;
   let enggCount = 0;
   let diplomaCount = 0;
   let vahanCount = 0;
@@ -1468,7 +1535,7 @@ function renderAdminOfficersTable() {
   const qualCounts = { 'Doctorate (PhD)': 0, 'Master Degree (M.Tech/MCA/M.Sc)': 0, 'Bachelor Degree (B.Tech/Degree)': 0, 'Diploma': 0, 'Other': 0 };
   const desigCounts = {};
 
-  officersStore.forEach(o => {
+  allOfficers.forEach(o => {
     const q = o.educational_qualification || '';
     if (q.includes('PHD')) qualCounts['Doctorate (PhD)']++;
     else if (q.includes('M.Tech') || q.includes('MCA')) { qualCounts['Master Degree (M.Tech/MCA/M.Sc)']++; enggCount++; }
@@ -1590,8 +1657,25 @@ function resetAdminOfficerFilters() {
 
 function editOfficerInAdmin(officerId) {
   selectModuleMenu('officer_training_qualification');
-  editOfficerRecord(officerId);
+
+  let targetId = officerId;
+  const combined = (typeof getCombinedOfficersList === 'function') ? getCombinedOfficersList() : (officersStore || []);
+  const off = combined.find(o => o.id === officerId || o.officer_pen === officerId);
+  if (off && off.officer_pen) {
+    targetId = off.officer_pen;
+  }
+
+  if (typeof window.loadProfileForEditing === 'function') {
+    window.loadProfileForEditing(targetId);
+  } else if (typeof loadProfileForEditing === 'function') {
+    loadProfileForEditing(targetId);
+  } else {
+    editOfficerRecord(officerId);
+  }
 }
+window.editOfficerInAdmin = editOfficerInAdmin;
+window.deleteOfficerRecord = deleteOfficerRecord;
+window.switchPortalModule = selectModuleMenu;
 
 function exportOfficersReportCSV() {
   if (officersStore.length === 0) {

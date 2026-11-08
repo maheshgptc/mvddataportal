@@ -232,6 +232,7 @@ let otCurrentRole = localStorage.getItem('mvd_ot_current_role') || 'head_of_offi
 let otActiveSubTab = 'form'; // 'form' | 'directory' | 'report' | 'roles'
 let otFormDirty = false;
 let otEditingProfileId = null;
+let otOriginalEditingPen = null;
 
 // Temporary staging for repeatable training records during form entry
 let otStagedTrainings = [];
@@ -593,6 +594,9 @@ function renderOfficeEditOptionList(officeCode) {
               <td style="text-align: right;">
                 <button type="button" class="btn btn-primary btn-sm" onclick="loadProfileForEditing('${p.id}')" style="padding: 3px 10px; font-size: 0.78rem;">
                   <i class="fa-solid fa-pen-to-square"></i> Edit
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="deleteOfficerProfile('${p.id}')" style="padding: 3px 10px; font-size: 0.78rem; margin-left: 6px;">
+                  <i class="fa-solid fa-trash"></i> Delete
                 </button>
               </td>
             </tr>
@@ -1425,6 +1429,11 @@ async function handleProfileSubmit(e) {
     // Check if office has an existing verified report: if so, mark that report for reverification
     triggerReverificationCheck(data.officeCode);
 
+    // If PEN changed during editing, permanently delete the old PEN row from Supabase first
+    if (otOriginalEditingPen && otOriginalEditingPen !== data.pen) {
+      await deleteOfficerFromSupabase(otEditingProfileId, otOriginalEditingPen);
+    }
+
     saveOfficerRecordToStore(data);
     markFormDirty(false);
     otLogAudit(otEditingProfileId ? 'UPDATE_PROFILE' : 'CREATE_PROFILE', data.pen, { officer: data.officerFullName, designation: data.designation, office: data.officeCode });
@@ -1439,9 +1448,12 @@ async function handleProfileSubmit(e) {
       console.warn("Supabase save error:", result?.error);
     }
 
+    otOriginalEditingPen = null;
+
     // Refresh directory and office tables
     renderAdminOfficersDirectory();
     renderOfficeSummaryReport();
+    if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
     resetOfficerForm();
     if (data.officeCode) {
       const officeSel = document.getElementById('otMainOfficeSelect');
@@ -1467,12 +1479,45 @@ function saveOfficerRecordToStore(profile) {
     otProfilesStore.unshift(profile);
   }
   localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+
+  // Sync to officersStore in app.js
+  if (typeof officersStore !== 'undefined') {
+    const offIdx = officersStore.findIndex(o => o.id === profile.id || o.officer_pen === profile.pen);
+    const mappedOff = {
+      id: profile.id,
+      office_name: profile.officeName ? `${profile.officeCode} ${profile.officeName}` : profile.officeCode,
+      officer_name: profile.officerFullName,
+      officer_pen: profile.pen,
+      officer_designation: profile.designation,
+      educational_qualification: profile.technicalQualification || profile.generalEducation || 'Plus Two',
+      qualification_other: profile.technicalQualificationOther || '',
+      specialization: (profile.specializedSkills || []).join(', ') || 'General',
+      technical_certifications: (profile.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', ') || 'None',
+      training_attended: (profile.trainingHistory || []).map(t => t.attended).join('; ') || 'None',
+      training_institutes: (profile.trainingHistory || []).map(t => t.conductedBy).join('; ') || 'MVD',
+      recent_training_year: profile.passingYear || 2024,
+      training_details: JSON.stringify(profile.trainingHistory || []),
+      officer_mobile: profile.enteredBy?.mobile || '9447000000',
+      officer_email: profile.enteredBy?.userId || '',
+      entry_officer_name: profile.enteredBy?.fullName || '',
+      entry_officer_designation: profile.enteredBy?.designation || '',
+      entry_officer_mobile: profile.enteredBy?.mobile || '',
+      created_at: profile.updatedAt || new Date().toISOString()
+    };
+    if (offIdx >= 0) {
+      officersStore[offIdx] = mappedOff;
+    } else {
+      officersStore.push(mappedOff);
+    }
+    localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
+  }
 }
 
 function resetOfficerForm() {
   if (otFormDirty && !confirm("Discard unsaved changes?")) return;
 
   otEditingProfileId = null;
+  otOriginalEditingPen = null;
   otStagedTrainings = [];
   otEditingTrainingIndex = -1;
   markFormDirty(false);
@@ -1519,20 +1564,60 @@ function cancelOfficerEdit() {
 }
 
 function loadProfileForEditing(profileId) {
-  const profile = otProfilesStore.find(p => p.id === profileId || p.pen === profileId);
+  let profile = otProfilesStore.find(p => p.id === profileId || p.pen === profileId);
+  if (!profile && typeof officersStore !== 'undefined') {
+    const off = officersStore.find(o => o.id === profileId || o.officer_pen === profileId);
+    if (off) {
+      profile = otProfilesStore.find(p => p.pen === off.officer_pen);
+      if (!profile) {
+        const offCode = (off.office_name || '').split(' ')[0] || '';
+        profile = {
+          id: off.id || ('prof_' + (off.officer_pen || 'item')),
+          pen: off.officer_pen || '',
+          officerFullName: off.officer_name || '',
+          designation: off.officer_designation || 'AMVI',
+          officeCode: offCode,
+          officeName: off.office_name || '',
+          generalEducation: 'Plus Two',
+          technicalQualification: off.educational_qualification || 'Diploma',
+          technicalQualificationOther: off.qualification_other || '',
+          institution: '',
+          passingYear: off.recent_training_year || 2024,
+          grade: 'First Class',
+          additionalQualifications: [],
+          specializedSkills: off.specialization ? off.specialization.split(',').map(s => s.trim()) : [],
+          trainingHistory: [],
+          enteredBy: {
+            fullName: off.entry_officer_name || 'Admin',
+            designation: off.entry_officer_designation || 'Superintendent',
+            mobile: off.entry_officer_mobile || '9447000000'
+          },
+          status: 'submitted',
+          version: 1
+        };
+        otProfilesStore.push(profile);
+      }
+    }
+  }
   if (!profile) {
     showToast("Profile not found", "error");
     return;
   }
 
-  // Permission check
-  if (!otHasPermission('edit_profile')) {
-    showToast("Your current role is not authorized to edit officer profiles.", "error");
+  // Permission check: Admin or Authorized User or role permission
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const lockedEmail = getOfficeLockedEmail(profile.officeCode);
+  const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
+
+  if (!isAdmin && !isAuthorized && !otHasPermission('edit_profile')) {
+    showToast(`This office is entered by ${lockedEmail || 'another account'}. Please login with ${lockedEmail || 'the authorized account'} to add and edit details.`, "error");
     return;
   }
 
   resetOfficerForm();
   otEditingProfileId = profile.id;
+  otOriginalEditingPen = profile.pen;
   document.getElementById('otFormActionTitle').innerHTML = `<i class="fa-solid fa-user-pen"></i> Edit Profile: ${escapeHtml(profile.officerFullName)} (PEN: ${escapeHtml(profile.pen)})`;
   document.getElementById('otBtnCancelEdit').style.display = 'inline-flex';
 
@@ -1638,13 +1723,16 @@ function loadProfileForEditing(profileId) {
   }
 
   // Switch to Form Tab
-  if (typeof switchPortalModule === 'function') {
+  if (typeof selectModuleMenu === 'function') {
+    selectModuleMenu('officer_training_qualification');
+  } else if (typeof switchPortalModule === 'function') {
     switchPortalModule('officer_training_qualification');
   }
   switchOfficerSubTab('form');
   document.getElementById('officerTrainingFormCard')?.scrollIntoView({ behavior: 'smooth' });
   showToast(`Loaded profile for editing: ${profile.officerFullName}`, "info");
 }
+window.loadProfileForEditing = loadProfileForEditing;
 
 // --- 11. PROFILE PREVIEW & SINGLE PROFILE PRINT / PDF DOWNLOAD ---
 
@@ -1921,21 +2009,74 @@ function resetAdminDirectoryFilters() {
 }
 
 async function deleteOfficerProfile(profileId) {
-  const p = otProfilesStore.find(x => x.id === profileId);
-  if (!p) return;
-  if (!confirm(`Are you sure you want to permanently delete profile for "${p.officerFullName}" (PEN: ${p.pen})?`)) return;
+  let p = otProfilesStore.find(x => x.id === profileId || x.pen === profileId);
+  if (!p && typeof officersStore !== 'undefined') {
+    const off = officersStore.find(o => o.id === profileId || o.officer_pen === profileId);
+    if (off) {
+      p = otProfilesStore.find(x => x.pen === off.officer_pen) || {
+        id: off.id,
+        pen: off.officer_pen,
+        officerFullName: off.officer_name,
+        officeCode: (off.office_name || '').split(' ')[0] || '',
+        officeName: off.office_name || ''
+      };
+    }
+  }
+  if (!p) {
+    showToast("Officer profile not found", "error");
+    return;
+  }
 
-  otProfilesStore = otProfilesStore.filter(x => x.id !== profileId);
+  // Permission check: Admin or Authorized User
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const lockedEmail = getOfficeLockedEmail(p.officeCode);
+  const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
+
+  if (!isAdmin && !isAuthorized) {
+    showToast(`This office is entered by ${lockedEmail || 'another account'}. Please login with ${lockedEmail || 'the authorized account'} to add and edit details.`, 'error');
+    return;
+  }
+
+  if (!confirm(`Are you sure you want to permanently delete profile for "${p.officerFullName}" (PEN: ${p.pen})?\n\nThis will permanently remove the record from Supabase and local storage.`)) return;
+
+  const pen = p.pen;
+  const pId = p.id;
+  const officeCode = p.officeCode;
+  const officerName = p.officerFullName;
+
+  // 1. Remove from local stores
+  otProfilesStore = otProfilesStore.filter(x => x.id !== pId && x.pen !== pen);
   localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
-  triggerReverificationCheck(p.officeCode);
 
-  otLogAudit('DELETE_PROFILE', p.pen, { officer: p.officerFullName, office: p.officeCode });
-  showToast(`Deleted profile for PEN: ${p.pen}`, "info");
+  if (typeof officersStore !== 'undefined') {
+    officersStore = officersStore.filter(x => x.id !== pId && x.officer_pen !== pen);
+    localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
+  }
 
-  await deleteOfficerQualificationFromSupabase(profileId, p.pen);
+  triggerReverificationCheck(officeCode);
+  otLogAudit('DELETE_PROFILE', pen, { officer: officerName, office: officeCode });
+
+  // 2. Delete from Supabase in real time
+  showToast(`Deleting "${officerName}" from Supabase...`, "info");
+  const delRes = await deleteOfficerFromSupabase(pId, pen);
+
+  if (delRes && delRes.success) {
+    showToast(`Successfully deleted profile for "${officerName}" (PEN: ${pen}) from Supabase.`, "success");
+  } else {
+    showToast(`Deleted locally. Note: ${delRes?.error?.message || 'Remote sync completed'}`, "info");
+  }
+
+  // 3. Re-render directory and office tables
   renderAdminOfficersDirectory();
   renderOfficeSummaryReport();
+  if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+  if (officeCode) {
+    renderOfficeEditOptionList(officeCode);
+    checkOfficeAccessAndLock(officeCode);
+  }
 }
+window.deleteOfficerProfile = deleteOfficerProfile;
 
 // Multi-file CSV Export (Officer Profiles CSV and Linked Trainings CSV)
 function exportOfficersDirectoryDualCSV() {
@@ -2741,6 +2882,9 @@ function subscribeToRealtimeOfficerProfiles() {
             localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
             renderAdminOfficersDirectory();
             renderOfficeSummaryReport();
+            if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+            const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+            if (currentSelectedOffice) renderOfficeEditOptionList(currentSelectedOffice);
           }
         } else if (newRec && newRec.pen) {
           const mapped = {
@@ -2782,6 +2926,9 @@ function subscribeToRealtimeOfficerProfiles() {
           localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
           renderAdminOfficersDirectory();
           renderOfficeSummaryReport();
+          if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+          const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+          if (currentSelectedOffice) renderOfficeEditOptionList(currentSelectedOffice);
         }
       }
     ).subscribe((status) => {
@@ -3051,7 +3198,7 @@ async function saveOfficerQualificationToSupabase(record) {
         officer_designation: record.designation,
         officer_mobile: record.enteredBy?.mobile,
         officer_email: record.enteredBy?.userId,
-        educational_qualification: record.technicalQualification,
+        educational_qualification: record.technicalQualification || record.generalEducation || 'Plus Two',
         qualification_other: record.technicalQualificationOther,
         specialization: (record.specializedSkills || []).join(', '),
         technical_certifications: (record.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', '),
@@ -3076,26 +3223,63 @@ async function saveOfficerQualificationToSupabase(record) {
   }
 }
 
-async function deleteOfficerQualificationFromSupabase(profileId, explicitPen) {
+async function deleteOfficerFromSupabase(profileId, explicitPen) {
   const client = getSupabaseClient();
-  if (!client) return;
+  if (!client) {
+    console.warn("Supabase client unavailable for deletion");
+    return { success: false, error: new Error("Database client not available") };
+  }
+
+  const pen = explicitPen || (typeof otProfilesStore !== 'undefined' ? otProfilesStore.find(x => x.id === profileId)?.pen : null) || (typeof officersStore !== 'undefined' ? officersStore.find(x => x.id === profileId)?.officer_pen : null) || profileId;
+  console.log(`[Supabase Delete] Deleting officer profileId: "${profileId}", pen: "${pen}"...`);
+
+  let pErr = null;
+  let qErr = null;
+
   try {
-    const pen = explicitPen || otProfilesStore.find(x => x.id === profileId)?.pen;
+    // 1. Delete from officer_profiles table by pen and by id
     if (pen) {
-      await client
+      const { error } = await client
         .from('officer_profiles')
         .delete()
         .eq('pen', pen);
+      if (error) pErr = error;
+    }
+    if (profileId) {
+      const { error } = await client
+        .from('officer_profiles')
+        .delete()
+        .eq('id', profileId);
+      if (error && !pErr) pErr = error;
+    }
 
-      await client
+    // 2. Delete from legacy officer_qualifications table by officer_pen and by id
+    if (pen) {
+      const { error } = await client
         .from('officer_qualifications')
         .delete()
         .eq('officer_pen', pen);
+      if (error) qErr = error;
     }
+    if (profileId) {
+      const { error } = await client
+        .from('officer_qualifications')
+        .delete()
+        .eq('id', profileId);
+      if (error && !qErr) qErr = error;
+    }
+
+    if (pErr) console.warn("Supabase delete warning (officer_profiles):", pErr);
+    if (qErr) console.warn("Supabase delete warning (officer_qualifications):", qErr);
+
+    return { success: !pErr, error: pErr || qErr };
   } catch (e) {
-    console.warn("Supabase delete failed:", e);
+    console.error("Supabase delete exception:", e);
+    return { success: false, error: e };
   }
 }
+window.deleteOfficerFromSupabase = deleteOfficerFromSupabase;
+window.deleteOfficerQualificationFromSupabase = deleteOfficerFromSupabase;
 
 async function saveOfficerReportToSupabase(snapshot) {
   const client = getSupabaseClient();
