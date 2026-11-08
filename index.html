@@ -679,11 +679,39 @@
 
             <form id="otOfficerForm" onsubmit="handleProfileSubmit(event)">
               
-              <!-- 1. Entered By — Officer Details -->
+              <!-- 1. Select Office -->
+              <div class="card-section sec-office" id="otOfficeSelectSection">
+                <div class="section-header">
+                  <h2 class="section-title">
+                    <i class="fa-solid fa-building"></i> 1. Select Office
+                  </h2>
+                  <span class="section-tag">Required *</span>
+                </div>
+
+                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">
+                  Select your MVD Office to initiate or update officer profiles. Each office is restricted to one authorized Gmail ID.
+                </p>
+
+                <div class="form-group" style="max-width: 650px;">
+                  <label for="otMainOfficeSelect"><i class="fa-solid fa-building"></i> Office Name (Code — Office Name) <span class="req-star">*</span></label>
+                  <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)" oninput="handleOfficeSelectPicked(this)">
+                    <option value="">-- Select Office (Code — Office Name) --</option>
+                  </select>
+                  <div class="field-error" id="err_otMainOfficeSelect"></div>
+                </div>
+
+                <!-- Office Lock & Access Alert Banner -->
+                <div id="otOfficeLockAlert" class="reflection-alert" style="display: none; margin-top: 16px;"></div>
+
+                <!-- Existing Profiles & Edit Option for Authorized Account -->
+                <div id="otOfficeAuthorizedPanel" style="display: none; margin-top: 16px;"></div>
+              </div>
+
+              <!-- 2. Entered By — Officer Details -->
               <div class="card-section sec-remarks">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-user-pen"></i> 1. Entered By — Officer Details
+                    <i class="fa-solid fa-user-pen"></i> 2. Entered By — Officer Details
                   </h2>
                   <span class="section-tag">Audit Submitter Info</span>
                 </div>
@@ -713,16 +741,16 @@
                 </div>
               </div>
 
-              <!-- 2. Official Identification & Current Posting -->
+              <!-- 3. Official Identification & Current Posting -->
               <div class="card-section sec-office" id="officerTrainingFormCard">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-id-card"></i> 2. Official Identification &amp; Current Posting
+                    <i class="fa-solid fa-id-card"></i> 3. Official Identification &amp; Current Posting
                   </h2>
                   <span class="section-tag">Required *</span>
                 </div>
 
-                <div class="ot-form-grid-2">
+                <div class="form-grid-3">
                   <!-- Officer Full Name -->
                   <div class="form-group">
                     <label for="otFullName"><i class="fa-solid fa-user"></i> Officer Full Name <span class="req-star">*</span></label>
@@ -736,9 +764,7 @@
                     <input type="text" id="otPen" class="form-control" required oninput="markFormDirty(true)">
                     <div class="field-error" id="err_otPen"></div>
                   </div>
-                </div>
 
-                <div class="ot-form-grid-2" style="margin-top: 16px;">
                   <!-- Current Designation (4 options only) -->
                   <div class="form-group">
                     <label for="otDesignationSelect"><i class="fa-solid fa-user-shield"></i> Current Designation <span class="req-star">*</span></label>
@@ -751,29 +777,14 @@
                     </select>
                     <div class="field-error" id="err_otDesignationSelect"></div>
                   </div>
-
-                  <!-- Office Dropdown -->
-                  <div class="form-group">
-                    <label for="otMainOfficeSelect"><i class="fa-solid fa-building"></i> Office Name (Code — Office Name) <span class="req-star">*</span></label>
-                    <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)">
-                      <option value="">-- Select Office (Code — Office Name) --</option>
-                    </select>
-                    <div class="field-error" id="err_otMainOfficeSelect"></div>
-                  </div>
                 </div>
-
-                <!-- Office Lock & Access Alert Banner -->
-                <div id="otOfficeLockAlert" class="reflection-alert" style="display: none; margin-top: 16px;"></div>
-
-                <!-- Existing Profiles & Edit Option for Authorized Account -->
-                <div id="otOfficeAuthorizedPanel" style="display: none; margin-top: 16px;"></div>
               </div>
 
-              <!-- 3. Academic & Technical Credentials -->
+              <!-- 4. Academic & Technical Credentials -->
               <div class="card-section sec-hardware">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-graduation-cap"></i> 3. Academic &amp; Technical Credentials
+                    <i class="fa-solid fa-graduation-cap"></i> 4. Academic &amp; Technical Credentials
                   </h2>
                   <span class="section-tag">Qualifications</span>
                 </div>
@@ -859,11 +870,11 @@
                 </div>
               </div>
 
-              <!-- 4. Specialized Skills & In-Service Trainings -->
+              <!-- 5. Specialized Skills & In-Service Trainings -->
               <div class="card-section sec-network">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-bolt"></i> 4. Specialized Skills &amp; In-Service Trainings
+                    <i class="fa-solid fa-bolt"></i> 5. Specialized Skills &amp; In-Service Trainings
                   </h2>
                   <span class="section-tag">Competencies &amp; Training</span>
                 </div>
@@ -959,11 +970,8 @@
               </div>
 
               <div style="display: flex; gap: 8px; flex-wrap: wrap;">
-                <button type="button" id="otBtnTriggerVerify" class="btn btn-success btn-sm" onclick="openVerificationModal()">
-                  <i class="fa-solid fa-signature"></i> Verify by Head of Office
-                </button>
-                <button type="button" id="otBtnTriggerForward" class="btn btn-primary btn-sm" style="display: none;" onclick="openForwardingModal()">
-                  <i class="fa-solid fa-paper-plane"></i> Mark as Forwarded
+                <button type="button" id="otBtnTriggerForward" class="btn btn-primary btn-sm" onclick="openForwardingModal()">
+                  <i class="fa-solid fa-paper-plane"></i> Send to Transport Commissionerate
                 </button>
                 <button type="button" class="btn btn-outline btn-sm" onclick="printOfficeSummaryReport()">
                   <i class="fa-solid fa-download"></i> Download PDF / Print
@@ -983,7 +991,7 @@
               <div class="ot-report-gov-header">
                 <h2>MOTOR VEHICLES DEPARTMENT, KERALA</h2>
                 <h3>OFFICER TRAINING &amp; QUALIFICATION</h3>
-                <h4>SUMMARY REPORT &amp; VERIFICATION</h4>
+                <h4>SUMMARY REPORT</h4>
                 <div style="margin-top: 6px; font-size: 0.88rem; color: #064e3b; font-weight: 700;">
                   FORWARDING REPORT FOR TRANSPORT COMMISSIONERATE, THIRUVANANTHAPURAM
                 </div>
@@ -995,7 +1003,7 @@
                   <strong>Office:</strong> <span id="otReportHeaderOffice">--</span>
                 </div>
                 <div>
-                  <strong>Verification Status:</strong> <span id="otReportVerificationStatusBadge" class="badge badge-warning">DRAFT — NOT VERIFIED</span>
+                  <strong>Report Status:</strong> <span id="otReportVerificationStatusBadge" class="badge badge-warning">PENDING SUBMISSION</span>
                 </div>
                 <div>
                   <strong>Reporting Cut-off:</strong> <span id="otReportCutoffTime">Loading...</span><br>
@@ -1250,68 +1258,32 @@
           </div>
         </div>
 
-        <!-- 3. Head of Office Report Verification Modal -->
-        <div id="otVerificationModal" class="modal-overlay" style="display: none;">
-          <div class="modal-card" style="max-width: 620px;">
-            <div class="modal-header" style="border-bottom: 2px solid #047857; padding-bottom: 12px;">
-              <h3 style="color: #064e3b; margin: 0;"><i class="fa-solid fa-shield-check" style="color: #047857;"></i> Digital Verification by Head of Office</h3>
-              <button type="button" class="btn btn-outline btn-sm" onclick="closeVerificationModal()"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-
-            <p style="font-size: 0.88rem; color: #334155; margin: 12px 0 16px 0; line-height: 1.5;">
-              You are certifying and locking the Office Summary Report for <strong id="otVerifOfficeCodeDisplay">KL01</strong> for forwarding to the Transport Commissionerate.
-            </p>
-
-            <form onsubmit="submitReportVerification(event)">
-              <div class="form-group" style="margin-bottom: 12px;">
-                <label for="otVerifOfficerNameInput">Verifying Officer Full Name <span class="req-star">*</span></label>
-                <input type="text" id="otVerifOfficerNameInput" class="form-control" required>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 14px;">
-                <label for="otVerifOfficerDesigInput">Designation / Holding Charge <span class="req-star">*</span></label>
-                <input type="text" id="otVerifOfficerDesigInput" class="form-control" placeholder="e.g. Regional Transport Officer" required>
-              </div>
-
-              <div class="form-group" style="margin-bottom: 16px;">
-                <label for="otVerifRemarksInput">Verification Remarks (Optional)</label>
-                <textarea id="otVerifRemarksInput" class="form-control" placeholder="Any specific endorsement or note for the Transport Commissionerate..."></textarea>
-              </div>
-
-              <!-- Mandatory Certification Confirmation -->
-              <div style="background: #f0fdf4; border: 1.5px solid #a7f3d0; padding: 14px; border-radius: 8px; margin-bottom: 20px;">
-                <label class="custom-checkbox-wrapper" style="display: flex; align-items: flex-start; gap: 10px; cursor: pointer;">
-                  <input type="checkbox" id="otVerifCertCheckbox" required style="width: 20px; height: 20px; margin-top: 2px; accent-color: #047857;">
-                  <span style="font-size: 0.86rem; color: #064e3b; line-height: 1.5; font-weight: 600;">
-                    <em>"Certified that the particulars of the officers included in this report have been verified with the records available in this office and are correct to the best of my knowledge and belief. The report is forwarded to the Transport Commissionerate."</em> <span class="req-star">*</span>
-                  </span>
-                </label>
-              </div>
-
-              <div style="display: flex; justify-content: flex-end; gap: 10px;">
-                <button type="button" class="btn btn-secondary" onclick="closeVerificationModal()">Cancel</button>
-                <button type="submit" class="btn btn-success"><i class="fa-solid fa-check"></i> Certify &amp; Lock Report Version</button>
-              </div>
-            </form>
-          </div>
-        </div>
-
-        <!-- 4. Office Forwarding / Dispatch Details Modal -->
+        <!-- Office Forwarding / Send Details Modal -->
         <div id="otForwardingModal" class="modal-overlay" style="display: none;">
-          <div class="modal-card" style="max-width: 520px;">
-            <div class="modal-header">
-              <h3><i class="fa-solid fa-paper-plane" style="color: #2563eb;"></i> Record Report Forwarding Details</h3>
+          <div class="modal-card" style="max-width: 560px;">
+            <div class="modal-header" style="border-bottom: 2px solid #2563eb; padding-bottom: 12px;">
+              <h3 style="color: #1e40af; margin: 0;"><i class="fa-solid fa-paper-plane" style="color: #2563eb;"></i> Record Report Forwarding Details</h3>
               <button type="button" class="btn btn-outline btn-sm" onclick="closeForwardingModal()"><i class="fa-solid fa-xmark"></i></button>
             </div>
 
-            <p style="font-size: 0.86rem; color: var(--text-muted); margin: 8px 0 16px 0;">
-              Record office outward details for verified report: <strong id="otFwdReportRefDisplay" style="color: #0284c7;"></strong>
+            <p style="font-size: 0.86rem; color: var(--text-muted); margin: 10px 0 16px 0;">
+              Record office forwarding details for report: <strong id="otFwdReportRefDisplay" style="color: #0284c7;"></strong>
             </p>
 
             <form onsubmit="submitReportForwarding(event)">
               <div class="form-group" style="margin-bottom: 14px;">
-                <label for="otFwdOutwardNoInput">Outward / Dispatch Reference Number <span class="req-star">*</span></label>
-                <input type="text" id="otFwdOutwardNoInput" class="form-control" placeholder="e.g. A1/1234/2026/RTO-TVM" required>
+                <label for="otFwdHeadNameInput">Name of Head of Office Forwarding <span class="req-star">*</span></label>
+                <input type="text" id="otFwdHeadNameInput" class="form-control" placeholder="Full name of Head of Office" required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="otFwdHeadDesigInput">Designation of Head of Office <span class="req-star">*</span></label>
+                <input type="text" id="otFwdHeadDesigInput" class="form-control" placeholder="e.g. Regional Transport Officer / Joint RTO" required>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 14px;">
+                <label for="otFwdOutwardNoInput">File No. <span class="req-star">*</span></label>
+                <input type="text" id="otFwdOutwardNoInput" class="form-control" placeholder="Enter File No." required>
               </div>
 
               <div class="form-group" style="margin-bottom: 14px;">
@@ -1322,12 +1294,12 @@
 
               <div class="form-group" style="margin-bottom: 20px;">
                 <label for="otFwdRemarksInput">Forwarding Remarks (Optional)</label>
-                <textarea id="otFwdRemarksInput" class="form-control" placeholder="e.g. Dispatched via Special Messenger / Tapal..."></textarea>
+                <textarea id="otFwdRemarksInput" class="form-control"></textarea>
               </div>
 
               <div style="display: flex; justify-content: flex-end; gap: 10px;">
                 <button type="button" class="btn btn-secondary" onclick="closeForwardingModal()">Cancel</button>
-                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-check"></i> Mark as Forwarded</button>
+                <button type="submit" class="btn btn-primary"><i class="fa-solid fa-paper-plane"></i> Send to Transport Commissionerate</button>
               </div>
             </form>
           </div>

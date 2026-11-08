@@ -336,7 +336,7 @@ function otHasPermission(action) {
     case 'verify_report':
       return role === 'head_of_office'; // Restricted to Head of Office / In-Charge
     case 'forward_report':
-      return role === 'dispatch_user' || role === 'head_of_office';
+      return true; // Direct forwarding to Transport Commissionerate
     case 'view_all_offices':
       return role === 'admin';
     default:
@@ -447,9 +447,14 @@ function checkOfficeAccessAndLock(officeCode) {
       }
       renderOfficeEditOptionList(officeCode);
     } else {
-      // Locked to another account: PREVENT ACCESS!
+      // Locked to another account: PREVENT ACCESS IMMEDIATELY!
       toggleOfficerFormDisabled(true);
       if (authPanel) authPanel.style.display = 'none';
+
+      // Clear input fields so unauthorized user cannot edit or submit
+      if (document.getElementById('otFullName')) document.getElementById('otFullName').value = '';
+      if (document.getElementById('otPen')) document.getElementById('otPen').value = '';
+      if (document.getElementById('otDesignationSelect')) document.getElementById('otDesignationSelect').value = '';
 
       const alertMsg = `This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`;
       if (alertBox) {
@@ -457,15 +462,15 @@ function checkOfficeAccessAndLock(officeCode) {
         alertBox.style.borderColor = '#fecdd3';
         alertBox.style.color = '#991b1b';
         alertBox.innerHTML = `
-          <div style="display: flex; align-items: flex-start; gap: 10px;">
-            <i class="fa-solid fa-lock" style="color:#dc2626; font-size: 1.2rem; margin-top: 2px;"></i>
-            <div>
-              <strong style="font-size: 0.92rem;">Access Restricted:</strong><br>
-              <span style="font-size: 0.9rem;">This office is entered by <strong>${escapeHtml(lockedEmail)}</strong>. Please login with <strong>${escapeHtml(lockedEmail)}</strong> to add and edit details.</span>
+          <div style="display: flex; align-items: center; gap: 12px; padding: 4px 0;">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.35rem; flex-shrink: 0;"></i>
+            <div style="font-size: 0.92rem; line-height: 1.5;">
+              <strong style="color: #991b1b;">Access Restricted:</strong> This office is entered by <strong>${escapeHtml(lockedEmail)}</strong>. Please login with <strong>${escapeHtml(lockedEmail)}</strong> to add and edit details.
             </div>
           </div>
         `;
         alertBox.style.display = 'flex';
+        alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       showToast(alertMsg, 'error');
     }
@@ -2085,21 +2090,18 @@ function renderOfficeSummaryReport() {
   const genDateEl = document.getElementById('otReportGenDate');
   if (genDateEl) genDateEl.textContent = otFormatIST(new Date().toISOString());
 
-  // Verification Status Badge
+  // Report Status Badge
   const statusBadge = document.getElementById('otReportVerificationStatusBadge');
   if (statusBadge) {
     if (isForwarded) {
       statusBadge.className = 'badge badge-working';
-      statusBadge.innerHTML = `<i class="fa-solid fa-paper-plane"></i> FORWARDED TO COMMISSIONERATE`;
-    } else if (isReverificationRequired) {
-      statusBadge.className = 'badge badge-danger';
-      statusBadge.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> REVERIFICATION REQUIRED`;
-    } else if (isVerified) {
-      statusBadge.className = 'badge badge-working';
-      statusBadge.innerHTML = `<i class="fa-solid fa-circle-check"></i> VERIFIED BY HEAD OF OFFICE`;
-    } else {
+      statusBadge.innerHTML = `<i class="fa-solid fa-paper-plane"></i> SENT TO TRANSPORT COMMISSIONERATE`;
+    } else if (submittedProfiles.length > 0) {
       statusBadge.className = 'badge badge-warning';
-      statusBadge.innerHTML = `<i class="fa-solid fa-file-pen"></i> DRAFT — NOT VERIFIED`;
+      statusBadge.innerHTML = `<i class="fa-solid fa-clock"></i> PENDING SUBMISSION`;
+    } else {
+      statusBadge.className = 'badge badge-secondary';
+      statusBadge.innerHTML = `<i class="fa-solid fa-file-pen"></i> DRAFT — NO PROFILES`;
     }
   }
 
@@ -2270,32 +2272,10 @@ function renderOfficeSummaryReport() {
     }
   }
 
-  // Digital Verification Box Display
+  // Digital Verification Box Display (Skipped in simplified workflow)
   const digiVerifBox = document.getElementById('otReportDigitalVerificationDetails');
   if (digiVerifBox) {
-    if (savedSnapshot && savedSnapshot.isVerified) {
-      digiVerifBox.style.display = 'block';
-      digiVerifBox.innerHTML = `
-        <div style="background: #f0fdf4; border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 14px 18px; margin-top: 16px;">
-          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap;">
-            <div>
-              <div style="color: #047857; font-weight: 800; font-size: 0.95rem;">
-                <i class="fa-solid fa-certificate"></i> DIGITALLY VERIFIED BY HEAD OF OFFICE
-              </div>
-              <div style="font-size: 0.85rem; color: #064e3b; margin-top: 4px;">
-                Verified by: <strong>${escapeHtml(savedSnapshot.verifiedBy?.name)}</strong> (${escapeHtml(savedSnapshot.verifiedBy?.designation)})
-              </div>
-              <div style="font-size: 0.8rem; color: #047857; margin-top: 2px;">
-                <i class="fa-regular fa-clock"></i> Verification Timestamp (IST): <strong>${otFormatIST(savedSnapshot.verifiedAt)}</strong>
-              </div>
-              ${savedSnapshot.verifiedRemarks ? `<div style="font-size: 0.82rem; font-style: italic; color: #334155; margin-top: 4px;">Remarks: "${escapeHtml(savedSnapshot.verifiedRemarks)}"</div>` : ''}
-            </div>
-          </div>
-        </div>
-      `;
-    } else {
-      digiVerifBox.style.display = 'none';
-    }
+    digiVerifBox.style.display = 'none';
   }
 
   // Dispatch / Forwarding Box Display
@@ -2305,15 +2285,19 @@ function renderOfficeSummaryReport() {
       dispatchBox.style.display = 'block';
       dispatchBox.innerHTML = `
         <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin-top: 14px;">
-          <div style="color: #1d4ed8; font-weight: 800; font-size: 0.95rem;">
-            <i class="fa-solid fa-paper-plane"></i> FORWARDING & DISPATCH DETAILS (OFFICE OUTWARD)
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+            <div style="color: #1d4ed8; font-weight: 800; font-size: 0.95rem;">
+              <i class="fa-solid fa-paper-plane"></i> SENT TO TRANSPORT COMMISSIONERATE
+            </div>
+            <span class="badge badge-working" style="font-size: 0.8rem; padding: 4px 8px;"><i class="fa-solid fa-circle-check"></i> Dispatched</span>
           </div>
-          <div class="form-grid-3" style="font-size: 0.85rem; margin-top: 6px;">
-            <div><strong>Outward / Dispatch No:</strong> <span class="badge badge-info" style="font-size: 0.88rem;">${escapeHtml(savedSnapshot.dispatchDetails?.outwardNo)}</span></div>
-            <div><strong>Date of Forwarding:</strong> <strong>${escapeHtml(savedSnapshot.dispatchDetails?.forwardDate)}</strong></div>
-            <div><strong>Forwarded By:</strong> ${escapeHtml(savedSnapshot.dispatchDetails?.userName)}</div>
+          <div class="form-grid-4" style="font-size: 0.85rem; margin-top: 6px; gap: 12px;">
+            <div><strong>Head of Office:</strong><br>${escapeHtml(savedSnapshot.dispatchDetails?.headName || savedSnapshot.verifiedBy?.name || 'N/A')}</div>
+            <div><strong>Designation:</strong><br>${escapeHtml(savedSnapshot.dispatchDetails?.headDesignation || savedSnapshot.verifiedBy?.designation || 'N/A')}</div>
+            <div><strong>File No.:</strong><br><span class="badge badge-info" style="font-size: 0.88rem;">${escapeHtml(savedSnapshot.dispatchDetails?.fileNo || savedSnapshot.dispatchDetails?.outwardNo || 'N/A')}</span></div>
+            <div><strong>Date Sent:</strong><br><strong>${escapeHtml(savedSnapshot.dispatchDetails?.forwardDate || 'N/A')}</strong></div>
           </div>
-          ${savedSnapshot.dispatchDetails?.remarks ? `<div style="font-size: 0.82rem; color: #1e40af; margin-top: 4px;">Forwarding Remarks: "${escapeHtml(savedSnapshot.dispatchDetails?.remarks)}"</div>` : ''}
+          ${savedSnapshot.dispatchDetails?.remarks ? `<div style="font-size: 0.82rem; color: #1e40af; margin-top: 8px;"><strong>Forwarding Remarks:</strong> "${escapeHtml(savedSnapshot.dispatchDetails?.remarks)}"</div>` : ''}
         </div>
       `;
     } else {
@@ -2326,18 +2310,15 @@ function renderOfficeSummaryReport() {
   const btnForward = document.getElementById('otBtnTriggerForward');
 
   if (btnVerify) {
-    btnVerify.style.display = (!isVerified || isReverificationRequired) ? 'inline-flex' : 'none';
-    btnVerify.disabled = !otHasPermission('verify_report');
-    if (!otHasPermission('verify_report')) {
-      btnVerify.title = "Only Head of Office / Officer Holding Charge can verify this report.";
-    }
+    btnVerify.style.display = 'none'; // Verification stage skipped
   }
 
   if (btnForward) {
-    btnForward.style.display = (isVerified && !isReverificationRequired && !isForwarded) ? 'inline-flex' : 'none';
-    btnForward.disabled = !otHasPermission('forward_report');
-    if (!otHasPermission('forward_report')) {
-      btnForward.title = "Only Dispatch User or Head of Office can mark as forwarded.";
+    btnForward.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send to Transport Commissionerate';
+    if (submittedProfiles.length === 0 || isForwarded) {
+      btnForward.style.display = 'none';
+    } else {
+      btnForward.style.display = 'inline-flex';
     }
   }
 }
@@ -2438,26 +2419,39 @@ function submitReportVerification(e) {
 
 // Forwarding Modal & Handler
 function openForwardingModal() {
-  if (!otHasPermission('forward_report')) {
-    showToast("Access Denied: Only Authorized Office Dispatch User or Head of Office can record forwarding.", "error");
+  const officeCode = otCurrentReportOfficeCode;
+  const user = otGetCurrentUser();
+  const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
+
+  if (submittedProfiles.length === 0) {
+    showToast("Please submit officer profiles before sending to the Transport Commissionerate.", "warning");
     return;
   }
 
-  const snapshot = otReportSnapshotsStore[otCurrentReportOfficeCode];
-  if (!snapshot || !snapshot.isVerified || snapshot.reverificationRequired) {
-    showToast("Report must be verified by Head of Office before recording forwarding details.", "warning");
-    return;
-  }
+  const prevSnapshot = otReportSnapshotsStore[officeCode];
+  const newVersion = prevSnapshot ? prevSnapshot.version + 1 : 1;
+  const refNum = prevSnapshot ? prevSnapshot.referenceNumber : `MVD/OTQ/${officeCode}/${new Date().getFullYear()}/V${newVersion}`;
 
-  document.getElementById('otFwdReportRefDisplay').textContent = snapshot.referenceNumber;
-  document.getElementById('otFwdOutwardNoInput').value = "";
+  const refDisplay = document.getElementById('otFwdReportRefDisplay');
+  if (refDisplay) refDisplay.textContent = refNum;
+
+  const headNameInput = document.getElementById('otFwdHeadNameInput');
+  if (headNameInput) headNameInput.value = prevSnapshot?.dispatchDetails?.headName || user.name || "";
+
+  const headDesigInput = document.getElementById('otFwdHeadDesigInput');
+  if (headDesigInput) headDesigInput.value = prevSnapshot?.dispatchDetails?.headDesignation || "";
+
+  const fileNoInput = document.getElementById('otFwdOutwardNoInput');
+  if (fileNoInput) fileNoInput.value = prevSnapshot?.dispatchDetails?.fileNo || prevSnapshot?.dispatchDetails?.outwardNo || "";
+
   const today = new Date().toISOString().substring(0, 10);
   const fwdDateInput = document.getElementById('otFwdDateInput');
   if (fwdDateInput) {
     fwdDateInput.max = today;
     fwdDateInput.value = today;
   }
-  document.getElementById('otFwdRemarksInput').value = "";
+  const remarksInput = document.getElementById('otFwdRemarksInput');
+  if (remarksInput) remarksInput.value = "";
 
   document.getElementById('otForwardingModal').style.display = 'flex';
 }
@@ -2469,16 +2463,26 @@ function closeForwardingModal() {
 function submitReportForwarding(e) {
   if (e) e.preventDefault();
 
-  const outwardNo = document.getElementById('otFwdOutwardNoInput').value.trim();
+  const headName = document.getElementById('otFwdHeadNameInput').value.trim();
+  const headDesig = document.getElementById('otFwdHeadDesigInput').value.trim();
+  const fileNo = document.getElementById('otFwdOutwardNoInput').value.trim();
   const fwdDate = document.getElementById('otFwdDateInput').value;
   const remarks = document.getElementById('otFwdRemarksInput').value.trim();
 
-  if (!outwardNo) {
-    alert("Please enter Outward / Dispatch Reference Number");
+  if (!headName) {
+    alert("Please enter Name of Head of Office Forwarding.");
+    return;
+  }
+  if (!headDesig) {
+    alert("Please enter Designation of Head of Office.");
+    return;
+  }
+  if (!fileNo) {
+    alert("Please enter File No.");
     return;
   }
   if (!fwdDate) {
-    alert("Please enter Date of Forwarding");
+    alert("Please enter Date of Forwarding.");
     return;
   }
 
@@ -2489,18 +2493,43 @@ function submitReportForwarding(e) {
   }
 
   const officeCode = otCurrentReportOfficeCode;
-  const snapshot = otReportSnapshotsStore[officeCode];
-  if (!snapshot) return;
+  const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode);
+  const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
+  const now = new Date().toISOString();
+
+  const prevSnapshot = otReportSnapshotsStore[officeCode];
+  const newVersion = prevSnapshot ? prevSnapshot.version + 1 : 1;
+  const refNum = `MVD/OTQ/${officeCode}/${new Date().getFullYear()}/V${newVersion}`;
 
   const user = otGetCurrentUser();
-  snapshot.isForwarded = true;
-  snapshot.dispatchDetails = {
-    outwardNo,
-    forwardDate: fwdDate,
-    remarks,
-    userName: user.name,
-    userEmail: user.email,
-    timestamp: new Date().toISOString()
+  const snapshot = {
+    officeCode,
+    officeName: officeObj ? officeObj.name : officeCode,
+    referenceNumber: refNum,
+    version: newVersion,
+    cutoffTimestamp: now,
+    verifiedAt: now,
+    isVerified: true,
+    reverificationRequired: false,
+    isForwarded: true,
+    verifiedBy: {
+      name: headName,
+      designation: headDesig
+    },
+    dispatchDetails: {
+      fileNo,
+      outwardNo: fileNo,
+      forwardDate: fwdDate,
+      remarks,
+      headName,
+      headDesignation: headDesig,
+      userName: user.name || headName,
+      userEmail: user.email,
+      timestamp: now
+    },
+    includedOfficerPenList: submittedProfiles.map(p => p.pen),
+    totalOfficersCount: submittedProfiles.length,
+    historicalCopies: prevSnapshot ? [...(prevSnapshot.historicalCopies || []), { ...prevSnapshot, historicalCopies: [] }] : []
   };
 
   otReportSnapshotsStore[officeCode] = snapshot;
@@ -2509,10 +2538,10 @@ function submitReportForwarding(e) {
     saveOfficerReportToSupabase(snapshot);
   }
 
-  otLogAudit('FORWARD_REPORT', snapshot.referenceNumber, { outwardNo, forwardDate: fwdDate });
+  otLogAudit('FORWARD_REPORT', refNum, { office: officeCode, fileNo, headName, headDesignation: headDesig, forwardDate: fwdDate });
   closeForwardingModal();
   renderOfficeSummaryReport();
-  showToast(`Report ${snapshot.referenceNumber} marked as forwarded with Outward No: ${outwardNo}`, "success");
+  showToast(`Report successfully sent to Transport Commissionerate (File No: ${fileNo})`, "success");
 }
 
 function printOfficeSummaryReport() {
