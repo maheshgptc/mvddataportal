@@ -637,7 +637,7 @@
                 <i class="fa-solid fa-triangle-exclamation"></i> Unsaved Changes
               </span>
               <span id="otRoleIndicatorPill" class="badge badge-info" style="padding: 6px 12px; font-size: 0.82rem;">
-                <i class="fa-solid fa-user-shield"></i> Role: Head of Office (RTO)
+                <i class="fa-solid fa-user-shield"></i> Office Head Entry Page
               </span>
             </div>
           </div>
@@ -699,7 +699,7 @@
                   <!-- PEN / Employee ID -->
                   <div class="form-group">
                     <label for="otPen"><i class="fa-solid fa-hashtag"></i> PEN / Employee ID <span class="req-star">*</span></label>
-                    <input type="text" id="otPen" class="form-control" placeholder="e.g. 058723 (Preserves leading zeros, unique per officer)" required oninput="markFormDirty(true)">
+                    <input type="text" id="otPen" class="form-control" required oninput="markFormDirty(true)">
                     <div class="field-error" id="err_otPen"></div>
                   </div>
                 </div>
@@ -718,14 +718,10 @@
                     <div class="field-error" id="err_otDesignationSelect"></div>
                   </div>
 
-                  <!-- Searchable Office Dropdown -->
-                  <div class="form-group searchable-select-wrapper">
+                  <!-- Office Dropdown -->
+                  <div class="form-group">
                     <label for="otMainOfficeSelect"><i class="fa-solid fa-building"></i> Office Name (Code — Office Name) <span class="req-star">*</span></label>
-                    <div class="office-search-field">
-                      <i class="fa-solid fa-magnifying-glass"></i>
-                      <input type="text" id="otOfficeSearchInput" class="form-control" placeholder="Search office by code or name..." oninput="handleOfficeSearchFilter(this, 'otMainOfficeSelect')" onblur="handleOfficeSearchBlur(this, 'otMainOfficeSelect')" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleOfficeSearchBlur(this, 'otMainOfficeSelect');}">
-                    </div>
-                    <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)" style="margin-top: 4px;">
+                    <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)">
                       <option value="">-- Select Office (Code — Office Name) --</option>
                     </select>
                     <div class="field-error" id="err_otMainOfficeSelect"></div>
@@ -1270,7 +1266,7 @@
 
               <div class="form-group" style="margin-bottom: 14px;">
                 <label for="otVerifOfficerDesigInput">Designation / Holding Charge <span class="req-star">*</span></label>
-                <input type="text" id="otVerifOfficerDesigInput" class="form-control" value="Regional Transport Officer (Head of Office)" required>
+                <input type="text" id="otVerifOfficerDesigInput" class="form-control" placeholder="e.g. Regional Transport Officer" required>
               </div>
 
               <div class="form-group" style="margin-bottom: 16px;">

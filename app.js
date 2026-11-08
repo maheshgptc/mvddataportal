@@ -603,6 +603,7 @@ function renderPortalMenuBar() {
 
 function selectModuleMenu(moduleId) {
   activeModuleId = moduleId;
+  const selectedMod = portalModules.find(m => m.id === moduleId);
   renderPortalMenuBar();
 
   const publicCont = document.getElementById('publicContainer');

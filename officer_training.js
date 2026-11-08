@@ -463,15 +463,13 @@ function otLogAudit(action, profileOrReportRef, details) {
 
 function otGetCurrentUser() {
   const gUser = window.googleAuthUser || JSON.parse(localStorage.getItem('mvd_google_user_session') || "null");
-  const fallbackEmail = otCurrentRole === 'admin' ? 'commissionerate.admin@keralam.gov.in' : 'rto.thiruvananthapuram@keralam.gov.in';
-  const fallbackName = otCurrentRole === 'head_of_office' ? 'Sri. K. M. Shaji, RTO' : (otCurrentRole === 'admin' ? 'Transport Commissionerate IT Head' : 'Junior Superintendent / Staff');
 
   return {
-    name: (gUser && gUser.name) ? gUser.name : fallbackName,
-    email: (gUser && gUser.email) ? gUser.email : fallbackEmail,
+    name: (gUser && gUser.name) ? gUser.name : "",
+    email: (gUser && gUser.email) ? gUser.email : "",
     role: otCurrentRole,
-    assignedOfficeCode: "KL01",
-    assignedOfficeName: "RTO, Thiruvananthapuram"
+    assignedOfficeCode: "",
+    assignedOfficeName: ""
   };
 }
 
@@ -508,12 +506,8 @@ function initOfficerTrainingModule() {
   prefillEnteredByDetails();
   renderRoleSwitcherUI();
 
-  // If user has chosen an active office, sync table and report
-  const user = otGetCurrentUser();
+  // Dropdown starts unselected with default prompt
   const officeSelect = document.getElementById('otMainOfficeSelect');
-  if (officeSelect && !officeSelect.value) {
-    officeSelect.value = user.assignedOfficeCode;
-  }
   const officeSearchInput = document.getElementById('otOfficeSearchInput');
   if (officeSearchInput && officeSelect && officeSelect.value) {
     const opt = officeSelect.querySelector(`option[value="${officeSelect.value}"]`);
@@ -985,10 +979,10 @@ function prefillEnteredByDetails() {
     nameInput.value = user.name || "";
   }
   if (desigInput && !desigInput.value.trim()) {
-    desigInput.value = (otCurrentRole === 'head_of_office' ? "Regional Transport Officer" : (otCurrentRole === 'data_entry' ? "Junior Superintendent" : "Officer"));
+    desigInput.value = "";
   }
   if (mobInput && !mobInput.value.trim()) {
-    mobInput.value = "9447000000";
+    mobInput.value = "";
   }
 }
 
@@ -1614,7 +1608,14 @@ function closeProfilePreviewModal() {
 }
 
 function printCurrentProfilePreview() {
+  document.body.classList.add('printing-modal');
+  const modal = document.getElementById('otProfilePreviewModal');
+  if (modal) modal.classList.add('print-active');
   window.print();
+  setTimeout(() => {
+    document.body.classList.remove('printing-modal');
+    if (modal) modal.classList.remove('print-active');
+  }, 1000);
 }
 
 // --- 12. ADMINISTRATIVE DIRECTORY & FILTER LISTING ---
@@ -2155,8 +2156,8 @@ function openVerificationModal() {
   const user = otGetCurrentUser();
 
   document.getElementById('otVerifOfficeCodeDisplay').textContent = officeCode;
-  document.getElementById('otVerifOfficerNameInput').value = user.name;
-  document.getElementById('otVerifOfficerDesigInput').value = "Regional Transport Officer (Head of Office)";
+  document.getElementById('otVerifOfficerNameInput').value = user.name || "";
+  document.getElementById('otVerifOfficerDesigInput').value = "";
   document.getElementById('otVerifRemarksInput').value = "";
   document.getElementById('otVerifCertCheckbox').checked = false;
 
@@ -2306,6 +2307,8 @@ function submitReportForwarding(e) {
 }
 
 function printOfficeSummaryReport() {
+  document.body.classList.remove('printing-modal');
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('print-active'));
   window.print();
 }
 
@@ -2325,12 +2328,12 @@ function renderRoleSwitcherUI() {
   if (container) {
     const roleLabels = {
       data_entry: "Data Entry User",
-      head_of_office: "Head of Office (RTO)",
+      head_of_office: "Office Head Entry Page",
       dispatch_user: "Office Dispatch User",
       admin: "Commissionerate Administrator"
     };
     container.innerHTML = `
-      <i class="fa-solid fa-user-shield"></i> Current Simulation Role: <strong>${roleLabels[otCurrentRole] || otCurrentRole}</strong>
+      <i class="fa-solid fa-user-shield"></i> <strong>${roleLabels[otCurrentRole] || otCurrentRole}</strong>
     `;
   }
 

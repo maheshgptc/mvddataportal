@@ -1298,79 +1298,13 @@ input:checked+.slider:before {
   }
 }
 
-/* Print Media Styles */
-@media print {
-  body {
-    background: #ffffff !important;
-    color: #000000 !important;
-    font-size: 11pt !important;
-  }
-
-  body * {
-    visibility: hidden;
-  }
-
-  .print-hide,
-  .portal-sidebar,
-  .top-gov-bar,
-  .modal-header.print-hide,
-  .btn,
-  nav,
-  header {
-    display: none !important;
-  }
-
-  #comprehensiveReportModal,
-  #comprehensiveReportModal *,
-  #officerReportModal,
-  #officerReportModal * {
-    visibility: visible;
-  }
-
-  #comprehensiveReportModal,
-  #officerReportModal {
-    position: absolute !important;
-    left: 0 !important;
-    top: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    background: #ffffff !important;
-    display: block !important;
-    box-shadow: none !important;
-  }
-
-  .printable-report-card {
-    max-width: 100% !important;
-    width: 100% !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-  }
-
-  .printable-report-area {
-    padding: 10px !important;
-  }
-
-  .data-table {
-    width: 100% !important;
-    border-collapse: collapse !important;
-    page-break-inside: auto !important;
-  }
-
-  .data-table th,
-  .data-table td {
-    border: 1px solid #cbd5e1 !important;
-    padding: 6px 8px !important;
-    font-size: 9pt !important;
-  }
-
-  .data-table tr {
-    page-break-inside: avoid !important;
-    page-break-after: auto !important;
-  }
+/* Modal and print utility classes */
+.printable-report-card {
+  max-width: 100%;
+  width: 100%;
+}
+.printable-report-area {
+  padding: 10px;
 }
 
 /* ==========================================================================
@@ -1919,76 +1853,171 @@ input:checked+.slider:before {
 @media print {
   @page {
     size: A4 landscape;
-    margin: 12mm 10mm 15mm 10mm;
+    margin: 10mm 10mm 12mm 10mm;
   }
 
-  body {
+  *, *::before, *::after {
+    box-sizing: border-box !important;
+  }
+
+  html, body {
     background: #ffffff !important;
     color: #000000 !important;
     font-size: 9.5pt !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+    min-width: 100% !important;
   }
 
-  /* Hide navigation, sidebars, headers, buttons */
+  /* Hide navigation, sidebars, headers, action buttons, closed modals, alerts, auth */
   .portal-sidebar,
   .top-gov-bar,
   .app-footer,
   .ot-subtab-bar,
   .table-toolbar,
   .btn,
+  button,
   .print-hide,
+  .auth-overlay,
+  .toast-container,
+  #googleAuthOverlay,
   #adminContainer,
   #publicContainer,
   #genericModuleContainer,
   .ot-role-switcher-box,
-  #otReportActionToolbar {
+  #otReportActionToolbar,
+  #otReportExcludedDraftsAlert,
+  #otTabContentForm,
+  #otTabContentDirectory,
+  #otTabContentRoles,
+  .modal-overlay:not(.print-active) {
     display: none !important;
+    visibility: hidden !important;
+  }
+
+  .app-layout {
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
   }
 
   .portal-main-area {
     margin-left: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
     width: 100% !important;
+    max-width: 100% !important;
+    display: block !important;
   }
 
   .main-wrapper {
     margin: 0 !important;
     padding: 0 !important;
+    width: 100% !important;
     max-width: 100% !important;
+    display: block !important;
   }
 
   #officerTrainingContainer {
     display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  #otTabContentReport {
+    display: block !important;
+    visibility: visible !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
   }
 
   .ot-report-official-container {
+    display: block !important;
+    visibility: visible !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
   }
 
-  table.data-table {
+  .ot-report-official-container * {
+    visibility: visible !important;
+  }
+
+  /* When printing from an active modal */
+  body.printing-modal .app-layout {
+    display: none !important;
+  }
+
+  body.printing-modal .modal-overlay.print-active,
+  body.printing-modal #otProfilePreviewModal.print-active,
+  body.printing-modal #comprehensiveReportModal.print-active,
+  body.printing-modal #officerReportModal.print-active {
+    display: block !important;
+    position: static !important;
+    left: 0 !important;
+    top: 0 !important;
+    width: 100% !important;
+    background: #ffffff !important;
+    box-shadow: none !important;
+    border: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    visibility: visible !important;
+  }
+
+  body.printing-modal .modal-card,
+  body.printing-modal .printable-report-card {
+    max-width: 100% !important;
+    width: 100% !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    visibility: visible !important;
+  }
+
+  body.printing-modal .modal-card *,
+  body.printing-modal .printable-report-card * {
+    visibility: visible !important;
+  }
+
+  table.data-table,
+  table.summary-report-table {
     width: 100% !important;
     border-collapse: collapse !important;
     page-break-inside: auto !important;
     font-size: 8.5pt !important;
   }
 
-  table.data-table thead {
+  table.data-table thead,
+  table.summary-report-table thead {
     display: table-header-group !important; /* Repeats table headers on each page */
   }
 
-  table.data-table th {
+  table.data-table th,
+  table.summary-report-table th {
     background: #f1f5f9 !important;
     color: #000000 !important;
-    border: 1px solid #64748b !important;
-    padding: 6px 8px !important;
+    border: 1px solid #475569 !important;
+    padding: 5px 6px !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
   }
 
-  table.data-table td {
-    border: 1px solid #cbd5e1 !important;
-    padding: 6px 8px !important;
+  table.data-table td,
+  table.summary-report-table td {
+    border: 1px solid #94a3b8 !important;
+    padding: 5px 6px !important;
   }
 
-  table.data-table tr {
+  table.data-table tr,
+  table.summary-report-table tr {
     page-break-inside: avoid !important;
   }
 
@@ -1996,18 +2025,20 @@ input:checked+.slider:before {
     page-break-inside: avoid !important;
     border: 1px solid #000000 !important;
     background: #ffffff !important;
+    margin-top: 20px !important;
+    padding: 12px !important;
   }
 
   /* Unverified Draft Watermark in Print */
   .ot-draft-watermark {
     display: block !important;
-    font-size: 24pt !important;
-    color: rgba(220, 38, 38, 0.4) !important;
+    font-size: 22pt !important;
+    color: rgba(220, 38, 38, 0.45) !important;
     text-align: center !important;
     font-weight: 800 !important;
     letter-spacing: 0.1em !important;
     margin-bottom: 12px !important;
     border: 2px dashed #dc2626 !important;
-    padding: 8px !important;
+    padding: 6px !important;
   }
 }
