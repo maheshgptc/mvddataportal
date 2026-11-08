@@ -680,6 +680,24 @@ textarea.form-control {
   animation: fadeIn 0.3s ease-in;
 }
 
+.reflection-alert.alert-restricted {
+  background: #fef2f2 !important;
+  border: 1.5px solid #ef4444 !important;
+  color: #991b1b !important;
+}
+
+.reflection-alert.alert-authorized {
+  background: #f0fdf4 !important;
+  border: 1.5px solid #10b981 !important;
+  color: #064e3b !important;
+}
+
+.reflection-alert.alert-unlocked {
+  background: #eff6ff !important;
+  border: 1.5px solid #3b82f6 !important;
+  color: #1e40af !important;
+}
+
 /* Hardware Counter Box Pairs */
 .pair-box {
   background: #f8fafc;

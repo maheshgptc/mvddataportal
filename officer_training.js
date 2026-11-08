@@ -346,6 +346,15 @@ function otHasPermission(action) {
 
 // --- ACCESS CONTROL & OFFICE LOCKING UTILITIES ---
 
+function clearFieldError(fieldId) {
+  if (!fieldId) return;
+  const field = document.getElementById(fieldId);
+  const errContainer = document.getElementById(`err_${fieldId}`);
+  if (field) field.classList.remove('is-invalid');
+  if (errContainer) errContainer.textContent = '';
+}
+window.clearFieldError = clearFieldError;
+
 function otGetLoggedInEmail() {
   const gUser = window.googleAuthUser || JSON.parse(localStorage.getItem('mvd_google_user_session') || "null");
   return (gUser && gUser.email) ? gUser.email.toLowerCase().trim() : '';
@@ -353,19 +362,56 @@ function otGetLoggedInEmail() {
 
 function getOfficeLockedEmail(officeCode) {
   if (!officeCode) return '';
-  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-  if (locks[officeCode]) return locks[officeCode].toLowerCase().trim();
+  const cleanCode = officeCode.trim();
+  const codePrefix = cleanCode.split(/[\s—–-]+/)[0].toUpperCase();
 
-  // Check existing profiles for this office
-  const existing = otProfilesStore.find(p => p.officeCode === officeCode && p.enteredBy && p.enteredBy.userId);
-  if (existing && existing.enteredBy.userId) {
-    const lockedId = existing.enteredBy.userId.toLowerCase().trim();
-    locks[officeCode] = lockedId;
-    localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
-    return lockedId;
+  // 1. Direct registry in mvd_ot_office_locks
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  if (locks[cleanCode]) return locks[cleanCode].toLowerCase().trim();
+  if (locks[codePrefix]) return locks[codePrefix].toLowerCase().trim();
+  for (const [k, v] of Object.entries(locks)) {
+    if (!v) continue;
+    const kPrefix = k.split(/[\s—–-]+/)[0].toUpperCase();
+    if (kPrefix === codePrefix || k.toUpperCase() === cleanCode.toUpperCase() || k.toUpperCase().includes(cleanCode.toUpperCase())) {
+      return v.toLowerCase().trim();
+    }
   }
+
+  // 2. Search otProfilesStore
+  if (Array.isArray(otProfilesStore)) {
+    const existing = otProfilesStore.find(p => {
+      if (!p || !p.officeCode || !p.enteredBy || !p.enteredBy.userId) return false;
+      const pPrefix = p.officeCode.split(/[\s—–-]+/)[0].toUpperCase();
+      return pPrefix === codePrefix || p.officeCode.toUpperCase() === cleanCode.toUpperCase();
+    });
+    if (existing && existing.enteredBy && existing.enteredBy.userId) {
+      const lockedId = existing.enteredBy.userId.toLowerCase().trim();
+      locks[codePrefix] = lockedId;
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+      return lockedId;
+    }
+  }
+
+  // 3. Search IT Equipment store (mvd_it_inventory_store)
+  try {
+    const itStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store') || '{}');
+    for (const [key, rec] of Object.entries(itStore)) {
+      if (!rec) continue;
+      const keyPrefix = key.split(/[\s—–-]+/)[0].toUpperCase();
+      if (keyPrefix === codePrefix || key.toUpperCase().includes(cleanCode.toUpperCase())) {
+        const email = (rec.createdOfficerEmail || rec.entryOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || '').toLowerCase().trim();
+        if (email) {
+          locks[codePrefix] = email;
+          localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+          return email;
+        }
+      }
+    }
+  } catch(e) {}
+
   return '';
 }
+window.getOfficeLockedEmail = getOfficeLockedEmail;
 
 function getOfficeLinkedToUser(email) {
   if (!email) return null;
@@ -419,31 +465,34 @@ function checkOfficeAccessAndLock(officeCode) {
   const authPanel = document.getElementById('otOfficeAuthorizedPanel');
 
   if (!officeCode) {
-    if (alertBox) alertBox.style.display = 'none';
+    if (alertBox) {
+      alertBox.style.display = 'none';
+      alertBox.innerHTML = '';
+    }
     if (authPanel) authPanel.style.display = 'none';
     toggleOfficerFormDisabled(false);
     return;
   }
 
   const currentEmail = otGetLoggedInEmail();
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   const lockedEmail = getOfficeLockedEmail(officeCode);
 
   if (lockedEmail) {
-    if (isAdmin || (currentEmail && lockedEmail.toLowerCase() === currentEmail.toLowerCase())) {
+    if (currentEmail && lockedEmail.toLowerCase() === currentEmail.toLowerCase()) {
       // Authorized User
       toggleOfficerFormDisabled(false);
       if (alertBox) {
+        alertBox.className = 'reflection-alert alert-authorized';
+        alertBox.style.display = 'flex';
         alertBox.style.background = '#f0fdf4';
-        alertBox.style.borderColor = '#a7f3d0';
+        alertBox.style.borderColor = '#86efac';
         alertBox.style.color = '#064e3b';
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-circle-check" style="color:#047857; font-size: 1.1rem;"></i>
-            <span><strong>Authorized Office:</strong> You are authorized with account <strong>${escapeHtml(currentEmail || lockedEmail)}</strong>. You can add new officers or edit existing details below.</span>
+            <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
+            <span><strong>Authorized Office:</strong> You are authorized with account <strong>${escapeHtml(currentEmail)}</strong>. You can add new officers or edit existing details below.</span>
           </div>
         `;
-        alertBox.style.display = 'flex';
       }
       renderOfficeEditOptionList(officeCode);
     } else {
@@ -458,44 +507,51 @@ function checkOfficeAccessAndLock(officeCode) {
 
       const alertMsg = `This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`;
       if (alertBox) {
+        alertBox.className = 'reflection-alert alert-restricted';
+        alertBox.style.display = 'flex';
         alertBox.style.background = '#fef2f2';
-        alertBox.style.borderColor = '#fecdd3';
+        alertBox.style.borderColor = '#ef4444';
         alertBox.style.color = '#991b1b';
         alertBox.innerHTML = `
-          <div style="display: flex; align-items: center; gap: 12px; padding: 4px 0;">
-            <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.35rem; flex-shrink: 0;"></i>
-            <div style="font-size: 0.92rem; line-height: 1.5;">
-              <strong style="color: #991b1b;">Access Restricted:</strong> This office is entered by <strong>${escapeHtml(lockedEmail)}</strong>. Please login with <strong>${escapeHtml(lockedEmail)}</strong> to add and edit details.
+          <div style="display: flex; align-items: flex-start; gap: 12px; padding: 4px 0; width: 100%;">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.4rem; flex-shrink: 0; margin-top: 2px;"></i>
+            <div style="font-size: 0.95rem; line-height: 1.5; color: #991b1b;">
+              <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px; color: #b91c1c;">
+                <i class="fa-solid fa-lock"></i> Access Restricted
+              </div>
+              <div>This office is entered by <strong>${escapeHtml(lockedEmail)}</strong>. Please login with <strong>${escapeHtml(lockedEmail)}</strong> to add and edit details.</div>
             </div>
           </div>
         `;
-        alertBox.style.display = 'flex';
         alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       }
       showToast(alertMsg, 'error');
     }
   } else {
-    // Unlocked office (first entry)
+    // Unlocked office (first entry will lock to current account)
     toggleOfficerFormDisabled(false);
     if (authPanel) authPanel.style.display = 'none';
     if (alertBox) {
       if (currentEmail) {
+        alertBox.className = 'reflection-alert alert-unlocked';
+        alertBox.style.display = 'flex';
         alertBox.style.background = '#eff6ff';
-        alertBox.style.borderColor = '#bfdbfe';
+        alertBox.style.borderColor = '#93c5fd';
         alertBox.style.color = '#1e40af';
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-shield-halved" style="color:#2563eb;"></i>
+            <i class="fa-solid fa-shield-halved" style="color:#2563eb; font-size: 1.1rem;"></i>
             <span>First entry for this office will lock it to your Gmail ID: <strong>${escapeHtml(currentEmail)}</strong></span>
           </div>
         `;
-        alertBox.style.display = 'flex';
       } else {
         alertBox.style.display = 'none';
+        alertBox.innerHTML = '';
       }
     }
   }
 }
+window.checkOfficeAccessAndLock = checkOfficeAccessAndLock;
 
 function renderOfficeEditOptionList(officeCode) {
   const panel = document.getElementById('otOfficeAuthorizedPanel');
@@ -567,12 +623,14 @@ function initOfficerTrainingModule() {
   prefillEnteredByDetails();
   renderRoleSwitcherUI();
 
-  // Dropdown starts unselected with default prompt
+  // Attach instant validation listeners to main office dropdown
   const officeSelect = document.getElementById('otMainOfficeSelect');
-  const officeSearchInput = document.getElementById('otOfficeSearchInput');
-  if (officeSearchInput && officeSelect && officeSelect.value) {
-    const opt = officeSelect.querySelector(`option[value="${officeSelect.value}"]`);
-    if (opt) officeSearchInput.value = opt.textContent;
+  if (officeSelect) {
+    officeSelect.onchange = function() { handleOfficeSelectPicked(this); };
+    officeSelect.oninput = function() { handleOfficeSelectPicked(this); };
+    if (officeSelect.value) {
+      checkOfficeAccessAndLock(officeSelect.value);
+    }
   }
 
   // Load from Supabase in background
@@ -714,16 +772,21 @@ function handleOfficeSearchBlur(inputEl, targetSelectId) {
 }
 
 function handleOfficeSelectPicked(sel) {
-  const sInput = document.getElementById('otOfficeSearchInput');
-  if (sInput && sel.selectedIndex >= 0) {
-    sInput.value = sel.options[sel.selectedIndex]?.value ? sel.options[sel.selectedIndex].text : '';
+  let val = '';
+  if (typeof sel === 'string') {
+    val = sel;
+    const el = document.getElementById('otMainOfficeSelect');
+    if (el && el.value !== val) el.value = val;
+  } else if (sel && sel.value !== undefined) {
+    val = sel.value;
   }
-  clearFieldError(sel.id);
-  if (sInput) clearFieldError(sInput.id);
+  const el = document.getElementById('otMainOfficeSelect');
+  if (el) clearFieldError(el.id);
   markFormDirty(true);
 
-  checkOfficeAccessAndLock(sel.value);
+  checkOfficeAccessAndLock(val);
 }
+window.handleOfficeSelectPicked = handleOfficeSelectPicked;
 
 // --- 7. DYNAMIC FORM RENDERING (ADDITIONAL QUALIFICATIONS & SKILLS) ---
 
@@ -2780,9 +2843,16 @@ async function syncOfficerProfilesWithSupabase() {
         } else {
           otProfilesStore.push(m);
         }
+        if (m.officeCode && m.enteredBy && m.enteredBy.userId) {
+          const codePrefix = m.officeCode.split(/[\s—–-]+/)[0].toUpperCase();
+          otOfficeLocks[codePrefix] = m.enteredBy.userId.toLowerCase().trim();
+        }
       });
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
       localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
       renderAdminOfficersDirectory();
+      const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+      if (currentSelectedOffice) checkOfficeAccessAndLock(currentSelectedOffice);
     } else {
       // Fallback: sync from legacy officer_qualifications
       const legacyRes = await client

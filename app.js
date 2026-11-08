@@ -275,7 +275,17 @@ let chartOfficerDesigInstance = null;
 
 // --- 5. GOOGLE OAUTH 2.0 AUTHENTICATION & ACCESS CONTROL ---
 let googleAuthUser = null;
+window.googleAuthUser = null;
 let googleTokenClient = null;
+
+function clearFieldError(fieldId) {
+  if (!fieldId) return;
+  const field = document.getElementById(fieldId);
+  const errContainer = document.getElementById(`err_${fieldId}`);
+  if (field) field.classList.remove('is-invalid');
+  if (errContainer) errContainer.textContent = '';
+}
+window.clearFieldError = clearFieldError;
 
 function checkGoogleAuthSession() {
   const saved = localStorage.getItem('mvd_google_user_session');
@@ -285,6 +295,7 @@ function checkGoogleAuthSession() {
   if (saved) {
     try {
       googleAuthUser = JSON.parse(saved);
+      window.googleAuthUser = googleAuthUser;
       if (googleAuthUser && googleAuthUser.email) {
         applyGoogleAuthSession(googleAuthUser);
         return true;
@@ -461,12 +472,15 @@ function handleGoogleCredentialResponse(response) {
 
 function handleGoogleAuthSuccess(userObj) {
   googleAuthUser = userObj;
+  window.googleAuthUser = userObj;
   localStorage.setItem('mvd_google_user_session', JSON.stringify(userObj));
   applyGoogleAuthSession(userObj);
   showToast(`Welcome, ${userObj.name}! Mandatory Google Authentication verified.`, 'success');
 }
 
 function applyGoogleAuthSession(userObj) {
+  googleAuthUser = userObj;
+  window.googleAuthUser = userObj;
   const overlay = document.getElementById('googleAuthOverlay');
   const appLayout = document.getElementById('appMainLayout');
   const userBar = document.getElementById('googleUserProfileBar');
@@ -498,6 +512,7 @@ function applyGoogleAuthSession(userObj) {
 
 function logoutGoogleUser() {
   googleAuthUser = null;
+  window.googleAuthUser = null;
   localStorage.removeItem('mvd_google_user_session');
 
   const overlay = document.getElementById('googleAuthOverlay');
@@ -1796,6 +1811,34 @@ function handleOfficeSelectChange(officeName) {
       showToast(`This office is entered by ${displayOwner}. Please login with ${displayOwner} to add and edit details.`, 'error');
     }
   } else {
+    // Check if office is locked in Officer Training locks
+    const otLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+    const cleanCode = officeName.split(/[\s—–-]+/)[0].toUpperCase();
+    const otOwner = otLocks[cleanCode] || otLocks[officeName];
+
+    if (otOwner && (!currentEmail || otOwner.toLowerCase() !== currentEmail.toLowerCase())) {
+      if (btnDeleteForm) btnDeleteForm.style.display = 'none';
+      if (btnDeleteAlert) btnDeleteAlert.style.display = 'none';
+      resetPublicFormFieldsOnly();
+      toggleFormFieldsDisabled(true);
+
+      if (alertBox && alertText) {
+        alertBox.style.background = '#fef2f2';
+        alertBox.style.borderColor = '#ef4444';
+        alertBox.style.color = '#991b1b';
+        alertText.innerHTML = `
+          <div>
+            <i class="fa-solid fa-lock" style="color:#dc2626;"></i>
+            <strong>This office is entered by ${escapeHtml(otOwner)}. Please login with ${escapeHtml(otOwner)} to add and edit details.</strong>
+          </div>
+        `;
+        alertBox.style.display = 'flex';
+      }
+      showToast(`This office is entered by ${otOwner}. Please login with ${otOwner} to add and edit details.`, 'error');
+      updateViewEnteredDataButtonVisibility();
+      return;
+    }
+
     if (btnDeleteForm) btnDeleteForm.style.display = 'none';
     if (btnDeleteAlert) btnDeleteAlert.style.display = 'none';
     toggleFormFieldsDisabled(false);
