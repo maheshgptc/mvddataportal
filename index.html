@@ -602,7 +602,7 @@
 
                 <div style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; align-items: center;">
                   <button type="button" id="btnAdminDeleteCurrentEntry" class="btn btn-danger" onclick="deleteCurrentAdminOfficeEntry()" style="display: none; margin-right: auto;">
-                    <i class="fa-solid fa-trash"></i> Delete Office Record from Supabase
+                    <i class="fa-solid fa-trash"></i> Delete Office Record
                   </button>
                   <button type="button" class="btn btn-secondary" onclick="resetPublicForm()">
                     <i class="fa-solid fa-rotate-left"></i> Reset Form
@@ -1305,6 +1305,66 @@
           </div>
         </div>
 
+        <!-- Custom In-App Confirmation Modal (Replaces browser confirm) -->
+        <div id="mvdCustomConfirmModal" class="modal-overlay" style="display: none; z-index: 100000;">
+          <div class="modal-card" style="max-width: 450px; padding: 24px; border-radius: 12px; box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3); border: 1px solid #e2e8f0;">
+            <div style="display: flex; align-items: flex-start; gap: 14px;">
+              <div id="mvdConfirmIcon" style="width: 44px; height: 44px; border-radius: 50%; background: #fee2e2; display: flex; align-items: center; justify-content: center; flex-shrink: 0;">
+                <i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 1.25rem;"></i>
+              </div>
+              <div style="flex: 1;">
+                <h3 id="mvdConfirmTitle" style="margin: 0 0 6px 0; font-size: 1.12rem; font-weight: 700; color: #0f172a;">Confirm Action</h3>
+                <div id="mvdConfirmMessage" style="margin: 0; font-size: 0.92rem; color: #475569; line-height: 1.5;"></div>
+              </div>
+            </div>
+            <div style="display: flex; justify-content: flex-end; gap: 10px; margin-top: 22px;">
+              <button type="button" id="mvdConfirmCancelBtn" class="btn btn-secondary" style="padding: 7px 18px; font-weight: 600;">Cancel</button>
+              <button type="button" id="mvdConfirmOkBtn" class="btn btn-danger" style="padding: 7px 20px; font-weight: 600;">Confirm</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Admin Edit Office Lock Modal -->
+        <div id="adminEditOfficeLockModal" class="modal-overlay" style="display: none; z-index: 100000;">
+          <div class="modal-card" style="max-width: 500px; padding: 24px;">
+            <div class="modal-header" style="border-bottom: 2px solid var(--primary-600); padding-bottom: 12px;">
+              <h3 style="color: var(--primary-900); margin: 0; font-size: 1.15rem;">
+                <i class="fa-solid fa-user-lock" style="color: var(--primary-600);"></i> Edit Authorised Data Entry User
+              </h3>
+              <button type="button" class="btn btn-outline btn-sm" onclick="closeEditOfficeLockModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form onsubmit="handleSaveOfficeLock(event)">
+              <input type="hidden" id="editLockOfficeCode">
+              
+              <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 8px; margin: 16px 0;">
+                <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Target MVD Office</div>
+                <div id="editLockOfficeDisplay" style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-top: 2px;"></div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label for="editLockEmailInput"><i class="fa-solid fa-envelope"></i> Authorised Gmail ID <span class="req-star">*</span></label>
+                <input type="email" id="editLockEmailInput" class="form-control" placeholder="e.g. officer.kl01@gmail.com" required>
+                <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; display: block;">
+                  Only this Google account will be authorized to enter and edit officer profiles for this office.
+                </small>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-outline btn-danger btn-sm" onclick="handleClearCurrentOfficeLock()">
+                  <i class="fa-solid fa-unlock"></i> Clear Lock (Open Office)
+                </button>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="btn btn-secondary" onclick="closeEditOfficeLockModal()">Cancel</button>
+                  <button type="submit" class="btn btn-primary" id="btnSaveOfficeLock">
+                    <i class="fa-solid fa-check"></i> Save Authorised User
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <!-- ==========================================================================
              ADMIN SESSION CONTAINER
              ========================================================================== -->
@@ -1329,6 +1389,9 @@
             <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
               <button class="btn btn-outline" id="btnAdminNavDashboard" onclick="switchAdminSubView('dashboard')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-chart-pie"></i> Executive Dashboard
+              </button>
+              <button class="btn btn-outline" id="btnAdminNavOfficeLocks" onclick="switchAdminSubView('officelocks')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
+                <i class="fa-solid fa-user-lock"></i> Authorised Data Entry Users
               </button>
               <button class="btn btn-outline" id="btnAdminNavSummary" onclick="switchAdminSubView('summary')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-table-list"></i> IT Summary Report
@@ -1897,7 +1960,7 @@
           <div id="adminEntrySubView" style="display: none;">
             <div class="reflection-alert" style="margin-bottom: 16px;">
               <i class="fa-solid fa-user-lock"></i>
-              <span>Admin Direct Entry Mode Active. Data submitted here updates the live Supabase cloud database directly.</span>
+              <span>Admin Direct Entry Mode Active. Data submitted here updates the live database directly.</span>
             </div>
             <div id="adminFormContainer"></div>
           </div>
@@ -1970,6 +2033,102 @@
               </p>
 
               <div id="menuManagerContainer" class="form-grid-2"></div>
+            </div>
+          </div>
+
+          <!-- ADMIN AUTHORISED DATA ENTRY USERS SUBVIEW -->
+          <div id="adminOfficeLocksSubView" style="display: none;">
+            <div class="card-section">
+              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="section-title" style="margin: 0; font-size: 1.25rem;">
+                    <i class="fa-solid fa-user-shield" style="color: var(--primary-600);"></i> Authorised Data Entry Users — Office Access Registry
+                  </h3>
+                  <p style="font-size: 0.85rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                    Manage designated Gmail accounts for data entry across all 105 MVD offices. Data entry and editing for each office is restricted exclusively to its assigned Gmail ID.
+                  </p>
+                </div>
+                <div style="display: flex; gap: 10px;">
+                  <button type="button" class="btn btn-outline btn-sm" onclick="exportOfficeLocksCSV()">
+                    <i class="fa-solid fa-file-csv"></i> Export Access List CSV
+                  </button>
+                </div>
+              </div>
+
+              <!-- Summary KPI Cards -->
+              <div class="form-grid-3" style="margin-top: 18px;">
+                <div class="metric-card" style="border-left: 4px solid var(--primary-600);">
+                  <div class="metric-icon" style="background: #e0f2fe; color: #0284c7;"><i class="fa-solid fa-building"></i></div>
+                  <div class="metric-content">
+                    <h4>Total MVD Offices</h4>
+                    <div class="metric-value" id="kpiTotalOfficeLocks">105</div>
+                    <div class="metric-sub">Statewide offices in master list</div>
+                  </div>
+                </div>
+                <div class="metric-card" style="border-left: 4px solid #059669;">
+                  <div class="metric-icon" style="background: #dcfce7; color: #16a34a;"><i class="fa-solid fa-lock"></i></div>
+                  <div class="metric-content">
+                    <h4>Assigned / Locked Offices</h4>
+                    <div class="metric-value" id="kpiAssignedOfficeLocks" style="color: #16a34a;">0</div>
+                    <div class="metric-sub">Restricted to designated Gmail ID</div>
+                  </div>
+                </div>
+                <div class="metric-card" style="border-left: 4px solid #d97706;">
+                  <div class="metric-icon" style="background: #fef3c7; color: #d97706;"><i class="fa-solid fa-lock-open"></i></div>
+                  <div class="metric-content">
+                    <h4>Open / Unassigned Offices</h4>
+                    <div class="metric-value" id="kpiOpenOfficeLocks" style="color: #d97706;">105</div>
+                    <div class="metric-sub">Available for first entry lock</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Search & Filters Toolbar -->
+              <div class="table-toolbar" style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <div style="flex: 1; min-width: 260px; position: relative;">
+                  <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                  <input type="text" id="adminOfficeLockSearchInput" class="form-control" placeholder="Search office code, office name, or Gmail ID..." oninput="renderAdminOfficeLocksTable()" style="padding-left: 36px;">
+                </div>
+                <div style="min-width: 220px;">
+                  <select id="adminOfficeLockCategoryFilter" class="form-control" onchange="renderAdminOfficeLocksTable()">
+                    <option value="ALL">-- All Office Categories --</option>
+                    <option value="Commissionerate & Deputy Transport Commissioners (DTC)">Commissionerate &amp; DTC</option>
+                    <option value="Regional Transport Offices (RTO)">RTO Offices</option>
+                    <option value="Sub Regional Transport Offices (Sub-RTO)">Sub-RTO Offices</option>
+                    <option value="Enforcement RTO Offices">Enforcement RTOs</option>
+                  </select>
+                </div>
+                <div style="min-width: 180px;">
+                  <select id="adminOfficeLockStatusFilter" class="form-control" onchange="renderAdminOfficeLocksTable()">
+                    <option value="ALL">-- All Access Statuses --</option>
+                    <option value="LOCKED">Assigned / Locked Only</option>
+                    <option value="OPEN">Open / Unassigned Only</option>
+                  </select>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="resetAdminOfficeLocksFilters()">
+                  <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                </button>
+              </div>
+
+              <!-- Table of All Offices with Editable Options -->
+              <div class="data-table-container" style="margin-top: 16px;">
+                <table class="data-table" id="adminOfficeLocksTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px; text-align: center;">#</th>
+                      <th style="min-width: 100px;">Code</th>
+                      <th style="min-width: 220px;">Office Name</th>
+                      <th style="min-width: 180px;">Category</th>
+                      <th style="min-width: 240px;">Authorised Gmail ID</th>
+                      <th style="width: 130px; text-align: center;">Status</th>
+                      <th style="width: 160px; text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOfficeLocksTableBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 

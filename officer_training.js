@@ -154,6 +154,7 @@ Object.entries(OT_OFFICE_GROUPS).forEach(([category, list]) => {
     });
   });
 });
+window.ALL_MVD_OFFICES = ALL_MVD_OFFICES;
 
 const DESIGNATION_OPTIONS = ["RTO", "Joint RTO", "MVI", "AMVI"];
 
@@ -225,6 +226,7 @@ otProfilesStore.forEach(p => {
   }
 });
 localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+window.otOfficeLocks = otOfficeLocks;
 
 // Active Session Roles:
 // 'data_entry' | 'head_of_office' | 'dispatch_user' | 'admin'
@@ -639,6 +641,9 @@ function initOfficerTrainingModule() {
 
   // Load from Supabase in background
   syncOfficerProfilesWithSupabase();
+  if (typeof syncOfficeLocksFromSupabase === 'function') {
+    syncOfficeLocksFromSupabase();
+  }
 
   // Subscribe to live Realtime updates from Supabase
   subscribeToRealtimeOfficerProfiles();
@@ -1046,26 +1051,26 @@ function saveStagedTrainingModal(e) {
   const monthYear = document.getElementById('otTrMonthYearInput').value;
 
   if (!attended) {
-    alert("Please enter Training Attended");
+    showToast("Please enter Training Attended", "warning");
     return;
   }
   if (!conductedBy) {
-    alert("Please enter Training Conducted By");
+    showToast("Please enter Training Conducted By", "warning");
     return;
   }
   if (durVal <= 0) {
-    alert("Please enter a positive numeric value for Duration of Training");
+    showToast("Please enter a positive numeric value for Duration of Training", "warning");
     return;
   }
   if (!monthYear) {
-    alert("Please enter Month & Year of Training");
+    showToast("Please enter Month & Year of Training", "warning");
     return;
   }
 
   // Prevent future dates
   const currentYM = new Date().toISOString().substring(0, 7);
   if (monthYear > currentYM) {
-    alert("Future dates are not allowed for attended training.");
+    showToast("Future dates are not allowed for attended training.", "warning");
     return;
   }
 
@@ -1089,12 +1094,17 @@ function saveStagedTrainingModal(e) {
   renderStagedTrainingTable();
 }
 
-function removeStagedTraining(idx) {
-  if (confirm("Remove this training record?")) {
-    otStagedTrainings.splice(idx, 1);
-    markFormDirty(true);
-    renderStagedTrainingTable();
-  }
+async function removeStagedTraining(idx) {
+  const ok = await (window.showCustomConfirm || showCustomConfirm)({
+    title: 'Remove Training Record',
+    message: 'Are you sure you want to remove this training record?',
+    confirmText: 'Remove',
+    isDanger: true
+  });
+  if (!ok) return;
+  otStagedTrainings.splice(idx, 1);
+  markFormDirty(true);
+  renderStagedTrainingTable();
 }
 
 // --- 9. SECTION 4: ENTERED-BY DETAILS & PREFILL ---
@@ -1359,6 +1369,10 @@ async function handleSaveDraft() {
     if (!lockedEmail && currentEmail) {
       otOfficeLocks[data.officeCode] = currentEmail;
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+      window.otOfficeLocks = otOfficeLocks;
+      if (typeof saveOfficeLocksToSupabase === 'function') {
+        saveOfficeLocksToSupabase(otOfficeLocks);
+      }
     }
   }
 
@@ -1376,7 +1390,7 @@ async function handleSaveDraft() {
 
     const result = await saveOfficerQualificationToSupabase(data);
     if (result && result.success) {
-      showToast(`Draft for PEN: ${data.pen} saved to Supabase in real time!`, "success");
+      showToast(`Draft for PEN: ${data.pen} saved successfully!`, "success");
     } else {
       showToast(`Draft saved locally for PEN: ${data.pen}`, "info");
     }
@@ -1415,6 +1429,10 @@ async function handleProfileSubmit(e) {
     if (!lockedEmail && currentEmail) {
       otOfficeLocks[data.officeCode] = currentEmail;
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+      window.otOfficeLocks = otOfficeLocks;
+      if (typeof saveOfficeLocksToSupabase === 'function') {
+        saveOfficeLocksToSupabase(otOfficeLocks);
+      }
     }
   }
 
@@ -1422,7 +1440,7 @@ async function handleProfileSubmit(e) {
   const origBtnContent = submitBtn ? submitBtn.innerHTML : '';
   if (submitBtn) {
     submitBtn.disabled = true;
-    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting to Supabase...';
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting profile...';
   }
 
   try {
@@ -1441,10 +1459,10 @@ async function handleProfileSubmit(e) {
     const result = await saveOfficerQualificationToSupabase(data);
 
     if (result && result.success) {
-      showToast(`Officer Profile for "${data.officerFullName}" (PEN: ${data.pen}) saved to Supabase in real time!`, "success");
+      showToast(`Officer Profile for "${data.officerFullName}" (PEN: ${data.pen}) saved successfully!`, "success");
     } else {
       const errMsg = result?.error?.message || "Sync warning";
-      showToast(`Saved locally, but Supabase returned error: ${errMsg}`, "warning");
+      showToast(`Saved locally, but server returned notice: ${errMsg}`, "warning");
       console.warn("Supabase save error:", result?.error);
     }
 
@@ -1513,8 +1531,16 @@ function saveOfficerRecordToStore(profile) {
   }
 }
 
-function resetOfficerForm() {
-  if (otFormDirty && !confirm("Discard unsaved changes?")) return;
+async function resetOfficerForm() {
+  if (otFormDirty) {
+    const ok = await (window.showCustomConfirm || showCustomConfirm)({
+      title: 'Discard Changes',
+      message: 'You have unsaved changes. Are you sure you want to discard them?',
+      confirmText: 'Discard',
+      isDanger: true
+    });
+    if (!ok) return;
+  }
 
   otEditingProfileId = null;
   otOriginalEditingPen = null;
@@ -2038,7 +2064,19 @@ async function deleteOfficerProfile(profileId) {
     return;
   }
 
-  if (!confirm(`Are you sure you want to permanently delete profile for "${p.officerFullName}" (PEN: ${p.pen})?\n\nThis will permanently remove the record from Supabase and local storage.`)) return;
+  const confirmFn = window.showCustomConfirm || (typeof showCustomConfirm === 'function' ? showCustomConfirm : null);
+  let confirmed = false;
+  if (confirmFn) {
+    confirmed = await confirmFn({
+      title: 'Delete Officer Profile',
+      message: `Are you sure you want to permanently delete profile for "${p.officerFullName}" (PEN: ${p.pen})?`,
+      confirmText: 'Delete',
+      isDanger: true
+    });
+  } else {
+    confirmed = window.confirm(`Are you sure you want to permanently delete profile for "${p.officerFullName}" (PEN: ${p.pen})?`);
+  }
+  if (!confirmed) return;
 
   const pen = p.pen;
   const pId = p.id;
@@ -2057,12 +2095,12 @@ async function deleteOfficerProfile(profileId) {
   triggerReverificationCheck(officeCode);
   otLogAudit('DELETE_PROFILE', pen, { officer: officerName, office: officeCode });
 
-  // 2. Delete from Supabase in real time
-  showToast(`Deleting "${officerName}" from Supabase...`, "info");
+  // 2. Delete from remote database in real time
+  showToast(`Deleting profile for "${officerName}"...`, "info");
   const delRes = await deleteOfficerFromSupabase(pId, pen);
 
   if (delRes && delRes.success) {
-    showToast(`Successfully deleted profile for "${officerName}" (PEN: ${pen}) from Supabase.`, "success");
+    showToast(`Successfully deleted profile for "${officerName}" (PEN: ${pen}).`, "success");
   } else {
     showToast(`Deleted locally. Note: ${delRes?.error?.message || 'Remote sync completed'}`, "info");
   }
@@ -2567,7 +2605,7 @@ function submitReportVerification(e) {
 
   const certCheck = document.getElementById('otVerifCertCheckbox');
   if (!certCheck || !certCheck.checked) {
-    alert("You must confirm the statutory certification statement before verifying.");
+    showToast("You must confirm the statutory certification statement before verifying.", "warning");
     return;
   }
 
@@ -2576,7 +2614,7 @@ function submitReportVerification(e) {
   const vRemarks = document.getElementById('otVerifRemarksInput').value.trim();
 
   if (!vName || !vDesig) {
-    alert("Please enter Verifying Officer Name and Designation.");
+    showToast("Please enter Verifying Officer Name and Designation.", "warning");
     return;
   }
 
@@ -2674,25 +2712,25 @@ function submitReportForwarding(e) {
   const remarks = document.getElementById('otFwdRemarksInput').value.trim();
 
   if (!headName) {
-    alert("Please enter Name of Head of Office Forwarding.");
+    showToast("Please enter Name of Head of Office Forwarding.", "warning");
     return;
   }
   if (!headDesig) {
-    alert("Please enter Designation of Head of Office.");
+    showToast("Please enter Designation of Head of Office.", "warning");
     return;
   }
   if (!fileNo) {
-    alert("Please enter File No.");
+    showToast("Please enter File No.", "warning");
     return;
   }
   if (!fwdDate) {
-    alert("Please enter Date of Forwarding.");
+    showToast("Please enter Date of Forwarding.", "warning");
     return;
   }
 
   const today = new Date().toISOString().substring(0, 10);
   if (fwdDate > today) {
-    alert("Future dates are not allowed for forwarding.");
+    showToast("Future dates are not allowed for forwarding.", "warning");
     return;
   }
 
@@ -2931,6 +2969,30 @@ function subscribeToRealtimeOfficerProfiles() {
           if (currentSelectedOffice) renderOfficeEditOptionList(currentSelectedOffice);
         }
       }
+    ).on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'mvd_app_settings' },
+      (payload) => {
+        const row = payload.new || payload.old;
+        if (row && row.id === 'office_locks' && row.menu_visibility) {
+          try {
+            const locks = typeof row.menu_visibility === 'object' ? row.menu_visibility : JSON.parse(row.menu_visibility);
+            localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+            if (typeof otOfficeLocks !== 'undefined') {
+              Object.assign(otOfficeLocks, locks);
+            }
+            if (typeof window.renderAdminOfficeLocksTable === 'function') {
+              window.renderAdminOfficeLocksTable();
+            }
+            const officeCode = document.getElementById('otMainOfficeSelect')?.value;
+            if (officeCode && typeof checkOfficeAccessAndLock === 'function') {
+              checkOfficeAccessAndLock(officeCode);
+            }
+          } catch (e) {
+            console.warn("Could not process realtime office_locks update:", e);
+          }
+        }
+      }
     ).subscribe((status) => {
       console.log("Supabase Realtime Officer Profiles subscription status:", status);
       if (status === 'SUBSCRIBED') otRealtimeSubscribed = true;
@@ -2996,6 +3058,7 @@ async function syncOfficerProfilesWithSupabase() {
         }
       });
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+window.otOfficeLocks = otOfficeLocks;
       localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
       renderAdminOfficersDirectory();
       const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;

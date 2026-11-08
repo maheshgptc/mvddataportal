@@ -822,6 +822,9 @@ async function syncWithSupabaseBackend() {
       renderMenuManagerUI();
     }
 
+    // Sync office locks registry
+    await syncOfficeLocksFromSupabase();
+
     renderPublicDataTable();
     renderAdminDataTable();
     renderAdminSummaryReport();
@@ -1417,7 +1420,13 @@ async function deleteOfficerRecord(officerId) {
   const name = off ? off.officer_name : 'this officer';
   const pen = off ? off.officer_pen : officerId;
 
-  if (!confirm(`Are you sure you want to permanently delete profile of "${name}"?`)) return;
+  const ok = await showCustomConfirm({
+    title: 'Delete Officer Record',
+    message: `Are you sure you want to delete profile for "${name}"?`,
+    confirmText: 'Delete',
+    isDanger: true
+  });
+  if (!ok) return;
 
   officersStore = officersStore.filter(o => o.id !== officerId && o.officer_pen !== officerId);
   localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
@@ -2367,9 +2376,9 @@ async function handleFormSubmit(e) {
 
     const sbRes = await saveRecordToSupabase(record);
     if (sbRes && sbRes.success) {
-      showToast(`IT Equipment details for "${officeName}" saved to Supabase in real time!`, 'success');
+      showToast(`IT Equipment details for "${officeName}" saved successfully in real time!`, 'success');
     } else {
-      showToast(`Saved locally. Supabase notice: ${sbRes?.error?.message || 'Check connection'}`, 'warning');
+      showToast(`Saved locally. Server notice: ${sbRes?.error?.message || 'Check connection'}`, 'warning');
     }
 
     renderAdminDataTable();
@@ -2536,6 +2545,7 @@ function switchAdminSubView(view) {
   adminSubView = view;
 
   const btnDash = document.getElementById('btnAdminNavDashboard');
+  const btnOfficeLocks = document.getElementById('btnAdminNavOfficeLocks');
   const btnSumm = document.getElementById('btnAdminNavSummary');
   const btnOffs = document.getElementById('btnAdminNavOfficers');
   const btnDir = document.getElementById('btnAdminNavDirectory');
@@ -2545,6 +2555,7 @@ function switchAdminSubView(view) {
   const btnMn = document.getElementById('btnAdminNavMenus');
 
   const dashSec = document.getElementById('adminDashboardSubView');
+  const officeLocksSec = document.getElementById('adminOfficeLocksSubView');
   const summSec = document.getElementById('adminSummarySubView');
   const offsSec = document.getElementById('adminOfficersSubView');
   const dirSec = document.getElementById('adminDirectorySubView');
@@ -2554,6 +2565,7 @@ function switchAdminSubView(view) {
   const mnSec = document.getElementById('adminMenusSubView');
 
   if (btnDash) btnDash.style.background = (view === 'dashboard') ? 'var(--primary-600)' : 'transparent';
+  if (btnOfficeLocks) btnOfficeLocks.style.background = (view === 'officelocks') ? 'var(--primary-600)' : 'transparent';
   if (btnSumm) btnSumm.style.background = (view === 'summary') ? 'var(--primary-600)' : 'transparent';
   if (btnOffs) btnOffs.style.background = (view === 'officers') ? 'var(--primary-600)' : 'transparent';
   if (btnDir) btnDir.style.background = (view === 'directory') ? 'var(--primary-600)' : 'transparent';
@@ -2563,6 +2575,7 @@ function switchAdminSubView(view) {
   if (btnMn) btnMn.style.background = (view === 'menus') ? 'var(--primary-600)' : 'transparent';
 
   if (dashSec) dashSec.style.display = (view === 'dashboard') ? 'block' : 'none';
+  if (officeLocksSec) officeLocksSec.style.display = (view === 'officelocks') ? 'block' : 'none';
   if (summSec) summSec.style.display = (view === 'summary') ? 'block' : 'none';
   if (offsSec) offsSec.style.display = (view === 'officers') ? 'block' : 'none';
   if (dirSec) dirSec.style.display = (view === 'directory') ? 'block' : 'none';
@@ -2572,6 +2585,7 @@ function switchAdminSubView(view) {
   if (mnSec) mnSec.style.display = (view === 'menus') ? 'block' : 'none';
 
   if (view === 'dashboard') renderAdminDashboard();
+  if (view === 'officelocks') renderAdminOfficeLocksTable();
   if (view === 'summary') renderAdminSummaryReport();
   if (view === 'officers') renderAdminOfficersTable();
   if (view === 'directory') {
@@ -2800,7 +2814,13 @@ function filterAdminTable() {
 }
 
 async function deleteOfficeEntry(officeName) {
-  if (!confirm(`Permanently delete data for "${officeName}"?`)) return;
+  const ok = await showCustomConfirm({
+    title: 'Delete Office Record',
+    message: `Are you sure you want to delete data for "${officeName}"?`,
+    confirmText: 'Delete',
+    isDanger: true
+  });
+  if (!ok) return;
 
   await deleteRecordFromSupabase(officeName);
   delete inventoryStore[officeName];
@@ -2989,7 +3009,15 @@ async function handleAddMenuSubmit(e) {
 }
 
 async function removeModule(moduleId) {
-  if (confirm(`Remove custom module "${moduleId}"?`)) {
+  const confirmFn = window.showCustomConfirm || (typeof showCustomConfirm === 'function' ? showCustomConfirm : null);
+  const ok = confirmFn ? await confirmFn({
+    title: 'Remove Module',
+    message: `Remove custom module "${moduleId}"?`,
+    confirmText: 'Remove',
+    isDanger: true
+  }) : window.confirm(`Remove custom module "${moduleId}"?`);
+
+  if (ok) {
     portalModules = portalModules.filter(m => m.id !== moduleId);
     localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
     renderPortalMenuBar();
@@ -3086,3 +3114,391 @@ function escapeHtml(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#039;');
 }
+
+// --- 21. CUSTOM IN-APP CONFIRMATION MODAL (Replaces browser confirm) ---
+function showCustomConfirm(options) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('mvdCustomConfirmModal');
+    if (!modal) {
+      const msg = typeof options === 'string' ? options : (options?.message || '');
+      resolve(window.confirm(msg));
+      return;
+    }
+
+    const opts = typeof options === 'string' ? { message: options } : (options || {});
+    const title = opts.title || 'Confirm Action';
+    const message = opts.message || 'Are you sure you want to proceed?';
+    const confirmText = opts.confirmText || 'Confirm';
+    const cancelText = opts.cancelText || 'Cancel';
+    const isDanger = opts.isDanger !== false;
+
+    const titleEl = document.getElementById('mvdConfirmTitle');
+    const msgEl = document.getElementById('mvdConfirmMessage');
+    const okBtn = document.getElementById('mvdConfirmOkBtn');
+    const cancelBtn = document.getElementById('mvdConfirmCancelBtn');
+    const iconBox = document.getElementById('mvdConfirmIcon');
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.innerHTML = typeof message === 'string' ? escapeHtml(message).replace(/\n/g, '<br>') : message;
+    if (okBtn) {
+      okBtn.textContent = confirmText;
+      okBtn.className = isDanger ? 'btn btn-danger' : 'btn btn-primary';
+    }
+    if (cancelBtn) cancelBtn.textContent = cancelText;
+
+    if (iconBox) {
+      if (isDanger) {
+        iconBox.style.background = '#fee2e2';
+        iconBox.innerHTML = '<i class="fa-solid fa-triangle-exclamation" style="color: #dc2626; font-size: 1.25rem;"></i>';
+      } else {
+        iconBox.style.background = '#e0f2fe';
+        iconBox.innerHTML = '<i class="fa-solid fa-circle-question" style="color: #0284c7; font-size: 1.25rem;"></i>';
+      }
+    }
+
+    modal.style.display = 'flex';
+
+    function onOk(e) {
+      if (e) e.preventDefault();
+      cleanup(true);
+    }
+
+    function onCancel(e) {
+      if (e) e.preventDefault();
+      cleanup(false);
+    }
+
+    function cleanup(result) {
+      modal.style.display = 'none';
+      if (okBtn) okBtn.removeEventListener('click', onOk);
+      if (cancelBtn) cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+
+    if (okBtn) okBtn.addEventListener('click', onOk, { once: true });
+    if (cancelBtn) cancelBtn.addEventListener('click', onCancel, { once: true });
+  });
+}
+window.showCustomConfirm = showCustomConfirm;
+
+// --- 22. AUTHORISED DATA ENTRY USERS ACCESS MANAGEMENT FOR ADMIN PORTAL ---
+
+async function saveOfficeLocksToSupabase(locks) {
+  const client = (typeof getSupabaseClient === 'function' ? getSupabaseClient() : null) || window.supabaseClient || supabaseClient;
+  if (!client) return { success: false, error: new Error('Client unavailable') };
+  try {
+    const payload = {
+      id: 'office_locks',
+      public_visible: true,
+      menu_visibility: locks,
+      updated_at: new Date().toISOString()
+    };
+    const { data, error } = await client
+      .from('mvd_app_settings')
+      .upsert(payload, { onConflict: 'id' });
+    if (error) {
+      console.warn('Could not sync office locks to database:', error);
+      return { success: false, error };
+    }
+    return { success: true, data };
+  } catch (err) {
+    console.warn('Sync office locks error:', err);
+    return { success: false, error: err };
+  }
+}
+window.saveOfficeLocksToSupabase = saveOfficeLocksToSupabase;
+
+async function syncOfficeLocksFromSupabase() {
+  const client = (typeof getSupabaseClient === 'function' ? getSupabaseClient() : null) || window.supabaseClient || supabaseClient;
+  if (!client) return;
+  try {
+    const { data, error } = await client
+      .from('mvd_app_settings')
+      .select('*')
+      .eq('id', 'office_locks')
+      .single();
+    if (!error && data && data.menu_visibility && typeof data.menu_visibility === 'object') {
+      const remoteLocks = data.menu_visibility;
+      const localLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+      const merged = { ...localLocks, ...remoteLocks };
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(merged));
+      if (typeof otOfficeLocks !== 'undefined') {
+        Object.assign(otOfficeLocks, merged);
+      }
+      if (typeof renderAdminOfficeLocksTable === 'function') renderAdminOfficeLocksTable();
+      const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+      if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
+        checkOfficeAccessAndLock(currentSelectedOffice);
+      }
+    }
+  } catch (e) {
+    console.warn('Could not load remote office locks:', e);
+  }
+}
+window.syncOfficeLocksFromSupabase = syncOfficeLocksFromSupabase;
+
+function getOfficeMasterList() {
+  if (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0) {
+    return ALL_MVD_OFFICES;
+  }
+  if (window.ALL_MVD_OFFICES && Array.isArray(window.ALL_MVD_OFFICES) && window.ALL_MVD_OFFICES.length > 0) {
+    return window.ALL_MVD_OFFICES;
+  }
+  if (typeof MVD_OFFICES !== 'undefined' && Array.isArray(MVD_OFFICES)) {
+    return MVD_OFFICES.map(item => {
+      const parts = item.split(' ');
+      const code = parts[0];
+      const name = parts.slice(1).join(' ');
+      return { code, name, category: 'Regional Transport Offices (RTO)' };
+    });
+  }
+  return [];
+}
+
+function renderAdminOfficeLocksTable() {
+  const tbody = document.getElementById('adminOfficeLocksTableBody');
+  if (!tbody) return;
+
+  const officeMaster = getOfficeMasterList();
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+
+  const searchTerm = (document.getElementById('adminOfficeLockSearchInput')?.value || '').toLowerCase().trim();
+  const catFilter = document.getElementById('adminOfficeLockCategoryFilter')?.value || 'ALL';
+  const statusFilter = document.getElementById('adminOfficeLockStatusFilter')?.value || 'ALL';
+
+  const totalOffices = officeMaster.length;
+  let lockedCount = 0;
+
+  officeMaster.forEach(off => {
+    const authEmail = locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '');
+    if (authEmail) lockedCount++;
+  });
+
+  const kpiTotal = document.getElementById('kpiTotalOfficeLocks');
+  const kpiAssigned = document.getElementById('kpiAssignedOfficeLocks');
+  const kpiOpen = document.getElementById('kpiOpenOfficeLocks');
+
+  if (kpiTotal) kpiTotal.textContent = totalOffices;
+  if (kpiAssigned) kpiAssigned.textContent = lockedCount;
+  if (kpiOpen) kpiOpen.textContent = (totalOffices - lockedCount);
+
+  let filtered = officeMaster.filter(off => {
+    const authEmail = (locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '') || '').toLowerCase().trim();
+
+    if (searchTerm) {
+      const hay = (off.code + ' ' + off.name + ' ' + (off.category || '') + ' ' + authEmail).toLowerCase();
+      if (!hay.includes(searchTerm)) return false;
+    }
+
+    if (catFilter !== 'ALL' && off.category !== catFilter) {
+      return false;
+    }
+
+    if (statusFilter === 'LOCKED' && !authEmail) return false;
+    if (statusFilter === 'OPEN' && authEmail) return false;
+
+    return true;
+  });
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="7" style="text-align: center; color: var(--text-muted); padding: 36px;"><i class="fa-solid fa-building-circle-xmark" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i> No offices match the filter criteria.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((off, idx) => {
+    const authEmail = locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '') || '';
+    const isLocked = !!authEmail;
+
+    return `
+      <tr>
+        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+        <td><code style="font-weight: 700; color: var(--primary-900); background: #f1f5f9; padding: 3px 8px; border-radius: 4px; font-size: 0.88rem;">${escapeHtml(off.code)}</code></td>
+        <td><strong style="color: #0f172a;">${escapeHtml(off.name)}</strong></td>
+        <td><small style="color: #64748b; font-weight: 500;">${escapeHtml(off.category || 'General MVD Office')}</small></td>
+        <td>
+          ${isLocked ? `<span style="font-weight: 600; color: #1e40af;"><i class="fa-solid fa-envelope" style="color: #2563eb; margin-right: 6px;"></i>${escapeHtml(authEmail)}</span>` : `<span style="color: #94a3b8; font-style: italic;"><i class="fa-solid fa-lock-open" style="margin-right: 6px;"></i>Open (locks on first entry)</span>`}
+        </td>
+        <td style="text-align: center;">
+          ${isLocked ? `<span class="badge badge-working" style="padding: 4px 10px; font-size: 0.78rem;"><i class="fa-solid fa-lock"></i> Assigned</span>` : `<span class="badge badge-warning" style="padding: 4px 10px; font-size: 0.78rem;"><i class="fa-solid fa-lock-open"></i> Open</span>`}
+        </td>
+        <td style="text-align: center;">
+          <div style="display: flex; gap: 6px; justify-content: center; align-items: center;">
+            <button type="button" class="btn btn-primary btn-sm" onclick="openEditOfficeLockModal('${off.code}')" style="padding: 4px 10px; font-size: 0.78rem;" title="Edit / Change Authorised Gmail ID">
+              <i class="fa-solid fa-user-pen"></i> ${isLocked ? 'Edit' : 'Assign'}
+            </button>
+            ${isLocked ? `
+              <button type="button" class="btn btn-outline btn-danger btn-sm" onclick="clearOfficeLock('${off.code}')" style="padding: 4px 8px; font-size: 0.78rem;" title="Clear lock to reopen initial entry">
+                <i class="fa-solid fa-unlock"></i>
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+window.renderAdminOfficeLocksTable = renderAdminOfficeLocksTable;
+
+function resetAdminOfficeLocksFilters() {
+  const search = document.getElementById('adminOfficeLockSearchInput');
+  const cat = document.getElementById('adminOfficeLockCategoryFilter');
+  const status = document.getElementById('adminOfficeLockStatusFilter');
+
+  if (search) search.value = '';
+  if (cat) cat.value = 'ALL';
+  if (status) status.value = 'ALL';
+
+  renderAdminOfficeLocksTable();
+  showToast('Office access filters reset', 'info');
+}
+window.resetAdminOfficeLocksFilters = resetAdminOfficeLocksFilters;
+
+function openEditOfficeLockModal(code) {
+  const modal = document.getElementById('adminEditOfficeLockModal');
+  if (!modal) return;
+
+  const officeMaster = getOfficeMasterList();
+  const off = officeMaster.find(o => o.code === code) || { code, name: code };
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  const currentLocked = locks[code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(code) : '') || '';
+
+  document.getElementById('editLockOfficeCode').value = code;
+  document.getElementById('editLockOfficeDisplay').textContent = `${off.code} — ${off.name}`;
+  document.getElementById('editLockEmailInput').value = currentLocked;
+
+  modal.style.display = 'flex';
+}
+window.openEditOfficeLockModal = openEditOfficeLockModal;
+
+function closeEditOfficeLockModal() {
+  const modal = document.getElementById('adminEditOfficeLockModal');
+  if (modal) modal.style.display = 'none';
+}
+window.closeEditOfficeLockModal = closeEditOfficeLockModal;
+
+async function handleSaveOfficeLock(e) {
+  if (e) e.preventDefault();
+  const code = document.getElementById('editLockOfficeCode')?.value;
+  const rawEmail = document.getElementById('editLockEmailInput')?.value || '';
+  const email = rawEmail.trim().toLowerCase();
+
+  if (!code || !email) {
+    showToast('Please enter a valid Gmail ID', 'error');
+    return;
+  }
+
+  const saveBtn = document.getElementById('btnSaveOfficeLock');
+  const origBtnContent = saveBtn ? saveBtn.innerHTML : '';
+  if (saveBtn) {
+    saveBtn.disabled = true;
+    saveBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+  }
+
+  try {
+    const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+    locks[code] = email;
+    localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+
+    if (typeof otOfficeLocks !== 'undefined') {
+      otOfficeLocks[code] = email;
+    }
+
+    const res = await saveOfficeLocksToSupabase(locks);
+    closeEditOfficeLockModal();
+    renderAdminOfficeLocksTable();
+
+    if (res && res.success) {
+      showToast(`Authorised user for ${code} updated to "${email}" successfully!`, 'success');
+    } else {
+      showToast(`Saved locally. Authorised user for ${code} set to "${email}".`, 'info');
+    }
+
+    const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+    if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
+      checkOfficeAccessAndLock(currentSelectedOffice);
+    }
+  } catch (err) {
+    console.error('Error saving office lock:', err);
+    showToast(`Error updating authorised user: ${err.message}`, 'error');
+  } finally {
+    if (saveBtn) {
+      saveBtn.disabled = false;
+      saveBtn.innerHTML = origBtnContent;
+    }
+  }
+}
+window.handleSaveOfficeLock = handleSaveOfficeLock;
+
+async function handleClearCurrentOfficeLock() {
+  const code = document.getElementById('editLockOfficeCode')?.value;
+  if (!code) return;
+  closeEditOfficeLockModal();
+  await clearOfficeLock(code);
+}
+window.handleClearCurrentOfficeLock = handleClearCurrentOfficeLock;
+
+async function clearOfficeLock(code) {
+  const ok = await showCustomConfirm({
+    title: 'Clear Office Lock',
+    message: `Are you sure you want to clear the authorized data entry account for office "${code}"?\n\nThis will reopen the office, allowing the next submitting account to become authorized.`,
+    confirmText: 'Clear Lock',
+    isDanger: false
+  });
+  if (!ok) return;
+
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  delete locks[code];
+
+  Object.keys(locks).forEach(k => {
+    if (k.toUpperCase() === code.toUpperCase() || k.split(/[\s—–-]+/)[0].toUpperCase() === code.toUpperCase()) {
+      delete locks[k];
+    }
+  });
+
+  localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+  if (typeof otOfficeLocks !== 'undefined') {
+    delete otOfficeLocks[code];
+  }
+
+  await saveOfficeLocksToSupabase(locks);
+  renderAdminOfficeLocksTable();
+  showToast(`Office lock cleared for ${code}. Initial entry will lock to next submitter.`, 'info');
+
+  const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+  if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
+    checkOfficeAccessAndLock(currentSelectedOffice);
+  }
+}
+window.clearOfficeLock = clearOfficeLock;
+
+function exportOfficeLocksCSV() {
+  const officeMaster = getOfficeMasterList();
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+
+  const headers = ["Sl No", "Office Code", "Office Name", "Office Category", "Authorised Gmail ID", "Status"];
+  const rows = officeMaster.map((off, idx) => {
+    const authEmail = locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '') || '';
+    const status = authEmail ? 'Assigned' : 'Open';
+    return [
+      idx + 1,
+      `"${(off.code || '').replace(/"/g, '""')}"`,
+      `"${(off.name || '').replace(/"/g, '""')}"`,
+      `"${(off.category || '').replace(/"/g, '""')}"`,
+      `"${(authEmail || 'Unassigned').replace(/"/g, '""')}"`,
+      `"${status}"`
+    ];
+  });
+
+  const csvContent = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `mvd_authorised_office_users_${new Date().toISOString().slice(0, 10)}.csv`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+  showToast('Downloaded Authorised Users CSV', 'success');
+}
+window.exportOfficeLocksCSV = exportOfficeLocksCSV;
