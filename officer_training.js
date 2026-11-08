@@ -479,7 +479,7 @@ function checkOfficeAccessAndLock(officeCode) {
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
-            <span><strong>Authorized Office:</strong> You are authorized with account <strong>${escapeHtml(currentEmail)}</strong>. You can add new officers or edit existing details below.</span>
+            <span>Use this Gmail ID: <strong>${escapeHtml(currentEmail)}</strong> for entering all officers Details. This Gmail ID is assigned for this office.</span>
           </div>
         `;
       }
@@ -529,15 +529,15 @@ function checkOfficeAccessAndLock(officeCode) {
     }
     if (alertBox) {
       if (currentEmail) {
-        alertBox.className = 'reflection-alert alert-unlocked';
+        alertBox.className = 'reflection-alert alert-authorized';
         alertBox.style.display = 'flex';
-        alertBox.style.background = '#eff6ff';
-        alertBox.style.borderColor = '#93c5fd';
-        alertBox.style.color = '#1e40af';
+        alertBox.style.background = '#f0fdf4';
+        alertBox.style.borderColor = '#86efac';
+        alertBox.style.color = '#064e3b';
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-lock-open" style="color:#2563eb; font-size: 1.1rem;"></i>
-            <span>This office is Open. First entry will lock it to your Gmail ID: <strong>${escapeHtml(currentEmail)}</strong></span>
+            <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
+            <span>Use this Gmail ID: <strong>${escapeHtml(currentEmail)}</strong> for entering all officers Details. This Gmail ID is assigned for this office.</span>
           </div>
         `;
       } else {
