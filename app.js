@@ -218,51 +218,8 @@ const SEED_DATA = {
   }
 };
 
-// Seed Officers for Officer Training & Qualification Module
-const SEED_OFFICERS = [
-  {
-    id: "off_seed_1",
-    office_name: "TCO Transport Commissionerate",
-    officer_name: "Sri. Rajesh Kumar K",
-    officer_pen: "432101",
-    officer_designation: "Joint Regional Transport Officer",
-    educational_qualification: "M.Tech",
-    qualification_other: "",
-    specialization: "Automobile & Traffic Engineering",
-    technical_certifications: "PGDCA, Road Safety Auditor Certified (CIRT)",
-    training_attended: "Vahan / Sarathi 4.0, e-Challan & ITMS, Road Safety Audit & Accident Investigation",
-    training_institutes: "CIRT Pune, IMG Thiruvananthapuram",
-    recent_training_year: 2025,
-    training_details: "Advanced Accident Reconstruction & Traffic Management (15 days at CIRT Pune)",
-    officer_mobile: "9447123456",
-    officer_email: "rajesh.mvd@keralam.gov.in",
-    entry_officer_name: "Sri. Rajesh Kumar K",
-    entry_officer_designation: "JRTO",
-    entry_officer_mobile: "9447123456",
-    created_at: "2026-07-20 11:30 AM"
-  },
-  {
-    id: "off_seed_2",
-    office_name: "KL01 RTO, Thiruvananthapuram",
-    officer_name: "Smt. Lekshmi Nair",
-    officer_pen: "567890",
-    officer_designation: "Motor Vehicles Inspector",
-    educational_qualification: "B.Tech",
-    qualification_other: "",
-    specialization: "Mechanical Engineering",
-    technical_certifications: "Certified Cyber Security Awareness, Python Basics",
-    training_attended: "Vahan / Sarathi 4.0, Automated Driving Testing Track (ADTT), Cyber Security Awareness",
-    training_institutes: "IDTR Edappal, CDAC",
-    recent_training_year: 2026,
-    training_details: "ADTT Automated Track Testing & Sensor Calibration Workshop",
-    officer_mobile: "9447987654",
-    officer_email: "lekshmi.mvd@keralam.gov.in",
-    entry_officer_name: "Sri. Suresh P",
-    entry_officer_designation: "Senior Superintendent",
-    entry_officer_mobile: "9447001122",
-    created_at: "2026-07-22 03:45 PM"
-  }
-];
+// Seed Officers for Officer Training & Qualification Module (Cleaned - No dummy officers)
+const SEED_OFFICERS = [];
 
 // --- 4. DEFAULT PORTAL MODULES REGISTRY (INCLUDES OFFICER TRAINING) ---
 const DEFAULT_PORTAL_MODULES = [
@@ -291,7 +248,9 @@ let isAdminAuthenticated = false;
 
 // Data Stores in LocalStorage with fallbacks
 let inventoryStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store')) || SEED_DATA;
-let officersStore = JSON.parse(localStorage.getItem('mvd_officers_store')) || SEED_OFFICERS;
+let officersStore = (JSON.parse(localStorage.getItem('mvd_officers_store')) || [])
+  .filter(o => o && o.id && !o.id.startsWith('off_seed_'));
+localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
 let appSettings = JSON.parse(localStorage.getItem('mvd_it_app_settings')) || {
   publicVisible: true,
   adminPasscode: "A!cell@2026"
@@ -1828,13 +1787,13 @@ function handleOfficeSelectChange(officeName) {
         alertBox.style.color = '#991b1b';
         alertText.innerHTML = `
           <div>
-            <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626;"></i>
-            <strong>Entry for this office already done with "${escapeHtml(displayOwner)}". Please Login with this account to view and update data</strong>
+            <i class="fa-solid fa-lock" style="color:#dc2626;"></i>
+            <strong>This office is entered by ${escapeHtml(displayOwner)}. Please login with ${escapeHtml(displayOwner)} to add and edit details.</strong>
           </div>
         `;
         alertBox.style.display = 'flex';
       }
-      showToast(`Entry already done with "${displayOwner}". Please Login with this account`, 'error');
+      showToast(`This office is entered by ${displayOwner}. Please login with ${displayOwner} to add and edit details.`, 'error');
     }
   } else {
     if (btnDeleteForm) btnDeleteForm.style.display = 'none';

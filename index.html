@@ -648,7 +648,7 @@
               <i class="fa-solid fa-file-pen"></i> Profile Data Entry
             </button>
             <button type="button" class="ot-subtab-btn" data-tab="report" onclick="switchOfficerSubTab('report')">
-              <i class="fa-solid fa-file-shield"></i> Office-wise Summary Report &amp; Verification
+              <i class="fa-solid fa-file-shield"></i> Summary Report &amp; Verification
             </button>
           </div>
 
@@ -679,11 +679,45 @@
 
             <form id="otOfficerForm" onsubmit="handleProfileSubmit(event)">
               
-              <!-- 1. Official Identification & Current Posting -->
+              <!-- 1. Entered By — Officer Details -->
+              <div class="card-section sec-remarks">
+                <div class="section-header">
+                  <h2 class="section-title">
+                    <i class="fa-solid fa-user-pen"></i> 1. Entered By — Officer Details
+                  </h2>
+                  <span class="section-tag">Audit Submitter Info</span>
+                </div>
+
+                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">
+                  Details of the officer entering or updating this record. Saved with authenticated user credentials.
+                </p>
+
+                <div class="form-grid-3">
+                  <div class="form-group">
+                    <label for="otEnteredByName"><i class="fa-solid fa-user"></i> Entered By — Officer Full Name <span class="req-star">*</span></label>
+                    <input type="text" id="otEnteredByName" class="form-control" placeholder="Reporting officer name" required oninput="markFormDirty(true)">
+                    <div class="field-error" id="err_otEnteredByName"></div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="otEnteredByDesignation"><i class="fa-solid fa-user-tag"></i> Entered By — Designation <span class="req-star">*</span></label>
+                    <input type="text" id="otEnteredByDesignation" class="form-control" placeholder="e.g. Senior Superintendent / Junior Superintendent / Clerk" required oninput="markFormDirty(true)">
+                    <div class="field-error" id="err_otEnteredByDesignation"></div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="otEnteredByMobile"><i class="fa-solid fa-phone"></i> Entered By — Mobile Number <span class="req-star">*</span></label>
+                    <input type="tel" id="otEnteredByMobile" class="form-control" placeholder="10-digit Indian Mobile" maxlength="14" required oninput="markFormDirty(true)">
+                    <div class="field-error" id="err_otEnteredByMobile"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Official Identification & Current Posting -->
               <div class="card-section sec-office" id="officerTrainingFormCard">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-id-card"></i> 1. Official Identification &amp; Current Posting
+                    <i class="fa-solid fa-id-card"></i> 2. Official Identification &amp; Current Posting
                   </h2>
                   <span class="section-tag">Required *</span>
                 </div>
@@ -727,13 +761,19 @@
                     <div class="field-error" id="err_otMainOfficeSelect"></div>
                   </div>
                 </div>
+
+                <!-- Office Lock & Access Alert Banner -->
+                <div id="otOfficeLockAlert" class="reflection-alert" style="display: none; margin-top: 16px;"></div>
+
+                <!-- Existing Profiles & Edit Option for Authorized Account -->
+                <div id="otOfficeAuthorizedPanel" style="display: none; margin-top: 16px;"></div>
               </div>
 
-              <!-- 2. Academic & Technical Credentials -->
+              <!-- 3. Academic & Technical Credentials -->
               <div class="card-section sec-hardware">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-graduation-cap"></i> 2. Academic &amp; Technical Credentials
+                    <i class="fa-solid fa-graduation-cap"></i> 3. Academic &amp; Technical Credentials
                   </h2>
                   <span class="section-tag">Qualifications</span>
                 </div>
@@ -819,11 +859,11 @@
                 </div>
               </div>
 
-              <!-- 3. Specialized Skills & In-Service Trainings -->
+              <!-- 4. Specialized Skills & In-Service Trainings -->
               <div class="card-section sec-network">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-bolt"></i> 3. Specialized Skills &amp; In-Service Trainings
+                    <i class="fa-solid fa-bolt"></i> 4. Specialized Skills &amp; In-Service Trainings
                   </h2>
                   <span class="section-tag">Competencies &amp; Training</span>
                 </div>
@@ -882,40 +922,6 @@
 
                   <!-- Mobile Responsive Training Cards -->
                   <div id="otTrainingCardsMobile" style="margin-top: 12px;"></div>
-                </div>
-              </div>
-
-              <!-- 4. Entered By — Officer Details -->
-              <div class="card-section sec-remarks">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-user-pen"></i> 4. Entered By — Officer Details
-                  </h2>
-                  <span class="section-tag">Audit Submitter Info</span>
-                </div>
-
-                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">
-                  Details of the officer entering or updating this record. Prefilled from your profile and saved with authenticated user credentials.
-                </p>
-
-                <div class="form-grid-3">
-                  <div class="form-group">
-                    <label for="otEnteredByName"><i class="fa-solid fa-user"></i> Entered By — Officer Full Name <span class="req-star">*</span></label>
-                    <input type="text" id="otEnteredByName" class="form-control" placeholder="Reporting officer name" required oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otEnteredByName"></div>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="otEnteredByDesignation"><i class="fa-solid fa-user-tag"></i> Entered By — Designation <span class="req-star">*</span></label>
-                    <input type="text" id="otEnteredByDesignation" class="form-control" placeholder="e.g. Senior Superintendent / Junior Superintendent / Clerk" required oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otEnteredByDesignation"></div>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="otEnteredByMobile"><i class="fa-solid fa-phone"></i> Entered By — Mobile Number <span class="req-star">*</span></label>
-                    <input type="tel" id="otEnteredByMobile" class="form-control" placeholder="10-digit Indian Mobile" maxlength="14" required oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otEnteredByMobile"></div>
-                  </div>
                 </div>
 
                 <!-- Form Action Buttons -->
@@ -977,7 +983,7 @@
               <div class="ot-report-gov-header">
                 <h2>MOTOR VEHICLES DEPARTMENT, KERALA</h2>
                 <h3>OFFICER TRAINING &amp; QUALIFICATION</h3>
-                <h4>OFFICE-WISE SUMMARY REPORT</h4>
+                <h4>SUMMARY REPORT &amp; VERIFICATION</h4>
                 <div style="margin-top: 6px; font-size: 0.88rem; color: #064e3b; font-weight: 700;">
                   FORWARDING REPORT FOR TRANSPORT COMMISSIONERATE, THIRUVANANTHAPURAM
                 </div>
@@ -986,11 +992,9 @@
               <!-- Report Meta Information Box -->
               <div class="ot-report-meta-grid">
                 <div>
-                  <strong>Office:</strong> <span id="otReportHeaderOffice">KL01 — RTO, Thiruvananthapuram</span><br>
-                  <strong>Report Ref No:</strong> <span id="otReportRefNum" style="font-family: monospace; font-weight: 700; color: #0284c7;">MVD/OTQ/KL01/2026/V1</span>
+                  <strong>Office:</strong> <span id="otReportHeaderOffice">--</span>
                 </div>
                 <div>
-                  <strong>Report Version:</strong> <span id="otReportVersion">Version 1.0</span><br>
                   <strong>Verification Status:</strong> <span id="otReportVerificationStatusBadge" class="badge badge-warning">DRAFT — NOT VERIFIED</span>
                 </div>
                 <div>

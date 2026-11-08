@@ -205,176 +205,26 @@ const SPECIALIZED_SKILL_OPTIONS = [
   "Others — Specify"
 ];
 
-// --- 2. SAMPLE SEED DATA ---
-const SEED_OFFICER_PROFILES = [
-  {
-    id: "prof_kl01_001",
-    officerFullName: "Sri. Rajesh Kumar K",
-    pen: "432101",
-    designation: "Joint RTO",
-    officeCode: "KL01",
-    officeName: "RTO, Thiruvananthapuram",
-    generalEducation: "Plus Two",
-    generalEducationOther: "",
-    technicalQualification: "M.Tech",
-    technicalQualificationOther: "",
-    institution: "College of Engineering Trivandrum (CET)",
-    passingYear: 2012,
-    grade: "First Class with Distinction (8.8 CGPA)",
-    additionalQualifications: [
-      {
-        qualification: "PGDeG (e-Governance)",
-        status: "Completed",
-        institution: "IIITM-K",
-        year: 2018,
-        remarks: "State e-Governance Merit Scholar"
-      },
-      {
-        qualification: "LLB",
-        status: "Pursuing",
-        institution: "Kerala Law Academy",
-        year: 2027,
-        remarks: "Evening Batch"
-      }
-    ],
-    specializedSkills: [
-      "Legal & Prosecution",
-      "IT & Software",
-      "AIS Standards & Homologation",
-      "EV Architecture",
-      "Data Analytics"
-    ],
-    customSkills: "",
-    trainingHistory: [
-      {
-        id: "tr_001",
-        attended: "Advanced Road Safety Audit & Accident Investigation",
-        conductedBy: "Central Institute of Road Transport (CIRT) Pune",
-        durationValue: 2,
-        durationUnit: "Weeks",
-        monthYear: "2025-08"
-      },
-      {
-        id: "tr_002",
-        attended: "Vahan 4.0 & e-Challan National Architecture Training",
-        conductedBy: "NIC Transport Project Division, New Delhi",
-        durationValue: 5,
-        durationUnit: "Days",
-        monthYear: "2024-11"
-      }
-    ],
-    enteredBy: {
-      fullName: "Sri. Rajesh Kumar K",
-      designation: "Joint RTO",
-      mobile: "9447123456",
-      userId: "rajesh.mvd@keralam.gov.in",
-      timestamp: "2026-07-20T10:30:00+05:30"
-    },
-    status: "submitted", // 'draft' or 'submitted'
-    createdAt: "2026-07-20T10:30:00+05:30",
-    updatedAt: "2026-07-20T10:30:00+05:30",
-    version: 1
-  },
-  {
-    id: "prof_kl01_002",
-    officerFullName: "Smt. Deepa Nair V",
-    pen: "058723", // Preserving leading zero
-    designation: "MVI",
-    officeCode: "KL01",
-    officeName: "RTO, Thiruvananthapuram",
-    generalEducation: "Plus Two",
-    generalEducationOther: "",
-    technicalQualification: "B.Tech",
-    technicalQualificationOther: "",
-    institution: "Government Engineering College Barton Hill",
-    passingYear: 2016,
-    grade: "First Class (76%)",
-    additionalQualifications: [
-      {
-        qualification: "Safety Engineering",
-        status: "Completed",
-        institution: "CLI Mumbai",
-        year: 2020,
-        remarks: "Certified Industrial Safety Auditor"
-      }
-    ],
-    specializedSkills: [
-      "Vehicle Fitness Inspection",
-      "Accident Investigation",
-      "Radar & Speed Enforcement",
-      "MV Act & Statutory Rules"
-    ],
-    customSkills: "",
-    trainingHistory: [
-      {
-        id: "tr_003",
-        attended: "Automated Driving Testing Track (ADTT) Operations",
-        conductedBy: "IDTR Edappal, Malappuram",
-        durationValue: 1,
-        durationUnit: "Weeks",
-        monthYear: "2025-02"
-      }
-    ],
-    enteredBy: {
-      fullName: "Smt. Deepa Nair V",
-      designation: "MVI",
-      mobile: "9446543210",
-      userId: "deepa.mvd@keralam.gov.in",
-      timestamp: "2026-07-22T14:15:00+05:30"
-    },
-    status: "submitted",
-    createdAt: "2026-07-22T14:15:00+05:30",
-    updatedAt: "2026-07-22T14:15:00+05:30",
-    version: 1
-  },
-  {
-    id: "prof_kl01_003",
-    officerFullName: "Sri. Harikrishnan M",
-    pen: "782341",
-    designation: "AMVI",
-    officeCode: "KL01",
-    officeName: "RTO, Thiruvananthapuram",
-    generalEducation: "Plus Two",
-    generalEducationOther: "",
-    technicalQualification: "Diploma",
-    technicalQualificationOther: "",
-    institution: "Central Polytechnic College, Vattiyoorkavu",
-    passingYear: 2019,
-    grade: "First Class",
-    additionalQualifications: [
-      {
-        qualification: "Certificate in Automotive Mechatronics",
-        status: "Completed",
-        institution: "BOSCH Vocational Institute",
-        year: 2021,
-        remarks: "EV Sensor Systems"
-      }
-    ],
-    specializedSkills: [
-      "Field Enforcement",
-      "Vehicle Fitness Inspection",
-      "Heavy Equipment Inspection"
-    ],
-    customSkills: "",
-    trainingHistory: [],
-    enteredBy: {
-      fullName: "Sri. Rajesh Kumar K",
-      designation: "Joint RTO",
-      mobile: "9447123456",
-      userId: "rajesh.mvd@keralam.gov.in",
-      timestamp: "2026-08-01T09:45:00+05:30"
-    },
-    status: "draft", // Example Draft record to demonstrate exclusion from reports
-    createdAt: "2026-08-01T09:45:00+05:30",
-    updatedAt: "2026-08-01T09:45:00+05:30",
-    version: 1
-  }
-];
+// --- 2. SAMPLE SEED DATA (Cleaned - No hardcoded or dummy officers) ---
+const SEED_OFFICER_PROFILES = [];
 
 // --- 3. STATE CONTROLLER ---
-let otProfilesStore = JSON.parse(localStorage.getItem('mvd_ot_profiles_store')) || SEED_OFFICER_PROFILES;
+let otProfilesStore = (JSON.parse(localStorage.getItem('mvd_ot_profiles_store')) || [])
+  .filter(p => p && p.id && !p.id.startsWith('prof_kl01_') && !p.id.startsWith('prof_kl07_') && !p.id.startsWith('off_seed_'));
+localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+
 let otReportSnapshotsStore = JSON.parse(localStorage.getItem('mvd_ot_report_snapshots')) || {};
 let otAuditLogs = JSON.parse(localStorage.getItem('mvd_ot_audit_logs')) || [];
+
+// Office Lock Registry: Maps officeCode => authorized Gmail ID
+let otOfficeLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks')) || {};
+// Build / sync locks from stored profiles
+otProfilesStore.forEach(p => {
+  if (p.officeCode && p.enteredBy && p.enteredBy.userId && !otOfficeLocks[p.officeCode]) {
+    otOfficeLocks[p.officeCode] = p.enteredBy.userId.toLowerCase().trim();
+  }
+});
+localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
 
 // Active Session Roles:
 // 'data_entry' | 'head_of_office' | 'dispatch_user' | 'admin'
@@ -492,6 +342,212 @@ function otHasPermission(action) {
     default:
       return false;
   }
+}
+
+// --- ACCESS CONTROL & OFFICE LOCKING UTILITIES ---
+
+function otGetLoggedInEmail() {
+  const gUser = window.googleAuthUser || JSON.parse(localStorage.getItem('mvd_google_user_session') || "null");
+  return (gUser && gUser.email) ? gUser.email.toLowerCase().trim() : '';
+}
+
+function getOfficeLockedEmail(officeCode) {
+  if (!officeCode) return '';
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  if (locks[officeCode]) return locks[officeCode].toLowerCase().trim();
+
+  // Check existing profiles for this office
+  const existing = otProfilesStore.find(p => p.officeCode === officeCode && p.enteredBy && p.enteredBy.userId);
+  if (existing && existing.enteredBy.userId) {
+    const lockedId = existing.enteredBy.userId.toLowerCase().trim();
+    locks[officeCode] = lockedId;
+    localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+    return lockedId;
+  }
+  return '';
+}
+
+function getOfficeLinkedToUser(email) {
+  if (!email) return null;
+  const clean = email.toLowerCase().trim();
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  for (const [code, owner] of Object.entries(locks)) {
+    if (owner && owner.toLowerCase().trim() === clean) return code;
+  }
+  const found = otProfilesStore.find(p => p.enteredBy && p.enteredBy.userId && p.enteredBy.userId.toLowerCase().trim() === clean);
+  if (found) return found.officeCode;
+  return null;
+}
+
+function toggleOfficerFormDisabled(disabled) {
+  const form = document.getElementById('otOfficerForm');
+  if (!form) return;
+  const elements = form.querySelectorAll('input:not(#otMainOfficeSelect), select:not(#otMainOfficeSelect), textarea');
+  elements.forEach(el => {
+    el.disabled = disabled;
+    if (disabled) {
+      el.style.opacity = '0.6';
+      el.style.cursor = 'not-allowed';
+    } else {
+      el.style.opacity = '';
+      el.style.cursor = '';
+    }
+  });
+
+  const submitBtn = document.getElementById('otBtnSubmitProfile');
+  const draftBtn = document.getElementById('otBtnSaveDraft');
+  const prevBtn = document.querySelector('button[onclick="handleProfilePreview()"]');
+  if (submitBtn) {
+    submitBtn.disabled = disabled;
+    submitBtn.style.opacity = disabled ? '0.6' : '';
+    submitBtn.style.cursor = disabled ? 'not-allowed' : '';
+  }
+  if (draftBtn) {
+    draftBtn.disabled = disabled;
+    draftBtn.style.opacity = disabled ? '0.6' : '';
+    draftBtn.style.cursor = disabled ? 'not-allowed' : '';
+  }
+  if (prevBtn) {
+    prevBtn.disabled = disabled;
+    prevBtn.style.opacity = disabled ? '0.6' : '';
+    prevBtn.style.cursor = disabled ? 'not-allowed' : '';
+  }
+}
+
+function checkOfficeAccessAndLock(officeCode) {
+  const alertBox = document.getElementById('otOfficeLockAlert');
+  const authPanel = document.getElementById('otOfficeAuthorizedPanel');
+
+  if (!officeCode) {
+    if (alertBox) alertBox.style.display = 'none';
+    if (authPanel) authPanel.style.display = 'none';
+    toggleOfficerFormDisabled(false);
+    return;
+  }
+
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  const lockedEmail = getOfficeLockedEmail(officeCode);
+
+  if (lockedEmail) {
+    if (isAdmin || (currentEmail && lockedEmail.toLowerCase() === currentEmail.toLowerCase())) {
+      // Authorized User
+      toggleOfficerFormDisabled(false);
+      if (alertBox) {
+        alertBox.style.background = '#f0fdf4';
+        alertBox.style.borderColor = '#a7f3d0';
+        alertBox.style.color = '#064e3b';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-check" style="color:#047857; font-size: 1.1rem;"></i>
+            <span><strong>Authorized Office:</strong> You are authorized with account <strong>${escapeHtml(currentEmail || lockedEmail)}</strong>. You can add new officers or edit existing details below.</span>
+          </div>
+        `;
+        alertBox.style.display = 'flex';
+      }
+      renderOfficeEditOptionList(officeCode);
+    } else {
+      // Locked to another account: PREVENT ACCESS!
+      toggleOfficerFormDisabled(true);
+      if (authPanel) authPanel.style.display = 'none';
+
+      const alertMsg = `This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`;
+      if (alertBox) {
+        alertBox.style.background = '#fef2f2';
+        alertBox.style.borderColor = '#fecdd3';
+        alertBox.style.color = '#991b1b';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: flex-start; gap: 10px;">
+            <i class="fa-solid fa-lock" style="color:#dc2626; font-size: 1.2rem; margin-top: 2px;"></i>
+            <div>
+              <strong style="font-size: 0.92rem;">Access Restricted:</strong><br>
+              <span style="font-size: 0.9rem;">This office is entered by <strong>${escapeHtml(lockedEmail)}</strong>. Please login with <strong>${escapeHtml(lockedEmail)}</strong> to add and edit details.</span>
+            </div>
+          </div>
+        `;
+        alertBox.style.display = 'flex';
+      }
+      showToast(alertMsg, 'error');
+    }
+  } else {
+    // Unlocked office (first entry)
+    toggleOfficerFormDisabled(false);
+    if (authPanel) authPanel.style.display = 'none';
+    if (alertBox) {
+      if (currentEmail) {
+        alertBox.style.background = '#eff6ff';
+        alertBox.style.borderColor = '#bfdbfe';
+        alertBox.style.color = '#1e40af';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-shield-halved" style="color:#2563eb;"></i>
+            <span>First entry for this office will lock it to your Gmail ID: <strong>${escapeHtml(currentEmail)}</strong></span>
+          </div>
+        `;
+        alertBox.style.display = 'flex';
+      } else {
+        alertBox.style.display = 'none';
+      }
+    }
+  }
+}
+
+function renderOfficeEditOptionList(officeCode) {
+  const panel = document.getElementById('otOfficeAuthorizedPanel');
+  if (!panel) return;
+
+  const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
+  if (officeProfiles.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+      <div style="font-weight: 700; color: #064e3b; font-size: 0.92rem;">
+        <i class="fa-solid fa-user-check"></i> ${officeProfiles.length} Officer Profile(s) Registered for this Office
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="startNewOfficerForOffice('${officeCode}')" style="font-size: 0.8rem; padding: 4px 10px; background: white;">
+        <i class="fa-solid fa-plus"></i> Add Another Officer
+      </button>
+    </div>
+    <div class="data-table-container" style="max-height: 220px; overflow-y: auto; background: white; border-radius: 6px; border: 1px solid #d1fae5;">
+      <table class="data-table" style="font-size: 0.85rem; margin: 0;">
+        <thead>
+          <tr style="background: #f0fdf4;">
+            <th>Officer Full Name</th>
+            <th>PEN</th>
+            <th>Designation</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${officeProfiles.map(p => `
+            <tr>
+              <td><strong>${escapeHtml(p.officerFullName)}</strong></td>
+              <td><code>${escapeHtml(p.pen)}</code></td>
+              <td>${escapeHtml(p.designation)}</td>
+              <td><span class="badge ${p.status === 'submitted' ? 'badge-working' : 'badge-warning'}" style="font-size: 0.75rem;">${escapeHtml(p.status.toUpperCase())}</span></td>
+              <td style="text-align: right;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="loadProfileForEditing('${p.id}')" style="padding: 3px 10px; font-size: 0.78rem;">
+                  <i class="fa-solid fa-pen-to-square"></i> Edit
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  panel.style.display = 'block';
+}
+
+function startNewOfficerForOffice(officeCode) {
+  resetOfficerForm();
+  const sel = document.getElementById('otMainOfficeSelect');
+  if (sel) sel.value = officeCode;
+  checkOfficeAccessAndLock(officeCode);
 }
 
 // --- 5. INITIALIZATION & MODULE ACTIVATION ---
@@ -660,6 +716,8 @@ function handleOfficeSelectPicked(sel) {
   clearFieldError(sel.id);
   if (sInput) clearFieldError(sInput.id);
   markFormDirty(true);
+
+  checkOfficeAccessAndLock(sel.value);
 }
 
 // --- 7. DYNAMIC FORM RENDERING (ADDITIONAL QUALIFICATIONS & SKILLS) ---
@@ -1218,6 +1276,20 @@ async function handleSaveDraft() {
     return;
   }
 
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  if (data.officeCode) {
+    const lockedEmail = getOfficeLockedEmail(data.officeCode);
+    if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
+      showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
+      return;
+    }
+    if (!lockedEmail && currentEmail) {
+      otOfficeLocks[data.officeCode] = currentEmail;
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+    }
+  }
+
   const draftBtn = document.getElementById('otBtnSaveDraft');
   const origBtnContent = draftBtn ? draftBtn.innerHTML : '';
   if (draftBtn) {
@@ -1236,6 +1308,7 @@ async function handleSaveDraft() {
     } else {
       showToast(`Draft saved locally for PEN: ${data.pen}`, "info");
     }
+    if (data.officeCode) checkOfficeAccessAndLock(data.officeCode);
   } catch (err) {
     console.warn("Draft save error:", err);
     showToast(`Draft saved locally for PEN: ${data.pen}`, "info");
@@ -1257,6 +1330,20 @@ async function handleProfileSubmit(e) {
     const firstErr = document.querySelector('.is-invalid');
     if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
     return;
+  }
+
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  if (data.officeCode) {
+    const lockedEmail = getOfficeLockedEmail(data.officeCode);
+    if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
+      showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
+      return;
+    }
+    if (!lockedEmail && currentEmail) {
+      otOfficeLocks[data.officeCode] = currentEmail;
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+    }
   }
 
   const submitBtn = document.getElementById('otBtnSubmitProfile');
@@ -1288,6 +1375,11 @@ async function handleProfileSubmit(e) {
     renderAdminOfficersDirectory();
     renderOfficeSummaryReport();
     resetOfficerForm();
+    if (data.officeCode) {
+      const officeSel = document.getElementById('otMainOfficeSelect');
+      if (officeSel) officeSel.value = data.officeCode;
+      checkOfficeAccessAndLock(data.officeCode);
+    }
   } catch (err) {
     console.error("Profile submit error:", err);
     showToast(`Submission error: ${err.message}`, "error");
@@ -1346,6 +1438,12 @@ function resetOfficerForm() {
   if (sel) {
     sel.querySelectorAll('option, optgroup').forEach(el => el.style.display = '');
   }
+
+  const alertBox = document.getElementById('otOfficeLockAlert');
+  if (alertBox) alertBox.style.display = 'none';
+  const authPanel = document.getElementById('otOfficeAuthorizedPanel');
+  if (authPanel) authPanel.style.display = 'none';
+  toggleOfficerFormDisabled(false);
 }
 
 function cancelOfficerEdit() {
@@ -1370,7 +1468,17 @@ function loadProfileForEditing(profileId) {
   document.getElementById('otFormActionTitle').innerHTML = `<i class="fa-solid fa-user-pen"></i> Edit Profile: ${escapeHtml(profile.officerFullName)} (PEN: ${escapeHtml(profile.pen)})`;
   document.getElementById('otBtnCancelEdit').style.display = 'inline-flex';
 
-  // Section 1
+  // Section 1: Entered By Details
+  if (profile.enteredBy) {
+    const nameEl = document.getElementById('otEnteredByName');
+    const desigEl = document.getElementById('otEnteredByDesignation');
+    const mobEl = document.getElementById('otEnteredByMobile');
+    if (nameEl) nameEl.value = profile.enteredBy.fullName || "";
+    if (desigEl) desigEl.value = profile.enteredBy.designation || "";
+    if (mobEl) mobEl.value = profile.enteredBy.mobile || "";
+  }
+
+  // Section 2: Identification & Office
   document.getElementById('otFullName').value = profile.officerFullName || "";
   document.getElementById('otPen').value = profile.pen || "";
   document.getElementById('otDesignationSelect').value = profile.designation || "";
@@ -1380,6 +1488,9 @@ function loadProfileForEditing(profileId) {
     const selOpt = document.getElementById('otMainOfficeSelect')?.querySelector(`option[value="${profile.officeCode}"]`);
     sInput.value = selOpt ? selOpt.textContent : (profile.officeCode ? `${profile.officeCode} — ${profile.officeName || ''}` : '');
   }
+
+  toggleOfficerFormDisabled(false);
+  checkOfficeAccessAndLock(profile.officeCode);
 
   // Section 2
   document.getElementById('otGenEdSelect').value = profile.generalEducation || "";
@@ -1846,15 +1957,111 @@ function otDownloadCsvFile(encodedContent, filename) {
 
 // --- 13. OFFICE-WISE SUMMARY REPORT & VERIFICATION WORKFLOW ---
 
-let otCurrentReportOfficeCode = "KL01";
+let otCurrentReportOfficeCode = "";
 
 function handleReportOfficeSelectChange(officeCode) {
   otCurrentReportOfficeCode = officeCode;
   renderOfficeSummaryReport();
 }
 
+function renderEmptyUserSummaryReport(userEmail) {
+  const reportSelect = document.getElementById('otReportOfficeSelect');
+  if (reportSelect) {
+    reportSelect.disabled = true;
+    reportSelect.value = "";
+    reportSelect.title = "No office is linked to your account yet";
+  }
+
+  const headerOfficeEl = document.getElementById('otReportHeaderOffice');
+  if (headerOfficeEl) headerOfficeEl.textContent = "No Linked Office Found";
+
+  const cutoffEl = document.getElementById('otReportCutoffTime');
+  if (cutoffEl) cutoffEl.textContent = otFormatIST(new Date().toISOString());
+
+  const genDateEl = document.getElementById('otReportGenDate');
+  if (genDateEl) genDateEl.textContent = otFormatIST(new Date().toISOString());
+
+  const statusBadge = document.getElementById('otReportVerificationStatusBadge');
+  if (statusBadge) {
+    statusBadge.className = 'badge badge-secondary';
+    statusBadge.innerHTML = `<i class="fa-solid fa-lock"></i> NO LINKED OFFICE`;
+  }
+
+  const draftAlert = document.getElementById('otReportExcludedDraftsAlert');
+  if (draftAlert) {
+    draftAlert.style.display = 'flex';
+    draftAlert.innerHTML = `
+      <i class="fa-solid fa-circle-exclamation" style="font-size: 1.1rem; color: #0284c7;"></i>
+      <span><strong>Account Notice:</strong> Logged in as <strong>${escapeHtml(userEmail)}</strong>. You have not submitted officer details for any office yet. Please select your office and enter officer details in the <strong>Officer Entry &amp; Qualification</strong> tab to generate the Summary Report for your office.</span>
+    `;
+  }
+
+  // Clear metric cards
+  if (document.getElementById('otSummTotalOfficers')) document.getElementById('otSummTotalOfficers').textContent = "0";
+  if (document.getElementById('otSummDesigCounts')) document.getElementById('otSummDesigCounts').innerHTML = "RTO: <strong>0</strong> • JRTO: <strong>0</strong> • MVI: <strong>0</strong> • AMVI: <strong>0</strong>";
+  if (document.getElementById('otSummCompAddQual')) document.getElementById('otSummCompAddQual').textContent = "0";
+  if (document.getElementById('otSummPursAddQual')) document.getElementById('otSummPursAddQual').textContent = "0";
+  if (document.getElementById('otSummSkills')) document.getElementById('otSummSkills').textContent = "0";
+  if (document.getElementById('otSummWithTrainings')) document.getElementById('otSummWithTrainings').textContent = "0";
+  if (document.getElementById('otSummTotalTrainings')) document.getElementById('otSummTotalTrainings').textContent = "0";
+  if (document.getElementById('otSummTechQualPills')) document.getElementById('otSummTechQualPills').innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">None</span>';
+
+  // Clear tables
+  const detailsTbody = document.getElementById('otReportDetailsTableBody');
+  if (detailsTbody) {
+    detailsTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No office linked to your Gmail ID (${escapeHtml(userEmail)}). Enter officer details first to view office data.</td></tr>`;
+  }
+  const annexTbody = document.getElementById('otReportAnnexureTableBody');
+  if (annexTbody) {
+    annexTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No training history records available.</td></tr>`;
+  }
+  const contribTbody = document.getElementById('otReportContributorsTableBody');
+  if (contribTbody) {
+    contribTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No contributors recorded.</td></tr>`;
+  }
+
+  const digiVerifBox = document.getElementById('otReportDigitalVerificationDisplay');
+  if (digiVerifBox) digiVerifBox.style.display = 'none';
+
+  const dispatchBox = document.getElementById('otReportForwardingDetailsDisplay');
+  if (dispatchBox) dispatchBox.style.display = 'none';
+}
+
 function renderOfficeSummaryReport() {
-  const officeCode = otCurrentReportOfficeCode || document.getElementById('otReportOfficeSelect')?.value || "KL01";
+  const userEmail = otGetLoggedInEmail();
+  const linkedOfficeCode = getOfficeLinkedToUser(userEmail);
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  const reportSelect = document.getElementById('otReportOfficeSelect');
+
+  let officeCode = otCurrentReportOfficeCode;
+
+  // Filter report to only show the office linked to the logged-in user
+  if (!isAdmin && userEmail) {
+    if (linkedOfficeCode) {
+      officeCode = linkedOfficeCode;
+      otCurrentReportOfficeCode = linkedOfficeCode;
+      if (reportSelect) {
+        reportSelect.value = linkedOfficeCode;
+        reportSelect.disabled = true;
+        reportSelect.title = "Summary Report is locked to your authorized office";
+      }
+    } else {
+      // User is logged in but hasn't entered data for any office yet
+      renderEmptyUserSummaryReport(userEmail);
+      return;
+    }
+  } else {
+    // Admin or no user session: default to selected office or first office
+    if (!officeCode) {
+      officeCode = reportSelect?.value || "KL01";
+      otCurrentReportOfficeCode = officeCode;
+    }
+    if (reportSelect) {
+      reportSelect.disabled = false;
+      reportSelect.value = officeCode;
+    }
+  }
+
   const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode) || { code: officeCode, name: "Selected Office" };
 
   // Fetch all profiles for this office
@@ -1869,11 +2076,14 @@ function renderOfficeSummaryReport() {
   const isForwarded = savedSnapshot && savedSnapshot.isForwarded;
 
   // Header Elements
-  document.getElementById('otReportHeaderOffice').textContent = `${officeObj.name} (${officeObj.code})`;
-  document.getElementById('otReportRefNum').textContent = savedSnapshot ? savedSnapshot.referenceNumber : `MVD/OTQ/${officeCode}/${new Date().getFullYear()}/V1`;
-  document.getElementById('otReportVersion').textContent = savedSnapshot ? `Version ${savedSnapshot.version}` : 'Version 1.0 (Draft)';
-  document.getElementById('otReportCutoffTime').textContent = savedSnapshot ? otFormatIST(savedSnapshot.cutoffTimestamp) : otFormatIST(new Date().toISOString());
-  document.getElementById('otReportGenDate').textContent = otFormatIST(new Date().toISOString());
+  const headerOfficeEl = document.getElementById('otReportHeaderOffice');
+  if (headerOfficeEl) headerOfficeEl.textContent = `${officeObj.name} (${officeObj.code})`;
+
+  const cutoffEl = document.getElementById('otReportCutoffTime');
+  if (cutoffEl) cutoffEl.textContent = savedSnapshot ? otFormatIST(savedSnapshot.cutoffTimestamp) : otFormatIST(new Date().toISOString());
+
+  const genDateEl = document.getElementById('otReportGenDate');
+  if (genDateEl) genDateEl.textContent = otFormatIST(new Date().toISOString());
 
   // Verification Status Badge
   const statusBadge = document.getElementById('otReportVerificationStatusBadge');
@@ -2080,7 +2290,6 @@ function renderOfficeSummaryReport() {
               </div>
               ${savedSnapshot.verifiedRemarks ? `<div style="font-size: 0.82rem; font-style: italic; color: #334155; margin-top: 4px;">Remarks: "${escapeHtml(savedSnapshot.verifiedRemarks)}"</div>` : ''}
             </div>
-            <span class="badge badge-working" style="font-size: 0.85rem; padding: 6px 12px;">SNAPSHOT VERSION ${savedSnapshot.version} LOCKED</span>
           </div>
         </div>
       `;
