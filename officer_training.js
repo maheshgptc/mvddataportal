@@ -219,13 +219,6 @@ let otAuditLogs = JSON.parse(localStorage.getItem('mvd_ot_audit_logs')) || [];
 
 // Office Lock Registry: Maps officeCode => authorized Gmail ID
 let otOfficeLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks')) || {};
-// Build / sync locks from stored profiles
-otProfilesStore.forEach(p => {
-  if (p.officeCode && p.enteredBy && p.enteredBy.userId && !otOfficeLocks[p.officeCode]) {
-    otOfficeLocks[p.officeCode] = p.enteredBy.userId.toLowerCase().trim();
-  }
-});
-localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
 window.otOfficeLocks = otOfficeLocks;
 
 // Active Session Roles:
@@ -368,53 +361,48 @@ function getOfficeLockedEmail(officeCode) {
   const cleanCode = officeCode.trim();
   const codePrefix = cleanCode.split(/[\s—–-]+/)[0].toUpperCase();
 
-  // 1. Direct registry in mvd_ot_office_locks
+  // Direct registry in mvd_ot_office_locks (authoritative source of truth)
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
   if (locks[cleanCode]) return locks[cleanCode].toLowerCase().trim();
   if (locks[codePrefix]) return locks[codePrefix].toLowerCase().trim();
+
   for (const [k, v] of Object.entries(locks)) {
     if (!v) continue;
     const kPrefix = k.split(/[\s—–-]+/)[0].toUpperCase();
-    if (kPrefix === codePrefix || k.toUpperCase() === cleanCode.toUpperCase() || k.toUpperCase().includes(cleanCode.toUpperCase())) {
+    if (kPrefix === codePrefix || k.toUpperCase() === cleanCode.toUpperCase()) {
       return v.toLowerCase().trim();
     }
   }
 
-  // 2. Search otProfilesStore
-  if (Array.isArray(otProfilesStore)) {
-    const existing = otProfilesStore.find(p => {
-      if (!p || !p.officeCode || !p.enteredBy || !p.enteredBy.userId) return false;
-      const pPrefix = p.officeCode.split(/[\s—–-]+/)[0].toUpperCase();
-      return pPrefix === codePrefix || p.officeCode.toUpperCase() === cleanCode.toUpperCase();
-    });
-    if (existing && existing.enteredBy && existing.enteredBy.userId) {
-      const lockedId = existing.enteredBy.userId.toLowerCase().trim();
-      locks[codePrefix] = lockedId;
-      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
-      return lockedId;
-    }
-  }
-
-  // 3. Search IT Equipment store (mvd_it_inventory_store)
-  try {
-    const itStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store') || '{}');
-    for (const [key, rec] of Object.entries(itStore)) {
-      if (!rec) continue;
-      const keyPrefix = key.split(/[\s—–-]+/)[0].toUpperCase();
-      if (keyPrefix === codePrefix || key.toUpperCase().includes(cleanCode.toUpperCase())) {
-        const email = (rec.createdOfficerEmail || rec.entryOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || '').toLowerCase().trim();
-        if (email) {
-          locks[codePrefix] = email;
-          localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
-          return email;
-        }
-      }
-    }
-  } catch(e) {}
-
   return '';
 }
 window.getOfficeLockedEmail = getOfficeLockedEmail;
+
+window.removeOfficeLock = function(code) {
+  if (!code) return {};
+  const clean = code.trim();
+  const prefix = clean.split(/[\s—–-]+/)[0].toUpperCase();
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  delete locks[clean];
+  delete locks[prefix];
+  for (const k of Object.keys(locks)) {
+    const kp = k.split(/[\s—–-]+/)[0].toUpperCase();
+    if (kp === prefix || k.toUpperCase() === clean.toUpperCase()) {
+      delete locks[k];
+    }
+  }
+  localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+  otOfficeLocks = locks;
+  window.otOfficeLocks = locks;
+  return locks;
+};
+
+window.removeAllOfficeLocks = function() {
+  localStorage.setItem('mvd_ot_office_locks', JSON.stringify({}));
+  otOfficeLocks = {};
+  window.otOfficeLocks = {};
+  return {};
+};
 
 function getOfficeLinkedToUser(email) {
   if (!email) return null;
@@ -423,8 +411,6 @@ function getOfficeLinkedToUser(email) {
   for (const [code, owner] of Object.entries(locks)) {
     if (owner && owner.toLowerCase().trim() === clean) return code;
   }
-  const found = otProfilesStore.find(p => p.enteredBy && p.enteredBy.userId && p.enteredBy.userId.toLowerCase().trim() === clean);
-  if (found) return found.officeCode;
   return null;
 }
 
@@ -531,9 +517,16 @@ function checkOfficeAccessAndLock(officeCode) {
       showToast(alertMsg, 'error');
     }
   } else {
-    // Unlocked office (first entry will lock to current account)
+    // Unlocked / Open office (first entry will lock to current account)
     toggleOfficerFormDisabled(false);
-    if (authPanel) authPanel.style.display = 'none';
+    if (authPanel) {
+      const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
+      if (officeProfiles.length > 0) {
+        renderOfficeEditOptionList(officeCode);
+      } else {
+        authPanel.style.display = 'none';
+      }
+    }
     if (alertBox) {
       if (currentEmail) {
         alertBox.className = 'reflection-alert alert-unlocked';
@@ -543,13 +536,22 @@ function checkOfficeAccessAndLock(officeCode) {
         alertBox.style.color = '#1e40af';
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-shield-halved" style="color:#2563eb; font-size: 1.1rem;"></i>
-            <span>First entry for this office will lock it to your Gmail ID: <strong>${escapeHtml(currentEmail)}</strong></span>
+            <i class="fa-solid fa-lock-open" style="color:#2563eb; font-size: 1.1rem;"></i>
+            <span>This office is Open. First entry will lock it to your Gmail ID: <strong>${escapeHtml(currentEmail)}</strong></span>
           </div>
         `;
       } else {
-        alertBox.style.display = 'none';
-        alertBox.innerHTML = '';
+        alertBox.className = 'reflection-alert alert-unlocked';
+        alertBox.style.display = 'flex';
+        alertBox.style.background = '#eff6ff';
+        alertBox.style.borderColor = '#93c5fd';
+        alertBox.style.color = '#1e40af';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-lock-open" style="color:#2563eb; font-size: 1.1rem;"></i>
+            <span>This office is Open for data entry. Please sign in with your Google account to submit.</span>
+          </div>
+        `;
       }
     }
   }
@@ -1636,8 +1638,8 @@ function loadProfileForEditing(profileId) {
   const lockedEmail = getOfficeLockedEmail(profile.officeCode);
   const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
 
-  if (!isAdmin && !isAuthorized && !otHasPermission('edit_profile')) {
-    showToast(`This office is entered by ${lockedEmail || 'another account'}. Please login with ${lockedEmail || 'the authorized account'} to add and edit details.`, "error");
+  if (lockedEmail && !isAdmin && !isAuthorized && !otHasPermission('edit_profile')) {
+    showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, "error");
     return;
   }
 
@@ -2059,8 +2061,8 @@ async function deleteOfficerProfile(profileId) {
   const lockedEmail = getOfficeLockedEmail(p.officeCode);
   const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
 
-  if (!isAdmin && !isAuthorized) {
-    showToast(`This office is entered by ${lockedEmail || 'another account'}. Please login with ${lockedEmail || 'the authorized account'} to add and edit details.`, 'error');
+  if (lockedEmail && !isAdmin && !isAuthorized) {
+    showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
     return;
   }
 
@@ -2978,8 +2980,17 @@ function subscribeToRealtimeOfficerProfiles() {
           try {
             const locks = typeof row.menu_visibility === 'object' ? row.menu_visibility : JSON.parse(row.menu_visibility);
             localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
-            if (typeof otOfficeLocks !== 'undefined') {
+            if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
+              for (const k in otOfficeLocks) {
+                if (!locks[k]) delete otOfficeLocks[k];
+              }
               Object.assign(otOfficeLocks, locks);
+            }
+            if (window.otOfficeLocks) {
+              for (const k in window.otOfficeLocks) {
+                if (!locks[k]) delete window.otOfficeLocks[k];
+              }
+              Object.assign(window.otOfficeLocks, locks);
             }
             if (typeof window.renderAdminOfficeLocksTable === 'function') {
               window.renderAdminOfficeLocksTable();
@@ -3052,13 +3063,7 @@ async function syncOfficerProfilesWithSupabase() {
         } else {
           otProfilesStore.push(m);
         }
-        if (m.officeCode && m.enteredBy && m.enteredBy.userId) {
-          const codePrefix = m.officeCode.split(/[\s—–-]+/)[0].toUpperCase();
-          otOfficeLocks[codePrefix] = m.enteredBy.userId.toLowerCase().trim();
-        }
       });
-      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
-window.otOfficeLocks = otOfficeLocks;
       localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
       renderAdminOfficersDirectory();
       const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;

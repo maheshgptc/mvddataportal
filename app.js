@@ -3217,14 +3217,23 @@ async function syncOfficeLocksFromSupabase() {
       .select('*')
       .eq('id', 'office_locks')
       .single();
-    if (!error && data && data.menu_visibility && typeof data.menu_visibility === 'object') {
-      const remoteLocks = data.menu_visibility;
-      const localLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-      const merged = { ...localLocks, ...remoteLocks };
-      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(merged));
-      if (typeof otOfficeLocks !== 'undefined') {
-        Object.assign(otOfficeLocks, merged);
+    if (!error && data) {
+      const remoteLocks = (data.menu_visibility && typeof data.menu_visibility === 'object') ? data.menu_visibility : {};
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(remoteLocks));
+
+      if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
+        for (const k in otOfficeLocks) {
+          if (!remoteLocks[k]) delete otOfficeLocks[k];
+        }
+        Object.assign(otOfficeLocks, remoteLocks);
       }
+      if (window.otOfficeLocks) {
+        for (const k in window.otOfficeLocks) {
+          if (!remoteLocks[k]) delete window.otOfficeLocks[k];
+        }
+        Object.assign(window.otOfficeLocks, remoteLocks);
+      }
+
       if (typeof renderAdminOfficeLocksTable === 'function') renderAdminOfficeLocksTable();
       const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
       if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
@@ -3255,6 +3264,24 @@ function getOfficeMasterList() {
   return [];
 }
 
+function getOfficeLockEmail(code, locksObj) {
+  if (!code) return '';
+  const locks = locksObj || JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  const clean = code.trim();
+  const prefix = clean.split(/[\s—–-]+/)[0].toUpperCase();
+  if (locks[clean]) return locks[clean].toLowerCase().trim();
+  if (locks[prefix]) return locks[prefix].toLowerCase().trim();
+  for (const [k, v] of Object.entries(locks)) {
+    if (!v) continue;
+    const kp = k.split(/[\s—–-]+/)[0].toUpperCase();
+    if (kp === prefix || k.toUpperCase() === clean.toUpperCase()) {
+      return v.toLowerCase().trim();
+    }
+  }
+  return '';
+}
+window.getOfficeLockEmail = getOfficeLockEmail;
+
 function renderAdminOfficeLocksTable() {
   const tbody = document.getElementById('adminOfficeLocksTableBody');
   if (!tbody) return;
@@ -3270,7 +3297,7 @@ function renderAdminOfficeLocksTable() {
   let lockedCount = 0;
 
   officeMaster.forEach(off => {
-    const authEmail = locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '');
+    const authEmail = getOfficeLockEmail(off.code, locks);
     if (authEmail) lockedCount++;
   });
 
@@ -3283,7 +3310,7 @@ function renderAdminOfficeLocksTable() {
   if (kpiOpen) kpiOpen.textContent = (totalOffices - lockedCount);
 
   let filtered = officeMaster.filter(off => {
-    const authEmail = (locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '') || '').toLowerCase().trim();
+    const authEmail = getOfficeLockEmail(off.code, locks);
 
     if (searchTerm) {
       const hay = (off.code + ' ' + off.name + ' ' + (off.category || '') + ' ' + authEmail).toLowerCase();
@@ -3306,7 +3333,7 @@ function renderAdminOfficeLocksTable() {
   }
 
   tbody.innerHTML = filtered.map((off, idx) => {
-    const authEmail = locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '') || '';
+    const authEmail = getOfficeLockEmail(off.code, locks);
     const isLocked = !!authEmail;
 
     return `
@@ -3438,6 +3465,7 @@ async function handleClearCurrentOfficeLock() {
 window.handleClearCurrentOfficeLock = handleClearCurrentOfficeLock;
 
 async function clearOfficeLock(code) {
+  if (!code) return;
   const ok = await showCustomConfirm({
     title: 'Clear Office Lock',
     message: `Are you sure you want to clear the authorized data entry account for office "${code}"?\n\nThis will reopen the office, allowing the next submitting account to become authorized.`,
@@ -3446,23 +3474,74 @@ async function clearOfficeLock(code) {
   });
   if (!ok) return;
 
+  const cleanCode = code.trim();
+  const codePrefix = cleanCode.split(/[\s—–-]+/)[0].toUpperCase();
+
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-  delete locks[code];
+  delete locks[cleanCode];
+  delete locks[codePrefix];
 
   Object.keys(locks).forEach(k => {
-    if (k.toUpperCase() === code.toUpperCase() || k.split(/[\s—–-]+/)[0].toUpperCase() === code.toUpperCase()) {
+    const kp = k.split(/[\s—–-]+/)[0].toUpperCase();
+    if (k.toUpperCase() === cleanCode.toUpperCase() || kp === codePrefix) {
       delete locks[k];
     }
   });
 
   localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
-  if (typeof otOfficeLocks !== 'undefined') {
-    delete otOfficeLocks[code];
+
+  if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
+    delete otOfficeLocks[cleanCode];
+    delete otOfficeLocks[codePrefix];
+    Object.keys(otOfficeLocks).forEach(k => {
+      const kp = k.split(/[\s—–-]+/)[0].toUpperCase();
+      if (k.toUpperCase() === cleanCode.toUpperCase() || kp === codePrefix) {
+        delete otOfficeLocks[k];
+      }
+    });
   }
+  if (window.otOfficeLocks) {
+    delete window.otOfficeLocks[cleanCode];
+    delete window.otOfficeLocks[codePrefix];
+    Object.keys(window.otOfficeLocks).forEach(k => {
+      const kp = k.split(/[\s—–-]+/)[0].toUpperCase();
+      if (k.toUpperCase() === cleanCode.toUpperCase() || kp === codePrefix) {
+        delete window.otOfficeLocks[k];
+      }
+    });
+  }
+
+  if (typeof window.removeOfficeLock === 'function') {
+    window.removeOfficeLock(code);
+  }
+
+  // Clear owner fields in IT inventory store if matched
+  try {
+    const invStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store') || '{}');
+    let invChanged = false;
+    for (const [key, item] of Object.entries(invStore)) {
+      const kp = key.split(/[\s—–-]+/)[0].toUpperCase();
+      if (kp === codePrefix || key.toUpperCase() === cleanCode.toUpperCase()) {
+        if (item) {
+          item.createdOfficerEmail = '';
+          item.submittedByEmail = '';
+          item.entryOfficerEmail = '';
+          item.updatedOfficerEmail = '';
+          invChanged = true;
+        }
+      }
+    }
+    if (invChanged) {
+      localStorage.setItem('mvd_it_inventory_store', JSON.stringify(invStore));
+      if (typeof inventoryStore !== 'undefined') {
+        Object.assign(inventoryStore, invStore);
+      }
+    }
+  } catch (e) {}
 
   await saveOfficeLocksToSupabase(locks);
   renderAdminOfficeLocksTable();
-  showToast(`Office lock cleared for ${code}. Initial entry will lock to next submitter.`, 'info');
+  showToast(`Office lock cleared for ${code}. Status reverted to Open.`, 'success');
 
   const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
   if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
@@ -3471,13 +3550,67 @@ async function clearOfficeLock(code) {
 }
 window.clearOfficeLock = clearOfficeLock;
 
+async function clearAllOfficeLocks() {
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  const assignedCount = Object.values(locks).filter(v => !!v).length;
+
+  const ok = await showCustomConfirm({
+    title: 'Clear All Office Locks',
+    message: `Are you sure you want to clear all office locks (${assignedCount} currently assigned)?\n\nAll 105 offices will be reset to "Open", allowing authorized data entry accounts to lock them upon initial entry.`,
+    confirmText: 'Clear All Locks',
+    isDanger: true
+  });
+  if (!ok) return;
+
+  const emptyLocks = {};
+  localStorage.setItem('mvd_ot_office_locks', JSON.stringify(emptyLocks));
+
+  if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
+    for (const k in otOfficeLocks) delete otOfficeLocks[k];
+  }
+  if (window.otOfficeLocks) {
+    for (const k in window.otOfficeLocks) delete window.otOfficeLocks[k];
+  }
+  if (typeof window.removeAllOfficeLocks === 'function') {
+    window.removeAllOfficeLocks();
+  }
+
+  // Clear owner fields in IT inventory store if any
+  try {
+    const invStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store') || '{}');
+    for (const item of Object.values(invStore)) {
+      if (item) {
+        item.createdOfficerEmail = '';
+        item.submittedByEmail = '';
+        item.entryOfficerEmail = '';
+        item.updatedOfficerEmail = '';
+      }
+    }
+    localStorage.setItem('mvd_it_inventory_store', JSON.stringify(invStore));
+    if (typeof inventoryStore !== 'undefined') {
+      Object.assign(inventoryStore, invStore);
+    }
+  } catch (e) {}
+
+  await saveOfficeLocksToSupabase(emptyLocks);
+  renderAdminOfficeLocksTable();
+
+  const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+  if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
+    checkOfficeAccessAndLock(currentSelectedOffice);
+  }
+
+  showToast('All office locks have been cleared successfully. All offices are now Open.', 'success');
+}
+window.clearAllOfficeLocks = clearAllOfficeLocks;
+
 function exportOfficeLocksCSV() {
   const officeMaster = getOfficeMasterList();
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
 
   const headers = ["Sl No", "Office Code", "Office Name", "Office Category", "Authorised Gmail ID", "Status"];
   const rows = officeMaster.map((off, idx) => {
-    const authEmail = locks[off.code] || (typeof getOfficeLockedEmail === 'function' ? getOfficeLockedEmail(off.code) : '') || '';
+    const authEmail = getOfficeLockEmail(off.code, locks);
     const status = authEmail ? 'Assigned' : 'Open';
     return [
       idx + 1,

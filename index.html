@@ -2048,7 +2048,10 @@
                     Manage designated Gmail accounts for data entry across all 105 MVD offices. Data entry and editing for each office is restricted exclusively to its assigned Gmail ID.
                   </p>
                 </div>
-                <div style="display: flex; gap: 10px;">
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-outline btn-danger btn-sm" onclick="clearAllOfficeLocks()" id="btnClearAllOfficeLocks" title="Clear all office locks simultaneously">
+                    <i class="fa-solid fa-unlock-keyhole"></i> Clear All Locks
+                  </button>
                   <button type="button" class="btn btn-outline btn-sm" onclick="exportOfficeLocksCSV()">
                     <i class="fa-solid fa-file-csv"></i> Export Access List CSV
                   </button>
