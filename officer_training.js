@@ -251,6 +251,7 @@ let otOriginalEditingPen = null;
 
 // Temporary staging for repeatable training records during form entry
 let otStagedTrainings = [];
+window.otStagedTrainings = otStagedTrainings;
 let otEditingTrainingIndex = -1;
 
 // Custom Qualifications staging
@@ -523,6 +524,29 @@ function getAllOfficesLinkedToUser(email) {
     if (canonical) linked.add(canonical);
   }
 
+  // Active office selected and locked to this user
+  const activeOffice = document.getElementById('otMainOfficeSelect')?.value;
+  if (activeOffice) {
+    const canonical = getCanonicalOfficeCode(activeOffice) || activeOffice;
+    const lockedOwner = getOfficeLockedEmail(canonical);
+    if (lockedOwner && lockedOwner.toLowerCase().trim() === clean) {
+      linked.add(canonical);
+    }
+  }
+
+  // Legacy IT equipment inventory owner check
+  if (typeof inventoryStore !== 'undefined' && inventoryStore) {
+    for (const [offName, rec] of Object.entries(inventoryStore)) {
+      if (rec) {
+        const oEmail = (rec.createdOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || rec.entryOfficerEmail || '').toLowerCase().trim();
+        if (oEmail && oEmail === clean) {
+          const canonical = getCanonicalOfficeCode(offName) || offName;
+          if (canonical) linked.add(canonical);
+        }
+      }
+    }
+  }
+
   return Array.from(linked);
 }
 window.getAllOfficesLinkedToUser = getAllOfficesLinkedToUser;
@@ -584,6 +608,26 @@ function checkOfficeAccessAndLock(officeCode) {
 
   const currentEmail = otGetLoggedInEmail();
   const lockedEmail = getOfficeLockedEmail(officeCode);
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+
+  if (isAdmin) {
+    toggleOfficerFormDisabled(false);
+    if (alertBox) {
+      alertBox.className = 'reflection-alert alert-authorized';
+      alertBox.style.display = 'flex';
+      alertBox.style.background = '#eff6ff';
+      alertBox.style.borderColor = '#93c5fd';
+      alertBox.style.color = '#1e40af';
+      alertBox.innerHTML = `
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <i class="fa-solid fa-user-shield" style="color:#2563eb; font-size: 1.15rem;"></i>
+          <span>Commissionerate Administrator Access — Full Edit & Verification Privileges for <strong>${escapeHtml(officeCode)}</strong>.</span>
+        </div>
+      `;
+    }
+    renderOfficeEditOptionList(officeCode);
+    return;
+  }
 
   if (lockedEmail) {
     if (currentEmail && lockedEmail.toLowerCase() === currentEmail.toLowerCase()) {
@@ -638,6 +682,18 @@ function checkOfficeAccessAndLock(officeCode) {
   } else {
     // Unlocked / Open office (first entry will lock to current account)
     toggleOfficerFormDisabled(false);
+    if (currentEmail) {
+      const canonical = getCanonicalOfficeCode(officeCode) || officeCode;
+      if (canonical && canonical !== 'DTC' && !otOfficeLocks[canonical]) {
+        otOfficeLocks[canonical] = currentEmail;
+        delete otOfficeLocks['DTC'];
+        localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+        window.otOfficeLocks = otOfficeLocks;
+        if (typeof saveOfficeLocksToSupabase === 'function') {
+          saveOfficeLocksToSupabase(otOfficeLocks);
+        }
+      }
+    }
     if (authPanel) {
       const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
       if (officeProfiles.length > 0) {
@@ -1771,7 +1827,8 @@ async function handleProfileSubmit(e) {
 }
 
 function saveOfficerRecordToStore(profile) {
-  const existingIdx = otProfilesStore.findIndex(p => p.id === profile.id || p.pen === profile.pen);
+  const profPen = profile.pen || profile.officer_pen || profile.officerPen;
+  const existingIdx = otProfilesStore.findIndex(p => (profile.id && p.id === profile.id) || (profPen && (p.pen === profPen || p.officer_pen === profPen)));
   if (existingIdx >= 0) {
     otProfilesStore[existingIdx] = profile;
   } else {
@@ -1812,29 +1869,23 @@ function saveOfficerRecordToStore(profile) {
   }
 }
 
-async function resetOfficerForm(force = false) {
-  if (!force && otFormDirty) {
-    const ok = await (window.showCustomConfirm || showCustomConfirm)({
-      title: 'Discard Changes',
-      message: 'You have unsaved changes. Are you sure you want to discard them?',
-      confirmText: 'Discard',
-      isDanger: true
-    });
-    if (!ok) return false;
-  }
-
+function resetOfficerFormSync() {
   otEditingProfileId = null;
   otOriginalEditingPen = null;
   otStagedTrainings = [];
+  window.otStagedTrainings = otStagedTrainings;
   otEditingTrainingIndex = -1;
   markFormDirty(false);
   clearFieldErrors();
 
-  document.getElementById('otOfficerForm').reset();
+  const form = document.getElementById('otOfficerForm');
+  if (form) form.reset();
   const contribEl = document.getElementById('otWillingnessToContribute');
   if (contribEl) contribEl.value = '';
-  document.getElementById('otFormActionTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Register New Officer Profile';
-  document.getElementById('otBtnCancelEdit').style.display = 'none';
+  const actionTitle = document.getElementById('otFormActionTitle');
+  if (actionTitle) actionTitle.innerHTML = '<i class="fa-solid fa-user-plus"></i> Register New Officer Profile';
+  const cancelBtn = document.getElementById('otBtnCancelEdit');
+  if (cancelBtn) cancelBtn.style.display = 'none';
 
   // Deselect additional qual panels & skills
   document.querySelectorAll('.ot-add-qual-chk').forEach(c => c.checked = false);
@@ -1869,16 +1920,35 @@ async function resetOfficerForm(force = false) {
   return true;
 }
 
+async function resetOfficerForm(force = false) {
+  if (!force && otFormDirty) {
+    const ok = await (window.showCustomConfirm || showCustomConfirm)({
+      title: 'Discard Changes',
+      message: 'You have unsaved changes. Are you sure you want to discard them?',
+      confirmText: 'Discard',
+      isDanger: true
+    });
+    if (!ok) return false;
+  }
+  return resetOfficerFormSync();
+}
+
 function cancelOfficerEdit() {
   resetOfficerForm();
 }
 
-async function loadProfileForEditing(profileId) {
-  let profile = otProfilesStore.find(p => p.id === profileId || p.pen === profileId);
+function loadProfileForEditing(profileId) {
+  const cleanId = String(profileId || '').trim();
+  let profile = otProfilesStore.find(p => p && (
+    String(p.id || '').trim() === cleanId ||
+    String(p.pen || '').trim() === cleanId ||
+    String(p.officer_pen || '').trim() === cleanId ||
+    String(p.officerPen || '').trim() === cleanId
+  ));
   if (!profile && typeof officersStore !== 'undefined') {
-    const off = officersStore.find(o => o.id === profileId || o.officer_pen === profileId);
+    const off = officersStore.find(o => o && (String(o.id || '').trim() === cleanId || String(o.officer_pen || '').trim() === cleanId));
     if (off) {
-      profile = otProfilesStore.find(p => p.pen === off.officer_pen);
+      profile = otProfilesStore.find(p => p && String(p.pen || '').trim() === String(off.officer_pen || '').trim());
       if (!profile) {
         const offCode = (off.office_name || '').split(' ')[0] || '';
         profile = {
@@ -1915,10 +1985,53 @@ async function loadProfileForEditing(profileId) {
     return;
   }
 
+  // Normalize property names (supports both camelCase and snake_case backend sources)
+  const normFullName = profile.officerFullName || profile.officer_full_name || "";
+  const normPen = profile.pen || profile.officer_pen || "";
+  let normDesig = profile.designation || profile.current_designation || profile.officer_designation || "";
+  if (normDesig === 'JRTO' || normDesig === 'Junior RTO') normDesig = 'Joint RTO';
+  const normOfficeCode = profile.officeCode || profile.office_code || "";
+  const normOfficeName = profile.officeName || profile.office_name || "";
+  const normGenEd = profile.generalEducation || profile.general_education || "";
+  const normGenEdOther = profile.generalEducationOther || profile.general_education_other || "";
+  const normTechQual = profile.technicalQualification || profile.technical_qualification || profile.educational_qualification || "";
+  const normTechQualOther = profile.technicalQualificationOther || profile.technical_qualification_other || profile.qualification_other || "";
+  const normInstitution = profile.institution || "";
+  const normPassingYear = profile.passingYear || profile.passing_year || profile.recent_training_year || "";
+  const normGrade = profile.grade || profile.class_grade || "";
+  const normWillingness = profile.willingnessToContribute || profile.willingness_to_contribute || "";
+
+  // Normalize additional qualifications (handles array or stringified JSON)
+  let normAddQuals = profile.additionalQualifications || profile.additional_qualifications || [];
+  if (typeof normAddQuals === 'string') {
+    try { normAddQuals = JSON.parse(normAddQuals); } catch (e) { normAddQuals = []; }
+  }
+  if (!Array.isArray(normAddQuals)) normAddQuals = [];
+
+  // Normalize specialized skills (handles array, stringified JSON, or comma-separated string)
+  let normSkills = profile.specializedSkills || profile.specialized_skills || [];
+  if (typeof normSkills === 'string') {
+    try { normSkills = JSON.parse(normSkills); } catch (e) { normSkills = normSkills.split(',').map(s => s.trim()); }
+  }
+  if (!Array.isArray(normSkills)) normSkills = [];
+  const normCustomSkills = profile.customSkills || profile.custom_skills || "";
+
+  // Normalize training history
+  let normTrainings = profile.trainingHistory || profile.training_history || [];
+  if (typeof normTrainings === 'string') {
+    try { normTrainings = JSON.parse(normTrainings); } catch (e) { normTrainings = []; }
+  }
+  if (!Array.isArray(normTrainings)) normTrainings = [];
+
+  // Normalize entered by
+  const normEnteredByName = profile.enteredBy?.fullName || profile.entered_by_name || profile.entry_officer_name || "";
+  const normEnteredByDesig = profile.enteredBy?.designation || profile.entered_by_designation || profile.entry_officer_designation || "";
+  const normEnteredByMobile = profile.enteredBy?.mobile || profile.entered_by_mobile || profile.entry_officer_mobile || "";
+
   // Permission check: Admin or Authorized User or role permission
   const currentEmail = otGetLoggedInEmail();
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
-  const lockedEmail = getOfficeLockedEmail(profile.officeCode);
+  const lockedEmail = getOfficeLockedEmail(normOfficeCode);
   const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
 
   if (lockedEmail && !isAdmin && !isAuthorized && !otHasPermission('edit_profile')) {
@@ -1926,121 +2039,230 @@ async function loadProfileForEditing(profileId) {
     return;
   }
 
-  // Instantly enable edit mode without prompts
-  await resetOfficerForm(true);
-  otEditingProfileId = profile.id;
-  otOriginalEditingPen = profile.pen;
-  document.getElementById('otFormActionTitle').innerHTML = `<i class="fa-solid fa-user-pen"></i> Edit Profile: ${escapeHtml(profile.officerFullName)} (PEN: ${escapeHtml(profile.pen)})`;
-  document.getElementById('otBtnCancelEdit').style.display = 'inline-flex';
-
-  // Section 1: Entered By Details
-  if (profile.enteredBy) {
-    const nameEl = document.getElementById('otEnteredByName');
-    const desigEl = document.getElementById('otEnteredByDesignation');
-    const mobEl = document.getElementById('otEnteredByMobile');
-    if (nameEl) nameEl.value = profile.enteredBy.fullName || "";
-    if (desigEl) desigEl.value = profile.enteredBy.designation || "";
-    if (mobEl) mobEl.value = profile.enteredBy.mobile || "";
+  // Ensure dynamic form containers are rendered
+  if (!document.querySelector('.ot-add-qual-chk')) {
+    renderAdditionalQualOptions();
+  }
+  if (!document.querySelector('.ot-skill-chk')) {
+    renderSpecializedSkillsOptions();
   }
 
-  // Section 2: Identification & Office
-  document.getElementById('otFullName').value = profile.officerFullName || "";
-  document.getElementById('otPen').value = profile.pen || "";
-  document.getElementById('otDesignationSelect').value = profile.designation || "";
-  document.getElementById('otMainOfficeSelect').value = profile.officeCode || "";
+  // Instantly enable edit mode without prompts
+  resetOfficerFormSync();
+  otEditingProfileId = profile.id;
+  otOriginalEditingPen = normPen;
+  document.getElementById('otFormActionTitle').innerHTML = `<i class="fa-solid fa-user-pen"></i> Edit Profile: ${escapeHtml(normFullName)} (PEN: ${escapeHtml(normPen)})`;
+  document.getElementById('otBtnCancelEdit').style.display = 'inline-flex';
+
+  // 1. Official Identification & Office
+  document.getElementById('otFullName').value = normFullName;
+  document.getElementById('otPen').value = normPen;
+
+  const desigSel = document.getElementById('otDesignationSelect');
+  if (desigSel) {
+    desigSel.value = normDesig;
+    if (!desigSel.value && normDesig) {
+      const opt = Array.from(desigSel.options).find(o => o.value.toLowerCase() === normDesig.toLowerCase() || o.textContent.toLowerCase() === normDesig.toLowerCase());
+      if (opt) desigSel.value = opt.value;
+    }
+  }
+
+  const officeSel = document.getElementById('otMainOfficeSelect');
+  if (officeSel) {
+    officeSel.value = normOfficeCode;
+  }
   const sInput = document.getElementById('otOfficeSearchInput');
   if (sInput) {
-    const selOpt = document.getElementById('otMainOfficeSelect')?.querySelector(`option[value="${profile.officeCode}"]`);
-    sInput.value = selOpt ? selOpt.textContent : (profile.officeCode ? `${profile.officeCode} — ${profile.officeName || ''}` : '');
+    const selOpt = officeSel?.querySelector(`option[value="${normOfficeCode}"]`);
+    sInput.value = selOpt ? selOpt.textContent : (normOfficeCode ? `${normOfficeCode} — ${normOfficeName}` : '');
   }
 
   toggleOfficerFormDisabled(false);
-  checkOfficeAccessAndLock(profile.officeCode);
+  checkOfficeAccessAndLock(normOfficeCode);
+  toggleOfficerFormDisabled(false); // Guarantee enabled state during edit mode
 
-  // Section 3: Academic & Technical
-  document.getElementById('otGenEdSelect').value = profile.generalEducation || "";
-  handleGeneralEducationChange(profile.generalEducation);
-  document.getElementById('otGenEdOtherInput').value = profile.generalEducationOther || "";
+  // 2. Academic & Basic Technical Credentials
+  const genEdSel = document.getElementById('otGenEdSelect');
+  if (genEdSel) {
+    genEdSel.value = normGenEd;
+    if (!genEdSel.value && normGenEd) {
+      genEdSel.value = "Others";
+    }
+    handleGeneralEducationChange(genEdSel.value);
+  }
+  const genEdOtherIn = document.getElementById('otGenEdOtherInput');
+  if (genEdOtherIn) {
+    genEdOtherIn.value = (genEdSel && genEdSel.value === "Others" && !normGenEdOther) ? normGenEd : normGenEdOther;
+  }
 
-  document.getElementById('otTechQualSelect').value = profile.technicalQualification || "";
-  handleTechnicalQualificationChange(profile.technicalQualification);
-  document.getElementById('otTechQualOtherInput').value = profile.technicalQualificationOther || "";
+  const techQualSel = document.getElementById('otTechQualSelect');
+  if (techQualSel) {
+    techQualSel.value = normTechQual;
+    if (!techQualSel.value && normTechQual) {
+      techQualSel.value = "Others";
+    }
+    handleTechnicalQualificationChange(techQualSel.value);
+  }
+  const techOtherIn = document.getElementById('otTechQualOtherInput');
+  if (techOtherIn) {
+    techOtherIn.value = (techQualSel && techQualSel.value === "Others" && !normTechQualOther) ? normTechQual : normTechQualOther;
+  }
 
-  document.getElementById('otTechInstitutionInput').value = profile.institution || "";
-  document.getElementById('otPassingYearInput').value = profile.passingYear || "";
-  document.getElementById('otGradeInput').value = profile.grade || "";
+  document.getElementById('otTechInstitutionInput').value = normInstitution;
+  document.getElementById('otPassingYearInput').value = normPassingYear;
+  document.getElementById('otGradeInput').value = normGrade;
 
-  // Additional Qualifications
-  if (Array.isArray(profile.additionalQualifications)) {
-    profile.additionalQualifications.forEach(aq => {
-      const isKnown = ADDITIONAL_QUAL_OPTIONS.includes(aq.qualification);
-      const qualNameToFind = isKnown ? aq.qualification : "Others — Specify";
+  // 3. Additional Qualifications Checkboxes & Dynamic Sub-Fields
+  const addQualCheckboxes = Array.from(document.querySelectorAll('.ot-add-qual-chk'));
+  addQualCheckboxes.forEach(c => {
+    c.checked = false;
+    const row = c.closest('.ot-qual-row');
+    if (row) {
+      const panel = row.querySelector('.ot-qual-detail-panel');
+      if (panel) panel.style.display = 'none';
+    }
+  });
 
-      const chk = document.querySelector(`.ot-add-qual-chk[value="${qualNameToFind}"]`);
+  normAddQuals.forEach(aq => {
+    const qName = (typeof aq === 'string' ? aq : (aq.qualification || '')).trim();
+    if (!qName) return;
+
+    let chk = addQualCheckboxes.find(c => {
+      const val = (c.value || '').toLowerCase().trim();
+      const target = qName.toLowerCase().trim();
+      return val === target || val.replace(/&amp;/g, '&') === target || val === target.replace(/&amp;/g, '&');
+    });
+    let isCustom = false;
+
+    if (!chk) {
+      chk = addQualCheckboxes.find(c => c.value.startsWith('Others'));
+      isCustom = true;
+    }
+
+    if (chk) {
+      chk.checked = true;
+      const row = chk.closest('.ot-qual-row');
+      const isNone = chk.value === 'No additional Qualifications';
+
+      if (row && !isNone) {
+        const detail = row.querySelector('.ot-qual-detail-panel');
+        if (detail) detail.style.display = 'block';
+
+        const status = (typeof aq === 'object' && aq.status) ? aq.status : 'Completed';
+        const statusSel = row.querySelector('.ot-detail-status');
+        if (statusSel) {
+          statusSel.value = status;
+          const idx = row.id ? row.id.split('_')[1] : null;
+          if (idx !== null && typeof handleQualStatusChange === 'function') {
+            handleQualStatusChange(idx, status);
+          }
+        }
+
+        const instIn = row.querySelector('.ot-detail-inst');
+        if (instIn && typeof aq === 'object' && aq.institution !== undefined) {
+          instIn.value = aq.institution || '';
+        }
+
+        const yrIn = row.querySelector('.ot-detail-year');
+        if (yrIn && typeof aq === 'object' && aq.year !== undefined && aq.year !== null) {
+          yrIn.value = aq.year || '';
+        }
+
+        const remIn = row.querySelector('.ot-detail-remarks');
+        if (remIn && typeof aq === 'object' && aq.remarks !== undefined) {
+          remIn.value = aq.remarks || '';
+        }
+
+        if (isCustom) {
+          const custNameIn = row.querySelector('.ot-detail-custom-name');
+          if (custNameIn) {
+            custNameIn.value = (typeof aq === 'object' && aq.customName) ? aq.customName : (qName !== chk.value ? qName : '');
+          }
+        }
+      }
+    }
+  });
+
+  // 4. Specialized Skills Checkboxes & Pills
+  const skillCheckboxes = Array.from(document.querySelectorAll('.ot-skill-chk'));
+  skillCheckboxes.forEach(cb => {
+    cb.checked = false;
+    cb.closest('.ot-skill-pill')?.classList.remove('active');
+  });
+
+  const customSkillsGroup = document.getElementById('otCustomSkillsGroup');
+  if (customSkillsGroup) customSkillsGroup.style.display = 'none';
+  const customSkillsInput = document.getElementById('otCustomSkillsInput');
+  if (customSkillsInput) customSkillsInput.value = '';
+
+  normSkills.forEach(skill => {
+    const clean = (typeof skill === 'string' ? skill : '').trim();
+    if (!clean) return;
+
+    if (clean.toLowerCase().startsWith('others:')) {
+      const customText = clean.replace(/^others:\s*/i, '').trim();
+      const otherChk = skillCheckboxes.find(c => c.value.startsWith('Others'));
+      if (otherChk) {
+        otherChk.checked = true;
+        otherChk.closest('.ot-skill-pill')?.classList.add('active');
+        if (customSkillsGroup) customSkillsGroup.style.display = 'block';
+        if (customSkillsInput) customSkillsInput.value = customText;
+      }
+    } else {
+      const chk = skillCheckboxes.find(c => {
+        const val = (c.value || '').toLowerCase().trim();
+        const target = clean.toLowerCase().trim();
+        return val === target || val.replace(/&amp;/g, '&') === target || val === target.replace(/&amp;/g, '&');
+      });
       if (chk) {
         chk.checked = true;
-        const row = chk.closest('.ot-qual-row');
-        const idx = row?.id?.split('_')[1];
-        if (idx !== undefined && qualNameToFind !== 'No additional Qualifications') {
-          toggleAdditionalQualDetail(idx, true);
-
-          const statusSel = row.querySelector('.ot-detail-status');
-          if (statusSel) {
-            statusSel.value = aq.status || "";
-            handleQualStatusChange(idx, aq.status);
-          }
-          const instIn = row.querySelector('.ot-detail-inst');
-          if (instIn) instIn.value = aq.institution || "";
-          const yrIn = row.querySelector('.ot-detail-year');
-          if (yrIn) yrIn.value = aq.year || "";
-          const remIn = row.querySelector('.ot-detail-remarks');
-          if (remIn) remIn.value = aq.remarks || "";
-
-          if (!isKnown) {
-            const custNameIn = row.querySelector('.ot-detail-custom-name');
-            if (custNameIn) custNameIn.value = aq.qualification;
-          }
-        }
-      }
-    });
-  }
-
-  // Section 4: Skills
-  if (Array.isArray(profile.specializedSkills)) {
-    profile.specializedSkills.forEach(skill => {
-      if (skill.startsWith('Others:')) {
-        const otherChk = document.querySelector('.ot-skill-chk[value="Others — Specify"]');
+        chk.closest('.ot-skill-pill')?.classList.add('active');
+      } else {
+        const otherChk = skillCheckboxes.find(c => c.value.startsWith('Others'));
         if (otherChk) {
           otherChk.checked = true;
-          handleSkillSelectionChange(otherChk, true);
-          document.getElementById('otCustomSkillsInput').value = skill.replace('Others:', '').trim();
-        }
-      } else {
-        const chk = document.querySelector(`.ot-skill-chk[value="${skill}"]`);
-        if (chk) {
-          chk.checked = true;
-          handleSkillSelectionChange(chk, false);
+          otherChk.closest('.ot-skill-pill')?.classList.add('active');
+          if (customSkillsGroup) customSkillsGroup.style.display = 'block';
+          if (customSkillsInput) {
+            customSkillsInput.value = customSkillsInput.value ? `${customSkillsInput.value}, ${clean}` : clean;
+          }
         }
       }
-    });
+    }
+  });
+
+  if (normCustomSkills) {
+    const otherChk = skillCheckboxes.find(c => c.value.startsWith('Others'));
+    if (otherChk) {
+      otherChk.checked = true;
+      otherChk.closest('.ot-skill-pill')?.classList.add('active');
+      if (customSkillsGroup) customSkillsGroup.style.display = 'block';
+      if (customSkillsInput) customSkillsInput.value = normCustomSkills;
+    }
   }
 
-  // Training History
-  otStagedTrainings = Array.isArray(profile.trainingHistory) ? JSON.parse(JSON.stringify(profile.trainingHistory)) : [];
+  // 5. In-Service Training History
+  otStagedTrainings = JSON.parse(JSON.stringify(normTrainings));
+  window.otStagedTrainings = otStagedTrainings;
   renderStagedTrainingTable();
 
-  // Section 5: Willingness to contribute
+  // 6. Willingness to contribute
   const contribEl = document.getElementById('otWillingnessToContribute');
-  if (contribEl) contribEl.value = profile.willingnessToContribute || '';
+  if (contribEl) contribEl.value = normWillingness;
 
-  // Section 6: Data entered By
-  if (profile.enteredBy) {
-    document.getElementById('otEnteredByName').value = profile.enteredBy.fullName || "";
-    document.getElementById('otEnteredByDesignation').value = profile.enteredBy.designation || "";
-    document.getElementById('otEnteredByMobile').value = profile.enteredBy.mobile || "";
-  }
+  // 7. Data entered By
+  const nameEl = document.getElementById('otEnteredByName');
+  const desigEl = document.getElementById('otEnteredByDesignation');
+  const mobEl = document.getElementById('otEnteredByMobile');
 
-  // Switch to Form Tab
+  if (nameEl) nameEl.value = normEnteredByName;
+  if (desigEl) desigEl.value = normEnteredByDesig;
+  if (mobEl) mobEl.value = normEnteredByMobile;
+
+  // 8. Navigation & View Switch
+  markFormDirty(false);
+  clearFieldErrors();
+
   if (typeof selectModuleMenu === 'function') {
     selectModuleMenu('officer_training_qualification');
   } else if (typeof switchPortalModule === 'function') {
@@ -2048,7 +2270,7 @@ async function loadProfileForEditing(profileId) {
   }
   switchOfficerSubTab('form');
   document.getElementById('officerTrainingFormCard')?.scrollIntoView({ behavior: 'smooth' });
-  showToast(`Loaded profile for editing: ${profile.officerFullName}`, "info");
+  showToast(`Loaded profile for editing: ${normFullName}`, "info");
 }
 window.loadProfileForEditing = loadProfileForEditing;
 
@@ -2606,7 +2828,7 @@ function renderOfficeSummaryReport() {
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   const reportSelect = document.getElementById('otReportOfficeSelect');
 
-  let officeCode = otCurrentReportOfficeCode;
+  let officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
 
   // Filter report to strictly show only the authorized office for authenticated non-admin users
   if (!isAdmin) {
@@ -2939,7 +3161,7 @@ function openVerificationModal() {
     return;
   }
 
-  const officeCode = otCurrentReportOfficeCode;
+  const officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
   const user = otGetCurrentUser();
 
   document.getElementById('otVerifOfficeCodeDisplay').textContent = officeCode;
@@ -2973,7 +3195,7 @@ function submitReportVerification(e) {
     return;
   }
 
-  const officeCode = otCurrentReportOfficeCode;
+  const officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
   const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode);
   const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
   const now = new Date().toISOString();
@@ -3016,7 +3238,16 @@ function submitReportVerification(e) {
 
 // Forwarding Modal & Handler
 function openForwardingModal() {
-  const officeCode = otCurrentReportOfficeCode;
+  const officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
+  const userEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  if (!isAdmin && userEmail) {
+    const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
+    if (!authorizedOffices.includes(officeCode)) {
+      showToast("Access Denied: You are not authorized to forward reports for this office.", "error");
+      return;
+    }
+  }
   const user = otGetCurrentUser();
   const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
 
@@ -3060,6 +3291,17 @@ function closeForwardingModal() {
 function submitReportForwarding(e) {
   if (e) e.preventDefault();
 
+  const officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
+  const userEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  if (!isAdmin && userEmail) {
+    const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
+    if (!authorizedOffices.includes(officeCode)) {
+      showToast("Access Denied: You cannot forward reports for an unauthorized office.", "error");
+      return;
+    }
+  }
+
   const headName = document.getElementById('otFwdHeadNameInput').value.trim();
   const headDesig = document.getElementById('otFwdHeadDesigInput').value.trim();
   const fileNo = document.getElementById('otFwdOutwardNoInput').value.trim();
@@ -3089,7 +3331,6 @@ function submitReportForwarding(e) {
     return;
   }
 
-  const officeCode = otCurrentReportOfficeCode;
   const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode);
   const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
   const now = new Date().toISOString();
@@ -3142,6 +3383,22 @@ function submitReportForwarding(e) {
 }
 
 function printOfficeSummaryReport() {
+  const userEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  if (!isAdmin) {
+    if (!userEmail) {
+      if (typeof showToast === 'function') showToast("Please log in to print summary reports.", "warning");
+      renderEmptyUserSummaryReport("Unauthenticated User");
+      return;
+    }
+    const currentRepCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
+    const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
+    if (!authorizedOffices || !authorizedOffices.includes(currentRepCode)) {
+      if (typeof showToast === 'function') showToast("Access Denied: You cannot print reports for an unauthorized office.", "error");
+      renderEmptyUserSummaryReport(userEmail);
+      return;
+    }
+  }
   document.body.classList.remove('printing-modal');
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('print-active'));
   const repTab = document.getElementById('otTabContentReport');
