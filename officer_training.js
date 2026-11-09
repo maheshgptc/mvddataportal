@@ -26,6 +26,19 @@
 
 // --- 1. MASTER DATA: OFFICES & DESIGNATIONS ---
 
+function escapeHtml(str) {
+  if (typeof window !== 'undefined' && typeof window.escapeHtml === 'function' && window.escapeHtml !== escapeHtml) {
+    return window.escapeHtml(str);
+  }
+  if (str === null || str === undefined) return '';
+  return String(str).replace(/[&<>"']/g, function(m) {
+    return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[m];
+  });
+}
+if (typeof window !== 'undefined' && !window.escapeHtml) {
+  window.escapeHtml = escapeHtml;
+}
+
 const OT_OFFICE_GROUPS = {
   "Commissionerate & DTC Offices": [
     { code: "TCO", name: "Transport Commissionerate" },
@@ -219,6 +232,7 @@ const SEED_OFFICER_PROFILES = [];
 let otProfilesStore = (JSON.parse(localStorage.getItem('mvd_ot_profiles_store')) || [])
   .filter(p => p && p.id && !p.id.startsWith('prof_kl01_') && !p.id.startsWith('prof_kl07_') && !p.id.startsWith('off_seed_'));
 localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+window.otProfilesStore = otProfilesStore;
 
 let otReportSnapshotsStore = JSON.parse(localStorage.getItem('mvd_ot_report_snapshots')) || {};
 let otAuditLogs = JSON.parse(localStorage.getItem('mvd_ot_audit_logs')) || [];
@@ -475,15 +489,49 @@ window.removeAllOfficeLocks = function() {
   return {};
 };
 
-function getOfficeLinkedToUser(email) {
-  if (!email) return null;
+function getAllOfficesLinkedToUser(email) {
+  if (!email) return [];
   const clean = email.toLowerCase().trim();
+  const linked = new Set();
+
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-  for (const [code, owner] of Object.entries(locks)) {
-    if (owner && owner.toLowerCase().trim() === clean) return code;
+  if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
+    Object.assign(locks, otOfficeLocks);
   }
-  return null;
+  for (const [code, owner] of Object.entries(locks)) {
+    if (owner && owner.toLowerCase().trim() === clean && code !== 'DTC') {
+      const canonical = getCanonicalOfficeCode(code) || code;
+      if (canonical) linked.add(canonical);
+    }
+  }
+
+  if (Array.isArray(otProfilesStore)) {
+    otProfilesStore.forEach(p => {
+      if (p && p.officeCode && (
+        (p.enteredBy?.userId && p.enteredBy.userId.toLowerCase().trim() === clean) ||
+        (p.enteredBy?.email && p.enteredBy.email.toLowerCase().trim() === clean)
+      )) {
+        const canonical = getCanonicalOfficeCode(p.officeCode) || p.officeCode;
+        if (canonical) linked.add(canonical);
+      }
+    });
+  }
+
+  const currentUser = otGetCurrentUser();
+  if (currentUser && currentUser.assignedOfficeCode) {
+    const canonical = getCanonicalOfficeCode(currentUser.assignedOfficeCode) || currentUser.assignedOfficeCode;
+    if (canonical) linked.add(canonical);
+  }
+
+  return Array.from(linked);
 }
+window.getAllOfficesLinkedToUser = getAllOfficesLinkedToUser;
+
+function getOfficeLinkedToUser(email) {
+  const all = getAllOfficesLinkedToUser(email);
+  return all.length > 0 ? all[0] : null;
+}
+window.getOfficeLinkedToUser = getOfficeLinkedToUser;
 
 function toggleOfficerFormDisabled(disabled) {
   const form = document.getElementById('otOfficerForm');
@@ -700,6 +748,7 @@ async function startNewOfficerForOffice(officeCode) {
   if (!confirmed) return;
 
   await resetOfficerForm(true);
+  prefillEnteredByDetails();
   const sel = document.getElementById('otMainOfficeSelect');
   if (sel) {
     sel.value = officeCode;
@@ -729,6 +778,29 @@ function initOfficerTrainingModule() {
   initUnsavedChangesProtection();
   prefillEnteredByDetails();
   renderRoleSwitcherUI();
+
+  // Attach live persistence for entered-by details
+  ['otEnteredByName', 'otEnteredByDesignation', 'otEnteredByMobile'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) {
+      const saveHandler = () => {
+        try {
+          const name = document.getElementById('otEnteredByName')?.value?.trim() || '';
+          const desig = document.getElementById('otEnteredByDesignation')?.value || '';
+          const mob = document.getElementById('otEnteredByMobile')?.value?.trim() || '';
+          if (name || desig || mob) {
+            localStorage.setItem('mvd_ot_last_entered_by', JSON.stringify({
+              fullName: name,
+              designation: desig,
+              mobile: mob
+            }));
+          }
+        } catch (e) {}
+      };
+      el.addEventListener('input', saveHandler);
+      el.addEventListener('change', saveHandler);
+    }
+  });
 
   // Attach instant validation listeners to main office dropdown
   const officeSelect = document.getElementById('otMainOfficeSelect');
@@ -772,13 +844,11 @@ function markFormDirty(dirty = true) {
 // --- 6. SEARCHABLE OFFICE DROPDOWN ENGINE ---
 
 function populateSearchableOfficeDropdowns() {
-  const selects = [
-    document.getElementById('otMainOfficeSelect'),
-    document.getElementById('otReportOfficeSelect'),
-    document.getElementById('otDirOfficeFilter')
-  ];
+  const mainSel = document.getElementById('otMainOfficeSelect');
+  const dirFilterSel = document.getElementById('otDirOfficeFilter');
+  const reportSel = document.getElementById('otReportOfficeSelect');
 
-  selects.forEach(sel => {
+  [mainSel, dirFilterSel].forEach(sel => {
     if (!sel) return;
     const isFilter = sel.id === 'otDirOfficeFilter';
     sel.innerHTML = isFilter ? '<option value="ALL">-- All MVD Offices (Statewide) --</option>' : '<option value="">-- Select Office (Code — Name) --</option>';
@@ -795,6 +865,41 @@ function populateSearchableOfficeDropdowns() {
       sel.appendChild(optgroup);
     });
   });
+
+  // Report Select: Restricted to specifically assigned/authorized office for authenticated non-admin users
+  if (reportSel) {
+    const userEmail = otGetLoggedInEmail();
+    const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+    if (isAdmin || !userEmail) {
+      reportSel.innerHTML = '<option value="">-- Select Office (Code — Name) --</option>';
+      Object.entries(OT_OFFICE_GROUPS).forEach(([groupName, offices]) => {
+        const optgroup = document.createElement('optgroup');
+        optgroup.label = groupName;
+        offices.forEach(off => {
+          const opt = document.createElement('option');
+          opt.value = off.code;
+          opt.textContent = `${off.code} — ${off.name}`;
+          optgroup.appendChild(opt);
+        });
+        reportSel.appendChild(optgroup);
+      });
+      reportSel.disabled = false;
+    } else {
+      const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
+      if (authorizedOffices.length > 0) {
+        reportSel.innerHTML = authorizedOffices.map(code => {
+          const off = ALL_MVD_OFFICES.find(o => o.code === code) || { code, name: code };
+          return `<option value="${escapeHtml(code)}">${escapeHtml(code)} — ${escapeHtml(off.name)}</option>`;
+        }).join('');
+        reportSel.disabled = (authorizedOffices.length === 1);
+        reportSel.title = (authorizedOffices.length === 1) ? "Summary Report is restricted to your authorized office" : "";
+      } else {
+        reportSel.innerHTML = '<option value="">-- No Authorized Office --</option>';
+        reportSel.disabled = true;
+        reportSel.title = "No office is authorized for your account";
+      }
+    }
+  }
 }
 
 function handleOfficeSearchFilter(inputEl, targetSelectId) {
@@ -1244,16 +1349,44 @@ function prefillEnteredByDetails() {
   const desigInput = document.getElementById('otEnteredByDesignation');
   const mobInput = document.getElementById('otEnteredByMobile');
 
-  if (nameInput && !nameInput.value.trim()) {
-    nameInput.value = user.name || "";
+  // Check stored last entered-by details
+  let lastEntered = null;
+  try {
+    const raw = localStorage.getItem('mvd_ot_last_entered_by');
+    if (raw) lastEntered = JSON.parse(raw);
+  } catch (e) {}
+
+  // If not in localStorage, look up any previous profile entered by this user
+  if (!lastEntered && Array.isArray(otProfilesStore) && otProfilesStore.length > 0) {
+    const userEmail = otGetLoggedInEmail();
+    const prevProf = otProfilesStore.find(p => p && p.enteredBy && (
+      (userEmail && p.enteredBy.userId && p.enteredBy.userId.toLowerCase().trim() === userEmail) ||
+      (user.name && p.enteredBy.fullName && p.enteredBy.fullName.toLowerCase().trim() === user.name.toLowerCase().trim())
+    ));
+    if (prevProf && prevProf.enteredBy) {
+      lastEntered = {
+        fullName: prevProf.enteredBy.fullName || "",
+        designation: prevProf.enteredBy.designation || "",
+        mobile: prevProf.enteredBy.mobile || ""
+      };
+    }
   }
-  if (desigInput && !desigInput.value.trim()) {
-    desigInput.value = "";
+
+  const defaultName = (lastEntered && lastEntered.fullName) ? lastEntered.fullName : (user.name || "");
+  const defaultDesig = (lastEntered && lastEntered.designation) ? lastEntered.designation : "";
+  const defaultMobile = (lastEntered && lastEntered.mobile) ? lastEntered.mobile : "";
+
+  if (nameInput) {
+    nameInput.value = defaultName;
   }
-  if (mobInput && !mobInput.value.trim()) {
-    mobInput.value = "";
+  if (desigInput && defaultDesig) {
+    desigInput.value = defaultDesig;
+  }
+  if (mobInput && defaultMobile) {
+    mobInput.value = defaultMobile;
   }
 }
+window.prefillEnteredByDetails = prefillEnteredByDetails;
 
 // --- 10. FORM SUBMISSION, VALIDATION & DRAFT SAVING ---
 
@@ -1481,6 +1614,16 @@ function extractOfficerFormData(status = 'submitted') {
     updatedAt: nowISO,
     version: otEditingProfileId ? ((otProfilesStore.find(p => p.id === otEditingProfileId)?.version || 1) + 1) : 1
   };
+
+  if (enteredByName || enteredByDesig || normalizedMobile) {
+    try {
+      localStorage.setItem('mvd_ot_last_entered_by', JSON.stringify({
+        fullName: enteredByName,
+        designation: enteredByDesig,
+        mobile: normalizedMobile
+      }));
+    } catch (e) {}
+  }
 
   return { isValid, data };
 }
@@ -2364,22 +2507,44 @@ function otDownloadCsvFile(encodedContent, filename) {
 // --- 13. OFFICE-WISE SUMMARY REPORT & VERIFICATION WORKFLOW ---
 
 let otCurrentReportOfficeCode = "";
+window.otCurrentReportOfficeCode = "";
 
 function handleReportOfficeSelectChange(officeCode) {
+  const userEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  if (!isAdmin) {
+    if (!userEmail) {
+      if (typeof showToast === 'function') showToast("Please log in to view summary reports.", "warning");
+      renderEmptyUserSummaryReport("Unauthenticated User");
+      return;
+    }
+    const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
+    if (!authorizedOffices.includes(officeCode)) {
+      if (typeof showToast === 'function') showToast("Access Denied: You are only authorized to view your assigned office.", "error");
+      const reportSelect = document.getElementById('otReportOfficeSelect');
+      if (reportSelect && authorizedOffices.length > 0) {
+        reportSelect.value = authorizedOffices[0];
+      }
+      return;
+    }
+  }
   otCurrentReportOfficeCode = officeCode;
+  window.otCurrentReportOfficeCode = officeCode;
   renderOfficeSummaryReport();
 }
+window.handleReportOfficeSelectChange = handleReportOfficeSelectChange;
 
 function renderEmptyUserSummaryReport(userEmail) {
   const reportSelect = document.getElementById('otReportOfficeSelect');
   if (reportSelect) {
+    reportSelect.innerHTML = '<option value="">-- No Authorized Office --</option>';
     reportSelect.disabled = true;
     reportSelect.value = "";
-    reportSelect.title = "No office is linked to your account yet";
+    reportSelect.title = "No office is authorized for your account yet";
   }
 
   const headerOfficeEl = document.getElementById('otReportHeaderOffice');
-  if (headerOfficeEl) headerOfficeEl.textContent = "No Linked Office Found";
+  if (headerOfficeEl) headerOfficeEl.textContent = "No Authorized Office Found";
 
   const cutoffEl = document.getElementById('otReportCutoffTime');
   if (cutoffEl) cutoffEl.textContent = otFormatIST(new Date().toISOString());
@@ -2390,7 +2555,7 @@ function renderEmptyUserSummaryReport(userEmail) {
   const statusBadge = document.getElementById('otReportVerificationStatusBadge');
   if (statusBadge) {
     statusBadge.className = 'badge badge-secondary';
-    statusBadge.innerHTML = `<i class="fa-solid fa-lock"></i> NO LINKED OFFICE`;
+    statusBadge.innerHTML = `<i class="fa-solid fa-lock"></i> ACCESS RESTRICTED`;
   }
 
   const draftAlert = document.getElementById('otReportExcludedDraftsAlert');
@@ -2398,7 +2563,7 @@ function renderEmptyUserSummaryReport(userEmail) {
     draftAlert.style.display = 'flex';
     draftAlert.innerHTML = `
       <i class="fa-solid fa-circle-exclamation" style="font-size: 1.1rem; color: #0284c7;"></i>
-      <span><strong>Account Notice:</strong> Logged in as <strong>${escapeHtml(userEmail)}</strong>. You have not submitted officer details for any office yet. Please select your office and enter officer details in the <strong>Officer Entry &amp; Qualification</strong> tab to generate the Summary Report for your office.</span>
+      <span><strong>Access Restricted:</strong> Logged in as <strong>${escapeHtml(userEmail || 'User')}</strong>. You do not have an authorized office assigned or active. Please select your office in the <strong>Officer Entry &amp; Qualification</strong> tab to view and generate the Summary Report for your office.</span>
     `;
   }
 
@@ -2415,7 +2580,7 @@ function renderEmptyUserSummaryReport(userEmail) {
   // Clear tables
   const detailsTbody = document.getElementById('otReportDetailsTableBody');
   if (detailsTbody) {
-    detailsTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No office linked to your Gmail ID (${escapeHtml(userEmail)}). Enter officer details first to view office data.</td></tr>`;
+    detailsTbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">No authorized office linked to your account (${escapeHtml(userEmail || 'User')}). Select your office to view office data.</td></tr>`;
   }
   const annexTbody = document.getElementById('otReportAnnexureTableBody');
   if (annexTbody) {
@@ -2423,7 +2588,7 @@ function renderEmptyUserSummaryReport(userEmail) {
   }
   const contribTbody = document.getElementById('otReportContributorsTableBody');
   if (contribTbody) {
-    contribTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No contributors recorded.</td></tr>`;
+    contribTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted); padding: 20px;">No contributors recorded.</td></tr>`;
   }
 
   const digiVerifBox = document.getElementById('otReportDigitalVerificationDisplay');
@@ -2431,40 +2596,69 @@ function renderEmptyUserSummaryReport(userEmail) {
 
   const dispatchBox = document.getElementById('otReportForwardingDetailsDisplay');
   if (dispatchBox) dispatchBox.style.display = 'none';
+
+  const btnForward = document.getElementById('otBtnTriggerForward');
+  if (btnForward) btnForward.style.display = 'none';
 }
 
 function renderOfficeSummaryReport() {
   const userEmail = otGetLoggedInEmail();
-  const linkedOfficeCode = getOfficeLinkedToUser(userEmail);
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   const reportSelect = document.getElementById('otReportOfficeSelect');
 
   let officeCode = otCurrentReportOfficeCode;
 
-  // Filter report to only show the office linked to the logged-in user
-  if (!isAdmin && userEmail) {
-    if (linkedOfficeCode) {
-      officeCode = linkedOfficeCode;
-      otCurrentReportOfficeCode = linkedOfficeCode;
-      if (reportSelect) {
-        reportSelect.value = linkedOfficeCode;
-        reportSelect.disabled = true;
-        reportSelect.title = "Summary Report is locked to your authorized office";
-      }
-    } else {
-      // User is logged in but hasn't entered data for any office yet
+  // Filter report to strictly show only the authorized office for authenticated non-admin users
+  if (!isAdmin) {
+    if (!userEmail) {
+      renderEmptyUserSummaryReport("Unauthenticated User");
+      return;
+    }
+    const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
+    if (!authorizedOffices || authorizedOffices.length === 0) {
       renderEmptyUserSummaryReport(userEmail);
       return;
     }
+
+    if (!officeCode || !authorizedOffices.includes(officeCode)) {
+      officeCode = authorizedOffices[0];
+      otCurrentReportOfficeCode = officeCode;
+      window.otCurrentReportOfficeCode = officeCode;
+    }
+
+    if (reportSelect) {
+      reportSelect.innerHTML = authorizedOffices.map(c => {
+        const off = ALL_MVD_OFFICES.find(o => o.code === c) || { code: c, name: c };
+        return `<option value="${escapeHtml(c)}">${escapeHtml(c)} — ${escapeHtml(off.name)}</option>`;
+      }).join('');
+      reportSelect.value = officeCode;
+      reportSelect.disabled = (authorizedOffices.length === 1);
+      reportSelect.title = (authorizedOffices.length === 1) ? "Summary Report is restricted to your authorized office" : "";
+    }
   } else {
-    // Admin or no user session: default to selected office or first office
+    // Admin mode: can inspect all offices
     if (!officeCode) {
       officeCode = reportSelect?.value || "KL01";
       otCurrentReportOfficeCode = officeCode;
     }
     if (reportSelect) {
+      if (reportSelect.options.length <= 1) {
+        reportSelect.innerHTML = '<option value="">-- Select Office (Code — Name) --</option>';
+        Object.entries(OT_OFFICE_GROUPS).forEach(([groupName, offices]) => {
+          const optgroup = document.createElement('optgroup');
+          optgroup.label = groupName;
+          offices.forEach(off => {
+            const opt = document.createElement('option');
+            opt.value = off.code;
+            opt.textContent = `${off.code} — ${off.name}`;
+            optgroup.appendChild(opt);
+          });
+          reportSelect.appendChild(optgroup);
+        });
+      }
       reportSelect.disabled = false;
       reportSelect.value = officeCode;
+      reportSelect.title = "Select office to review summary report";
     }
   }
 
@@ -2724,6 +2918,7 @@ function renderOfficeSummaryReport() {
     }
   }
 }
+window.renderOfficeSummaryReport = renderOfficeSummaryReport;
 
 // Trigger automatic "Reverification Required" when source records change
 function triggerReverificationCheck(officeCode) {
@@ -2949,6 +3144,9 @@ function submitReportForwarding(e) {
 function printOfficeSummaryReport() {
   document.body.classList.remove('printing-modal');
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('print-active'));
+  const repTab = document.getElementById('otTabContentReport');
+  if (repTab) repTab.style.display = 'block';
+  renderOfficeSummaryReport();
   window.print();
 }
 

@@ -1876,8 +1876,8 @@ input:checked+.slider:before {
    ========================================================================== */
 @media print {
   @page {
-    size: A4 landscape;
-    margin: 10mm 10mm 12mm 10mm;
+    size: A4;
+    margin: 8mm 6mm 10mm 6mm;
   }
 
   *, *::before, *::after {
@@ -2011,12 +2011,25 @@ input:checked+.slider:before {
     visibility: visible !important;
   }
 
-  table.data-table,
-  table.summary-report-table {
+  .data-table-container {
+    overflow: visible !important;
     width: 100% !important;
+    max-width: 100% !important;
+    margin: 0 0 14px 0 !important;
+    padding: 0 !important;
+  }
+
+  table.data-table,
+  table.summary-report-table,
+  #otReportDetailsTable,
+  #otReportAnnexureTable,
+  #otReportContributorsTable {
+    width: 100% !important;
+    max-width: 100% !important;
+    table-layout: auto !important;
     border-collapse: collapse !important;
     page-break-inside: auto !important;
-    font-size: 8.5pt !important;
+    font-size: 7.5pt !important;
   }
 
   table.data-table thead,
@@ -2025,25 +2038,100 @@ input:checked+.slider:before {
   }
 
   table.data-table th,
-  table.summary-report-table th {
+  table.summary-report-table th,
+  #otReportDetailsTable th,
+  #otReportAnnexureTable th,
+  #otReportContributorsTable th {
     background: #f1f5f9 !important;
     color: #000000 !important;
     border: 1px solid #475569 !important;
-    padding: 5px 6px !important;
+    padding: 4px 5px !important;
+    min-width: 0 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
 
   table.data-table td,
-  table.summary-report-table td {
+  table.summary-report-table td,
+  #otReportDetailsTable td,
+  #otReportAnnexureTable td,
+  #otReportContributorsTable td {
     border: 1px solid #94a3b8 !important;
-    padding: 5px 6px !important;
+    padding: 4px 5px !important;
+    min-width: 0 !important;
+    word-break: break-word !important;
+    overflow-wrap: break-word !important;
+    white-space: normal !important;
+    font-size: 7.5pt !important;
+    line-height: 1.3 !important;
   }
 
   table.data-table tr,
   table.summary-report-table tr {
     page-break-inside: avoid !important;
   }
+
+  /* Specific column proportions for Officer-wise Details Table on A4 */
+  #otReportDetailsTable th:nth-child(1),
+  #otReportDetailsTable td:nth-child(1) { width: 4% !important; text-align: center; }
+  #otReportDetailsTable th:nth-child(2),
+  #otReportDetailsTable td:nth-child(2) { width: 13% !important; }
+  #otReportDetailsTable th:nth-child(3),
+  #otReportDetailsTable td:nth-child(3) { width: 9% !important; }
+  #otReportDetailsTable th:nth-child(4),
+  #otReportDetailsTable td:nth-child(4) { width: 8% !important; }
+  #otReportDetailsTable th:nth-child(5),
+  #otReportDetailsTable td:nth-child(5) { width: 10% !important; }
+  #otReportDetailsTable th:nth-child(6),
+  #otReportDetailsTable td:nth-child(6) { width: 18% !important; }
+  #otReportDetailsTable th:nth-child(7),
+  #otReportDetailsTable td:nth-child(7) { width: 14% !important; }
+  #otReportDetailsTable th:nth-child(8),
+  #otReportDetailsTable td:nth-child(8) { width: 11% !important; }
+  #otReportDetailsTable th:nth-child(9),
+  #otReportDetailsTable td:nth-child(9) { width: 13% !important; }
+
+  /* Dashboard summary grid scaling in print */
+  .dashboard-grid-4 {
+    display: grid !important;
+    grid-template-columns: repeat(3, 1fr) !important;
+    gap: 8px !important;
+    margin-bottom: 12px !important;
+  }
+
+  .dashboard-grid-4 > div {
+    padding: 8px !important;
+    page-break-inside: avoid !important;
+    font-size: 8pt !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #f8fafc !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ot-report-meta-grid {
+    display: flex !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+    padding: 8px 12px !important;
+    margin-bottom: 14px !important;
+    border: 1px solid #cbd5e1 !important;
+    background: #f8fafc !important;
+    font-size: 8.5pt !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .ot-report-gov-header {
+    text-align: center !important;
+    margin-bottom: 14px !important;
+  }
+  .ot-report-gov-header h2 { font-size: 13pt !important; margin: 0 0 2px 0 !important; color: #000000 !important; }
+  .ot-report-gov-header h3 { font-size: 11pt !important; margin: 0 0 2px 0 !important; color: #000000 !important; }
+  .ot-report-gov-header h4 { font-size: 10pt !important; margin: 0 0 4px 0 !important; color: #000000 !important; }
 
   .ot-report-signature-block {
     page-break-inside: avoid !important;
