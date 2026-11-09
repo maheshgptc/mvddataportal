@@ -224,17 +224,17 @@ const SEED_OFFICERS = [];
 // --- 4. DEFAULT PORTAL MODULES REGISTRY (INCLUDES OFFICER TRAINING) ---
 const DEFAULT_PORTAL_MODULES = [
   {
-    id: "officer_training_qualification",
-    title: "Officer Training & Qualification",
-    icon: "fa-user-graduate",
-    description: "Officer Profile, Qualifications, Skills and Training Records",
-    visible: true
-  },
-  {
     id: "it_equipment_list",
     title: "IT Equipment List",
     icon: "fa-desktop",
     description: "Core module for office-wise inventory of Monitors, CPUs, Laptops, Printers, UPS, Batteries, OS, and System Age.",
+    visible: true
+  },
+  {
+    id: "officer_training_qualification",
+    title: "Officer Training & Qualification",
+    icon: "fa-user-graduate",
+    description: "Officer Profile, Qualifications, Skills and Training Records",
     visible: true
   }
 ];
@@ -260,16 +260,11 @@ if (appSettings.adminPasscode === 'admin123') {
   localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
 }
 
-// Ensure both core modules are loaded in registry with Officer Training first
+// Ensure both core modules are loaded in registry
 let storedModules = JSON.parse(localStorage.getItem('mvd_it_portal_modules')) || DEFAULT_PORTAL_MODULES;
 let portalModules = storedModules.filter(m => m.id === 'it_equipment_list' || m.id === 'officer_training_qualification' || !['network_infrastructure', 'software_licensing', 'hardware_ewaste'].includes(m.id));
-if (!portalModules.some(m => m.id === 'officer_training_qualification')) portalModules.unshift(DEFAULT_PORTAL_MODULES[0]);
-if (!portalModules.some(m => m.id === 'it_equipment_list')) portalModules.push(DEFAULT_PORTAL_MODULES[1]);
-const otIdx = portalModules.findIndex(m => m.id === 'officer_training_qualification');
-if (otIdx > 0) {
-  const [otItem] = portalModules.splice(otIdx, 1);
-  portalModules.unshift(otItem);
-}
+if (!portalModules.some(m => m.id === 'it_equipment_list')) portalModules.unshift(DEFAULT_PORTAL_MODULES[0]);
+if (!portalModules.some(m => m.id === 'officer_training_qualification')) portalModules.push(DEFAULT_PORTAL_MODULES[1]);
 localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
 
 // Chart Instances
@@ -513,7 +508,11 @@ function applyGoogleAuthSession(userObj) {
   }
 
   updateViewEnteredDataButtonVisibility();
-  selectModuleMenu(activeModuleId);
+
+  // Ensure default module (Officer Training & Qualification) is displayed on login
+  if (typeof selectModuleMenu === 'function') {
+    selectModuleMenu(activeModuleId || 'officer_training_qualification');
+  }
 }
 
 function logoutGoogleUser() {
@@ -555,6 +554,11 @@ document.addEventListener('DOMContentLoaded', () => {
   renderPublicDataTable();
   renderAdminDataTable();
   renderMenuManagerUI();
+
+  // Ensure default module (Officer Training & Qualification) is displayed on launch
+  if (typeof selectModuleMenu === 'function') {
+    selectModuleMenu(activeModuleId || 'officer_training_qualification');
+  }
 });
 
 // --- 7. LEFT SIDEBAR NAVIGATION MENU BAR RENDERER & SWITCHER ---
@@ -1911,9 +1915,8 @@ function handleOfficeSelectChange(officeName) {
     }
   } else {
     // Check if office is locked in Officer Training locks
-    const otOwner = (typeof getOfficeLockEmail === 'function') 
-      ? getOfficeLockEmail(officeName) 
-      : ((typeof window.getOfficeLockEmail === 'function') ? window.getOfficeLockEmail(officeName) : '');
+    const otLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+    const otOwner = getOfficeLockEmail(officeName, otLocks);
 
     if (otOwner && (!currentEmail || otOwner.toLowerCase() !== currentEmail.toLowerCase())) {
       if (btnDeleteForm) btnDeleteForm.style.display = 'none';
@@ -3189,46 +3192,10 @@ window.showCustomConfirm = showCustomConfirm;
 
 // --- 22. AUTHORISED DATA ENTRY USERS ACCESS MANAGEMENT FOR ADMIN PORTAL ---
 
-function normalizeOfficeCode(input) {
-  if (!input || typeof input !== 'string') return '';
-  const str = input.trim();
-  if (!str) return '';
-  const upper = str.toUpperCase();
-  if (upper.includes('CZ II') || upper.includes('CZ-II') || upper.includes('CZ 2') || upper.includes('CZ2')) {
-    return 'DTC CZ II';
-  }
-  if (upper.includes('CZ I') || upper.includes('CZ-I') || upper.includes('CZ 1') || upper.includes('CZ1')) {
-    return 'DTC CZ I';
-  }
-  if (upper.includes('DTC NZ') || upper.includes('OFFICE NZ') || upper.includes('NZ, KOZHIKKODE') || upper === 'DTC NZ' || upper === 'NZ') {
-    return 'DTC NZ';
-  }
-  if (upper.includes('DTC SZ') || upper.includes('OFFICE SZ') || upper.includes('SZ, THIRUVANANTHAPURAM') || upper === 'DTC SZ' || upper === 'SZ') {
-    return 'DTC SZ';
-  }
-  if (upper.startsWith('TCO')) {
-    return 'TCO';
-  }
-  if (/[—–-]/.test(str)) {
-    const parts = str.split(/\s+[—–-]\s+/);
-    if (parts.length > 1) {
-      const candidate = parts[0].trim().toUpperCase();
-      if (candidate) return candidate;
-    }
-  }
-  const m = str.match(/^(KLE\d{2}|KL\d{2}|\d{3})/i);
-  if (m) {
-    return m[1].toUpperCase();
-  }
-  return str.split(/[\s—–-]+/)[0].toUpperCase();
-}
-window.normalizeOfficeCode = normalizeOfficeCode;
-
 async function saveOfficeLocksToSupabase(locks) {
   const client = (typeof getSupabaseClient === 'function' ? getSupabaseClient() : null) || window.supabaseClient || supabaseClient;
   if (!client) return { success: false, error: new Error('Client unavailable') };
   try {
-    delete locks['DTC'];
     const payload = {
       id: 'office_locks',
       public_visible: true,
@@ -3261,21 +3228,18 @@ async function syncOfficeLocksFromSupabase() {
       .single();
     if (!error && data) {
       const remoteLocks = (data.menu_visibility && typeof data.menu_visibility === 'object') ? data.menu_visibility : {};
-      delete remoteLocks['DTC'];
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(remoteLocks));
 
       if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
         for (const k in otOfficeLocks) {
           if (!remoteLocks[k]) delete otOfficeLocks[k];
         }
-        delete otOfficeLocks['DTC'];
         Object.assign(otOfficeLocks, remoteLocks);
       }
       if (window.otOfficeLocks) {
         for (const k in window.otOfficeLocks) {
           if (!remoteLocks[k]) delete window.otOfficeLocks[k];
         }
-        delete window.otOfficeLocks['DTC'];
         Object.assign(window.otOfficeLocks, remoteLocks);
       }
 
@@ -3291,6 +3255,63 @@ async function syncOfficeLocksFromSupabase() {
 }
 window.syncOfficeLocksFromSupabase = syncOfficeLocksFromSupabase;
 
+function getCanonicalOfficeCode(office) {
+  if (!office) return '';
+  const str = String(office).trim();
+  const upper = str.toUpperCase();
+
+  // 1. Direct match with ALL_MVD_OFFICES
+  const masterList = (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0)
+    ? ALL_MVD_OFFICES
+    : (window.ALL_MVD_OFFICES && Array.isArray(window.ALL_MVD_OFFICES) ? window.ALL_MVD_OFFICES : []);
+
+  if (masterList.length > 0) {
+    const found = masterList.find(o => 
+      o.code.toUpperCase() === upper ||
+      o.displayName?.toUpperCase() === upper ||
+      o.name.toUpperCase() === upper
+    );
+    if (found) return found.code;
+  }
+
+  // 2. Specific DTC Offices detection (guarantees the 4 DTC offices are strictly separate)
+  if (upper.includes('DTC')) {
+    if (upper.includes('CZ II') || upper.includes('CZ 2') || upper.includes('ERNAKULAM') || upper.includes('CZ-II') || upper.includes('CZ_II')) {
+      return 'DTC CZ II';
+    }
+    if (upper.includes('CZ I') || upper.includes('CZ 1') || upper.includes('THRISSUR') || upper.includes('CZ-I') || upper.includes('CZ_I')) {
+      return 'DTC CZ I';
+    }
+    if (upper.includes('NZ') || upper.includes('KOZHIKKODE') || upper.includes('KOZHIKODE') || upper.includes('CALICUT')) {
+      return 'DTC NZ';
+    }
+    if (upper.includes('SZ') || upper.includes('THIRUVANANTHAPURAM') || upper.includes('TRIVANDRUM')) {
+      return 'DTC SZ';
+    }
+  }
+
+  // 3. Transport Commissionerate
+  if (upper.includes('TCO') || upper.includes('COMMISSIONERATE')) {
+    return 'TCO';
+  }
+
+  // 4. Try matching prefix against masterList codes (e.g. "KL01 RTO..." -> "KL01", "KLE05..." -> "KLE05", "301 Checkpost..." -> "301")
+  for (const off of masterList) {
+    if (off.code && upper.startsWith(off.code.toUpperCase())) {
+      return off.code;
+    }
+  }
+
+  // 5. Standard office code extraction (non-DTC)
+  const firstWord = upper.split(/[\s—–,-]+/)[0];
+  if (firstWord && firstWord !== 'DTC') {
+    return firstWord;
+  }
+
+  return str;
+}
+window.getCanonicalOfficeCode = getCanonicalOfficeCode;
+
 function getOfficeMasterList() {
   if (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0) {
     return ALL_MVD_OFFICES;
@@ -3300,9 +3321,14 @@ function getOfficeMasterList() {
   }
   if (typeof MVD_OFFICES !== 'undefined' && Array.isArray(MVD_OFFICES)) {
     return MVD_OFFICES.map(item => {
-      const code = normalizeOfficeCode(item);
-      const name = item.replace(new RegExp(`^${code}[\\s—–-]+`, 'i'), '').trim() || item;
-      return { code, name, category: 'Regional Transport Offices (RTO)' };
+      const code = getCanonicalOfficeCode(item);
+      const name = item;
+      let category = 'Regional Transport Offices (RTO)';
+      if (item.includes('DTC') || item.includes('Transport Commissionerate')) category = 'Commissionerate & DTC Offices';
+      else if (item.includes('SRTO')) category = 'Sub-RTO Offices';
+      else if (item.includes('Enforcement')) category = 'Enforcement RTOs';
+      else if (item.includes('Check')) category = 'Border Checkposts';
+      return { code, name, category, displayName: `${code} — ${name}` };
     });
   }
   return [];
@@ -3310,13 +3336,22 @@ function getOfficeMasterList() {
 
 function getOfficeLockEmail(code, locksObj) {
   if (!code) return '';
-  const normCode = normalizeOfficeCode(code);
-  if (!normCode) return '';
   const locks = locksObj || JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  if (locks['DTC']) delete locks['DTC'];
+
+  const canonical = getCanonicalOfficeCode(code);
+  const clean = code.trim();
+
+  if (canonical && locks[canonical]) return locks[canonical].toLowerCase().trim();
+  if (locks[clean]) return locks[clean].toLowerCase().trim();
+
   for (const [k, v] of Object.entries(locks)) {
-    if (!v) continue;
-    if (k.trim().toUpperCase() === 'DTC') continue;
-    if (normalizeOfficeCode(k) === normCode) {
+    if (!v || k === 'DTC') continue;
+    const kCanonical = getCanonicalOfficeCode(k);
+    if (canonical && kCanonical === canonical) {
+      return v.toLowerCase().trim();
+    }
+    if (k.toUpperCase() === clean.toUpperCase()) {
       return v.toLowerCase().trim();
     }
   }
@@ -3359,13 +3394,8 @@ function renderAdminOfficeLocksTable() {
       if (!hay.includes(searchTerm)) return false;
     }
 
-    if (catFilter !== 'ALL') {
-      const match = (off.category === catFilter) ||
-        (catFilter.includes('DTC') && (off.category || '').includes('DTC')) ||
-        (catFilter.includes('Sub') && (off.category || '').includes('Sub')) ||
-        (catFilter.includes('Enforcement') && (off.category || '').includes('Enforcement')) ||
-        (!catFilter.includes('Sub') && !catFilter.includes('Enforcement') && catFilter.includes('RTO') && (off.category || '').startsWith('RTO'));
-      if (!match) return false;
+    if (catFilter !== 'ALL' && off.category !== catFilter) {
+      return false;
     }
 
     if (statusFilter === 'LOCKED' && !authEmail) return false;
@@ -3452,14 +3482,16 @@ window.closeEditOfficeLockModal = closeEditOfficeLockModal;
 
 async function handleSaveOfficeLock(e) {
   if (e) e.preventDefault();
-  const code = document.getElementById('editLockOfficeCode')?.value;
+  const rawCode = document.getElementById('editLockOfficeCode')?.value;
   const rawEmail = document.getElementById('editLockEmailInput')?.value || '';
   const email = rawEmail.trim().toLowerCase();
 
-  if (!code || !email) {
+  if (!rawCode || !email) {
     showToast('Please enter a valid Gmail ID', 'error');
     return;
   }
+
+  const code = getCanonicalOfficeCode(rawCode) || rawCode.trim();
 
   const saveBtn = document.getElementById('btnSaveOfficeLock');
   const origBtnContent = saveBtn ? saveBtn.innerHTML : '';
@@ -3469,19 +3501,18 @@ async function handleSaveOfficeLock(e) {
   }
 
   try {
-    const normCode = normalizeOfficeCode(code);
     const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-    delete locks['DTC'];
-    locks[normCode] = email;
+    if (locks['DTC']) delete locks['DTC'];
+    locks[code] = email;
     localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
 
     if (typeof otOfficeLocks !== 'undefined') {
-      delete otOfficeLocks['DTC'];
-      otOfficeLocks[normCode] = email;
+      if (otOfficeLocks['DTC']) delete otOfficeLocks['DTC'];
+      otOfficeLocks[code] = email;
     }
     if (window.otOfficeLocks) {
-      delete window.otOfficeLocks['DTC'];
-      window.otOfficeLocks[normCode] = email;
+      if (window.otOfficeLocks['DTC']) delete window.otOfficeLocks['DTC'];
+      window.otOfficeLocks[code] = email;
     }
 
     const res = await saveOfficeLocksToSupabase(locks);
@@ -3520,52 +3551,52 @@ window.handleClearCurrentOfficeLock = handleClearCurrentOfficeLock;
 
 async function clearOfficeLock(code) {
   if (!code) return;
+  const canonical = getCanonicalOfficeCode(code);
+  const cleanCode = code.trim();
+
   const ok = await showCustomConfirm({
     title: 'Clear Office Lock',
-    message: `Are you sure you want to clear the authorized data entry account for office "${code}"?\n\nThis will reopen the office, allowing the next submitting account to become authorized.`,
+    message: `Are you sure you want to clear the authorized data entry account for office "${cleanCode}"?\n\nThis will reopen the office, allowing the next submitting account to become authorized.`,
     confirmText: 'Clear Lock',
     isDanger: false
   });
   if (!ok) return;
 
-  const normCode = normalizeOfficeCode(code);
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-  delete locks[code];
+  delete locks[canonical];
+  delete locks[cleanCode];
   delete locks['DTC'];
-  if (normCode) {
-    delete locks[normCode];
-    Object.keys(locks).forEach(k => {
-      if (normalizeOfficeCode(k) === normCode) {
-        delete locks[k];
-      }
-    });
-  }
+
+  Object.keys(locks).forEach(k => {
+    const kCanonical = getCanonicalOfficeCode(k);
+    if ((canonical && kCanonical === canonical) || k.toUpperCase() === cleanCode.toUpperCase()) {
+      delete locks[k];
+    }
+  });
 
   localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
 
   if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
-    delete otOfficeLocks[code];
+    delete otOfficeLocks[canonical];
+    delete otOfficeLocks[cleanCode];
     delete otOfficeLocks['DTC'];
-    if (normCode) {
-      delete otOfficeLocks[normCode];
-      Object.keys(otOfficeLocks).forEach(k => {
-        if (normalizeOfficeCode(k) === normCode) {
-          delete otOfficeLocks[k];
-        }
-      });
-    }
+    Object.keys(otOfficeLocks).forEach(k => {
+      const kCanonical = getCanonicalOfficeCode(k);
+      if ((canonical && kCanonical === canonical) || k.toUpperCase() === cleanCode.toUpperCase()) {
+        delete otOfficeLocks[k];
+      }
+    });
   }
   if (window.otOfficeLocks) {
-    delete window.otOfficeLocks[code];
+    delete window.otOfficeLocks[canonical];
+    delete window.otOfficeLocks[cleanCode];
     delete window.otOfficeLocks['DTC'];
-    if (normCode) {
-      delete window.otOfficeLocks[normCode];
-      Object.keys(window.otOfficeLocks).forEach(k => {
-        if (normalizeOfficeCode(k) === normCode) {
-          delete window.otOfficeLocks[k];
-        }
-      });
-    }
+    Object.keys(window.otOfficeLocks).forEach(k => {
+      const kCanonical = getCanonicalOfficeCode(k);
+      if ((canonical && kCanonical === canonical) || k.toUpperCase() === cleanCode.toUpperCase()) {
+        delete window.otOfficeLocks[k];
+      }
+    });
   }
 
   if (typeof window.removeOfficeLock === 'function') {
@@ -3577,7 +3608,8 @@ async function clearOfficeLock(code) {
     const invStore = JSON.parse(localStorage.getItem('mvd_it_inventory_store') || '{}');
     let invChanged = false;
     for (const [key, item] of Object.entries(invStore)) {
-      if (normalizeOfficeCode(key) === normCode) {
+      const kCanonical = getCanonicalOfficeCode(key);
+      if ((canonical && kCanonical === canonical) || key.toUpperCase() === cleanCode.toUpperCase()) {
         if (item) {
           item.createdOfficerEmail = '';
           item.submittedByEmail = '';

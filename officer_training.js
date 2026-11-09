@@ -167,7 +167,6 @@ const TECH_QUAL_OPTIONS = [
 ];
 
 const ADDITIONAL_QUAL_OPTIONS = [
-  "No additional Qualifications",
   "PHD with Post Doctoral research",
   "PHD",
   "M.Tech",
@@ -183,7 +182,8 @@ const ADDITIONAL_QUAL_OPTIONS = [
   "Certificate in Automotive Mechatronics",
   "B.Sc. Computer Science",
   "Certified Data Analyst",
-  "Others — Specify"
+  "Others — Specify",
+  "No additional Qualifications"
 ];
 
 const SPECIALIZED_SKILL_OPTIONS = [
@@ -204,6 +204,11 @@ const SPECIALIZED_SKILL_OPTIONS = [
   "Transport Administration",
   "Vehicle Homologation",
   "Heavy Equipment Inspection",
+  "IIT",
+  "ARAI",
+  "CIRT",
+  "IMG",
+  "IDTR",
   "Others — Specify"
 ];
 
@@ -357,51 +362,81 @@ function otGetLoggedInEmail() {
   return (gUser && gUser.email) ? gUser.email.toLowerCase().trim() : '';
 }
 
-function normalizeOfficeCode(input) {
-  if (!input || typeof input !== 'string') return '';
-  const str = input.trim();
-  if (!str) return '';
+function getCanonicalOfficeCode(office) {
+  if (!office) return '';
+  const str = String(office).trim();
   const upper = str.toUpperCase();
-  if (upper.includes('CZ II') || upper.includes('CZ-II') || upper.includes('CZ 2') || upper.includes('CZ2')) {
-    return 'DTC CZ II';
+
+  const masterList = (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0)
+    ? ALL_MVD_OFFICES
+    : (window.ALL_MVD_OFFICES && Array.isArray(window.ALL_MVD_OFFICES) ? window.ALL_MVD_OFFICES : []);
+
+  if (masterList.length > 0) {
+    const found = masterList.find(o => 
+      o.code.toUpperCase() === upper ||
+      o.displayName?.toUpperCase() === upper ||
+      o.name.toUpperCase() === upper
+    );
+    if (found) return found.code;
   }
-  if (upper.includes('CZ I') || upper.includes('CZ-I') || upper.includes('CZ 1') || upper.includes('CZ1')) {
-    return 'DTC CZ I';
-  }
-  if (upper.includes('DTC NZ') || upper.includes('OFFICE NZ') || upper.includes('NZ, KOZHIKKODE') || upper === 'DTC NZ' || upper === 'NZ') {
-    return 'DTC NZ';
-  }
-  if (upper.includes('DTC SZ') || upper.includes('OFFICE SZ') || upper.includes('SZ, THIRUVANANTHAPURAM') || upper === 'DTC SZ' || upper === 'SZ') {
-    return 'DTC SZ';
-  }
-  if (upper.startsWith('TCO')) {
-    return 'TCO';
-  }
-  if (/[—–-]/.test(str)) {
-    const parts = str.split(/\s+[—–-]\s+/);
-    if (parts.length > 1) {
-      const candidate = parts[0].trim().toUpperCase();
-      if (candidate) return candidate;
+
+  // Specific DTC Offices detection (guarantees the 4 DTC offices are strictly separate)
+  if (upper.includes('DTC')) {
+    if (upper.includes('CZ II') || upper.includes('CZ 2') || upper.includes('ERNAKULAM') || upper.includes('CZ-II') || upper.includes('CZ_II')) {
+      return 'DTC CZ II';
+    }
+    if (upper.includes('CZ I') || upper.includes('CZ 1') || upper.includes('THRISSUR') || upper.includes('CZ-I') || upper.includes('CZ_I')) {
+      return 'DTC CZ I';
+    }
+    if (upper.includes('NZ') || upper.includes('KOZHIKKODE') || upper.includes('KOZHIKODE') || upper.includes('CALICUT')) {
+      return 'DTC NZ';
+    }
+    if (upper.includes('SZ') || upper.includes('THIRUVANANTHAPURAM') || upper.includes('TRIVANDRUM')) {
+      return 'DTC SZ';
     }
   }
-  const m = str.match(/^(KLE\d{2}|KL\d{2}|\d{3})/i);
-  if (m) {
-    return m[1].toUpperCase();
+
+  if (upper.includes('TCO') || upper.includes('COMMISSIONERATE')) {
+    return 'TCO';
   }
-  return str.split(/[\s—–-]+/)[0].toUpperCase();
+
+  for (const off of masterList) {
+    if (off.code && upper.startsWith(off.code.toUpperCase())) {
+      return off.code;
+    }
+  }
+
+  const firstWord = upper.split(/[\s—–,-]+/)[0];
+  if (firstWord && firstWord !== 'DTC') {
+    return firstWord;
+  }
+
+  return str;
 }
-window.normalizeOfficeCode = normalizeOfficeCode;
+window.getCanonicalOfficeCode = getCanonicalOfficeCode;
 
 function getOfficeLockedEmail(officeCode) {
   if (!officeCode) return '';
-  const normCode = normalizeOfficeCode(officeCode);
-  if (!normCode) return '';
+  const canonicalCode = getCanonicalOfficeCode(officeCode);
+  const cleanCode = officeCode.trim();
 
+  // Direct registry in mvd_ot_office_locks (authoritative source of truth)
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  if (locks['DTC']) {
+    delete locks['DTC'];
+    localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+  }
+
+  if (canonicalCode && locks[canonicalCode]) return locks[canonicalCode].toLowerCase().trim();
+  if (locks[cleanCode]) return locks[cleanCode].toLowerCase().trim();
+
   for (const [k, v] of Object.entries(locks)) {
-    if (!v) continue;
-    if (k.trim().toUpperCase() === 'DTC') continue;
-    if (normalizeOfficeCode(k) === normCode) {
+    if (!v || k === 'DTC') continue;
+    const kCanonical = getCanonicalOfficeCode(k);
+    if (canonicalCode && kCanonical === canonicalCode) {
+      return v.toLowerCase().trim();
+    }
+    if (k.toUpperCase() === cleanCode.toUpperCase()) {
       return v.toLowerCase().trim();
     }
   }
@@ -412,18 +447,21 @@ window.getOfficeLockedEmail = getOfficeLockedEmail;
 
 window.removeOfficeLock = function(code) {
   if (!code) return {};
-  const normCode = normalizeOfficeCode(code);
+  const canonical = getCanonicalOfficeCode(code);
+  const clean = code.trim();
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-  delete locks[code];
+
+  delete locks[canonical];
+  delete locks[clean];
   delete locks['DTC'];
-  if (normCode) {
-    delete locks[normCode];
-    for (const k of Object.keys(locks)) {
-      if (normalizeOfficeCode(k) === normCode) {
-        delete locks[k];
-      }
+
+  for (const k of Object.keys(locks)) {
+    const kCanonical = getCanonicalOfficeCode(k);
+    if ((canonical && kCanonical === canonical) || k.toUpperCase() === clean.toUpperCase()) {
+      delete locks[k];
     }
   }
+
   localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
   otOfficeLocks = locks;
   window.otOfficeLocks = locks;
@@ -442,8 +480,7 @@ function getOfficeLinkedToUser(email) {
   const clean = email.toLowerCase().trim();
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
   for (const [code, owner] of Object.entries(locks)) {
-    if (code.trim().toUpperCase() === 'DTC') continue;
-    if (owner && owner.toLowerCase().trim() === clean) return normalizeOfficeCode(code);
+    if (owner && owner.toLowerCase().trim() === clean) return code;
   }
   return null;
 }
@@ -497,7 +534,6 @@ function checkOfficeAccessAndLock(officeCode) {
     return;
   }
 
-  const normCode = normalizeOfficeCode(officeCode);
   const currentEmail = otGetLoggedInEmail();
   const lockedEmail = getOfficeLockedEmail(officeCode);
 
@@ -555,7 +591,7 @@ function checkOfficeAccessAndLock(officeCode) {
     // Unlocked / Open office (first entry will lock to current account)
     toggleOfficerFormDisabled(false);
     if (authPanel) {
-      const officeProfiles = otProfilesStore.filter(p => normalizeOfficeCode(p.officeCode) === normCode);
+      const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
       if (officeProfiles.length > 0) {
         renderOfficeEditOptionList(officeCode);
       } else {
@@ -571,8 +607,8 @@ function checkOfficeAccessAndLock(officeCode) {
         alertBox.style.color = '#064e3b';
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-lock-open" style="color:#059669; font-size: 1.15rem;"></i>
-            <span>This office is <strong>Open</strong> for data entry. Signed in as <strong>${escapeHtml(currentEmail)}</strong> (will be assigned to this Gmail ID upon submitting the first officer profile).</span>
+            <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
+            <span>Use this Gmail ID: <strong>${escapeHtml(currentEmail)}</strong> for entering all officers Details. This Gmail ID is assigned for this office.</span>
           </div>
         `;
       } else {
@@ -597,8 +633,7 @@ function renderOfficeEditOptionList(officeCode) {
   const panel = document.getElementById('otOfficeAuthorizedPanel');
   if (!panel) return;
 
-  const normCode = normalizeOfficeCode(officeCode);
-  const officeProfiles = otProfilesStore.filter(p => normalizeOfficeCode(p.officeCode) === normCode);
+  const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
   if (officeProfiles.length === 0) {
     panel.style.display = 'none';
     return;
@@ -653,7 +688,7 @@ async function startNewOfficerForOffice(officeCode) {
   let confirmed = false;
   if (confirmFn) {
     confirmed = await confirmFn({
-      title: 'Add Officer',
+      title: 'Add Another Officer',
       message: 'Do you want to add another Officer?',
       confirmText: 'Yes',
       cancelText: 'Cancel',
@@ -662,26 +697,26 @@ async function startNewOfficerForOffice(officeCode) {
   } else {
     confirmed = window.confirm('Do you want to add another Officer?');
   }
-
   if (!confirmed) return;
 
   await resetOfficerForm(true);
   const sel = document.getElementById('otMainOfficeSelect');
   if (sel) {
     sel.value = officeCode;
-    const selOpt = sel.querySelector(`option[value="${officeCode}"]`);
     const sInput = document.getElementById('otOfficeSearchInput');
-    if (sInput && selOpt) sInput.value = selOpt.textContent;
+    if (sInput) {
+      const opt = sel.querySelector(`option[value="${officeCode}"]`);
+      sInput.value = opt ? opt.textContent : officeCode;
+    }
   }
   checkOfficeAccessAndLock(officeCode);
-
-  const card = document.getElementById('officerTrainingFormCard');
-  if (card) {
-    card.scrollIntoView({ behavior: 'smooth' });
-  }
-  const nameInput = document.getElementById('otFullName');
-  if (nameInput) nameInput.focus();
+  switchOfficerSubTab('form');
+  document.getElementById('officerTrainingFormCard')?.scrollIntoView({ behavior: 'smooth' });
+  setTimeout(() => {
+    document.getElementById('otFullName')?.focus();
+  }, 300);
 }
+window.startNewOfficerForOffice = startNewOfficerForOffice;
 
 // --- 5. INITIALIZATION & MODULE ACTIVATION ---
 
@@ -875,8 +910,8 @@ function renderAdditionalQualOptions() {
     return `
       <div class="ot-qual-row" id="otQualRow_${idx}">
         <label class="ot-checkbox-label">
-          <input type="checkbox" class="ot-add-qual-chk" value="${escapeHtml(qual)}" onchange="toggleAdditionalQualDetail(${idx}, this.checked)">
-          <span class="ot-qual-name" style="${isNone ? 'font-weight: 700; color: #047857;' : ''}">${escapeHtml(qual)}</span>
+          <input type="checkbox" class="ot-add-qual-chk" value="${escapeHtml(qual)}" onchange="handleAdditionalQualCheck(${idx}, this)">
+          <span class="ot-qual-name">${escapeHtml(qual)}</span>
         </label>
 
         ${isNone ? '' : `
@@ -924,27 +959,33 @@ function renderAdditionalQualOptions() {
   }).join('');
 }
 
-function toggleAdditionalQualDetail(idx, isChecked) {
+function handleAdditionalQualCheck(idx, chk) {
   markFormDirty(true);
-  const qual = ADDITIONAL_QUAL_OPTIONS[idx];
-
-  if (qual === 'No additional Qualifications') {
-    if (isChecked) {
-      // Uncheck all other qualifications and hide their panels
-      document.querySelectorAll('.ot-add-qual-chk').forEach(c => {
-        if (c.value !== 'No additional Qualifications') {
-          c.checked = false;
+  const qual = chk.value;
+  if (qual === 'No additional Qualifications' && chk.checked) {
+    document.querySelectorAll('.ot-add-qual-chk').forEach(otherChk => {
+      if (otherChk !== chk && otherChk.checked) {
+        otherChk.checked = false;
+        const row = otherChk.closest('.ot-qual-row');
+        if (row) {
+          const detail = row.querySelector('.ot-qual-detail-panel');
+          if (detail) detail.style.display = 'none';
         }
-      });
-      document.querySelectorAll('.ot-qual-detail-panel').forEach(p => p.style.display = 'none');
+      }
+    });
+  } else if (chk.checked) {
+    const noneChk = Array.from(document.querySelectorAll('.ot-add-qual-chk')).find(c => c.value === 'No additional Qualifications');
+    if (noneChk && noneChk.checked) {
+      noneChk.checked = false;
     }
-    return;
-  } else if (isChecked) {
-    // If checking any other qualification, uncheck "No additional Qualifications"
-    const noneChk = document.querySelector('.ot-add-qual-chk[value="No additional Qualifications"]');
-    if (noneChk) noneChk.checked = false;
   }
 
+  toggleAdditionalQualDetail(idx, chk.checked);
+}
+window.handleAdditionalQualCheck = handleAdditionalQualCheck;
+
+function toggleAdditionalQualDetail(idx, isChecked) {
+  markFormDirty(true);
   const panel = document.getElementById(`otQualDetail_${idx}`);
   if (panel) {
     panel.style.display = isChecked ? 'block' : 'none';
@@ -1275,25 +1316,15 @@ function extractOfficerFormData(status = 'submitted') {
   qualRows.forEach((row, idx) => {
     const chk = row.querySelector('.ot-add-qual-chk');
     if (chk && chk.checked) {
-      if (chk.value === 'No additional Qualifications') {
-        additionalQuals.push({
-          qualification: 'No additional Qualifications',
-          status: 'Completed',
-          institution: '',
-          year: null,
-          remarks: ''
-        });
-        return;
-      }
-
+      const isNone = chk.value === 'No additional Qualifications';
       const isOther = chk.value === 'Others — Specify';
       const customName = isOther ? (row.querySelector('.ot-detail-custom-name')?.value || "").trim() : chk.value;
-      const compStatus = row.querySelector('.ot-detail-status')?.value || "";
-      const inst = (row.querySelector('.ot-detail-inst')?.value || "").trim();
-      const yr = parseInt(row.querySelector('.ot-detail-year')?.value) || null;
-      const rem = (row.querySelector('.ot-detail-remarks')?.value || "").trim();
+      const compStatus = isNone ? 'N/A' : (row.querySelector('.ot-detail-status')?.value || "");
+      const inst = isNone ? '' : (row.querySelector('.ot-detail-inst')?.value || "").trim();
+      const yr = isNone ? null : (parseInt(row.querySelector('.ot-detail-year')?.value) || null);
+      const rem = isNone ? '' : (row.querySelector('.ot-detail-remarks')?.value || "").trim();
 
-      if (status === 'submitted') {
+      if (status === 'submitted' && !isNone) {
         if (!compStatus) {
           const errEl = row.querySelector(`#err_qual_status_${idx}`);
           if (errEl) errEl.textContent = "Status is required (Completed / Pursuing)";
@@ -1314,7 +1345,7 @@ function extractOfficerFormData(status = 'submitted') {
 
       additionalQuals.push({
         qualification: customName || chk.value,
-        status: compStatus,
+        status: isNone ? 'Completed' : compStatus,
         institution: inst,
         year: yr,
         remarks: rem
@@ -1339,10 +1370,10 @@ function extractOfficerFormData(status = 'submitted') {
     specializedSkills.push(`Others: ${customSkills}`);
   }
 
-  // Section 4: Willingness to Contribute
+  // Section 5: Willingness to Contribute
   const willingnessToContribute = (document.getElementById('otWillingnessToContribute')?.value || "").trim();
 
-  // Section 5: Data entered By Details
+  // Section 6: Entered-By Details
   const enteredByName = (document.getElementById('otEnteredByName')?.value || "").trim();
   const enteredByDesig = (document.getElementById('otEnteredByDesignation')?.value || "").trim();
   const rawMobile = (document.getElementById('otEnteredByMobile')?.value || "").trim();
@@ -1390,11 +1421,11 @@ function extractOfficerFormData(status = 'submitted') {
     }
 
     if (!enteredByName) {
-      setFieldError('otEnteredByName', "Data entered By — Officer Full Name is required");
+      setFieldError('otEnteredByName', "Data entered By Officer Full Name is required");
       isValid = false;
     }
     if (!enteredByDesig) {
-      setFieldError('otEnteredByDesignation', "Data entered By — Designation is required");
+      setFieldError('otEnteredByDesignation', "Data entered By Designation is required");
       isValid = false;
     }
     if (!normalizedMobile || normalizedMobile.length !== 10) {
@@ -1436,8 +1467,8 @@ function extractOfficerFormData(status = 'submitted') {
     additionalQualifications: additionalQuals,
     specializedSkills,
     customSkills,
-    trainingHistory: [...otStagedTrainings],
     willingnessToContribute,
+    trainingHistory: [...otStagedTrainings],
     enteredBy: {
       fullName: enteredByName,
       designation: enteredByDesig,
@@ -1464,16 +1495,15 @@ async function handleSaveDraft() {
   const currentEmail = otGetLoggedInEmail();
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   if (data.officeCode) {
-    const normCode = normalizeOfficeCode(data.officeCode);
-    data.officeCode = normCode;
-    const lockedEmail = getOfficeLockedEmail(normCode);
+    const lockedEmail = getOfficeLockedEmail(data.officeCode);
     if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
       showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
       return;
     }
     if (!lockedEmail && currentEmail) {
+      const lockKey = getCanonicalOfficeCode(data.officeCode) || data.officeCode;
+      otOfficeLocks[lockKey] = currentEmail;
       delete otOfficeLocks['DTC'];
-      otOfficeLocks[normCode] = currentEmail;
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
       window.otOfficeLocks = otOfficeLocks;
       if (typeof saveOfficeLocksToSupabase === 'function') {
@@ -1527,16 +1557,15 @@ async function handleProfileSubmit(e) {
   const currentEmail = otGetLoggedInEmail();
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   if (data.officeCode) {
-    const normCode = normalizeOfficeCode(data.officeCode);
-    data.officeCode = normCode;
-    const lockedEmail = getOfficeLockedEmail(normCode);
+    const lockedEmail = getOfficeLockedEmail(data.officeCode);
     if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
       showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
       return;
     }
     if (!lockedEmail && currentEmail) {
+      const lockKey = getCanonicalOfficeCode(data.officeCode) || data.officeCode;
+      otOfficeLocks[lockKey] = currentEmail;
       delete otOfficeLocks['DTC'];
-      otOfficeLocks[normCode] = currentEmail;
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
       window.otOfficeLocks = otOfficeLocks;
       if (typeof saveOfficeLocksToSupabase === 'function') {
@@ -1648,7 +1677,7 @@ async function resetOfficerForm(force = false) {
       confirmText: 'Discard',
       isDanger: true
     });
-    if (!ok) return;
+    if (!ok) return false;
   }
 
   otEditingProfileId = null;
@@ -1659,6 +1688,8 @@ async function resetOfficerForm(force = false) {
   clearFieldErrors();
 
   document.getElementById('otOfficerForm').reset();
+  const contribEl = document.getElementById('otWillingnessToContribute');
+  if (contribEl) contribEl.value = '';
   document.getElementById('otFormActionTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Register New Officer Profile';
   document.getElementById('otBtnCancelEdit').style.display = 'none';
 
@@ -1677,9 +1708,6 @@ async function resetOfficerForm(force = false) {
   const techQualGroup = document.getElementById('otTechQualOtherGroup');
   if (techQualGroup) techQualGroup.style.display = 'none';
 
-  const willingEl = document.getElementById('otWillingnessToContribute');
-  if (willingEl) willingEl.value = '';
-
   renderStagedTrainingTable();
   prefillEnteredByDetails();
 
@@ -1695,20 +1723,21 @@ async function resetOfficerForm(force = false) {
   const authPanel = document.getElementById('otOfficeAuthorizedPanel');
   if (authPanel) authPanel.style.display = 'none';
   toggleOfficerFormDisabled(false);
+  return true;
 }
 
 function cancelOfficerEdit() {
   resetOfficerForm();
 }
 
-function loadProfileForEditing(profileId) {
+async function loadProfileForEditing(profileId) {
   let profile = otProfilesStore.find(p => p.id === profileId || p.pen === profileId);
   if (!profile && typeof officersStore !== 'undefined') {
     const off = officersStore.find(o => o.id === profileId || o.officer_pen === profileId);
     if (off) {
       profile = otProfilesStore.find(p => p.pen === off.officer_pen);
       if (!profile) {
-        const offCode = normalizeOfficeCode(off.office_name) || (off.office_name || '').split(' ')[0] || '';
+        const offCode = (off.office_name || '').split(' ')[0] || '';
         profile = {
           id: off.id || ('prof_' + (off.officer_pen || 'item')),
           pen: off.officer_pen || '',
@@ -1724,6 +1753,7 @@ function loadProfileForEditing(profileId) {
           grade: 'First Class',
           additionalQualifications: [],
           specializedSkills: off.specialization ? off.specialization.split(',').map(s => s.trim()) : [],
+          willingnessToContribute: off.willingness_to_contribute || '',
           trainingHistory: [],
           enteredBy: {
             fullName: off.entry_officer_name || 'Admin',
@@ -1753,7 +1783,8 @@ function loadProfileForEditing(profileId) {
     return;
   }
 
-  resetOfficerForm(true);
+  // Instantly enable edit mode without prompts
+  await resetOfficerForm(true);
   otEditingProfileId = profile.id;
   otOriginalEditingPen = profile.pen;
   document.getElementById('otFormActionTitle').innerHTML = `<i class="fa-solid fa-user-pen"></i> Edit Profile: ${escapeHtml(profile.officerFullName)} (PEN: ${escapeHtml(profile.pen)})`;
@@ -1783,7 +1814,7 @@ function loadProfileForEditing(profileId) {
   toggleOfficerFormDisabled(false);
   checkOfficeAccessAndLock(profile.officeCode);
 
-  // Section 2
+  // Section 3: Academic & Technical
   document.getElementById('otGenEdSelect').value = profile.generalEducation || "";
   handleGeneralEducationChange(profile.generalEducation);
   document.getElementById('otGenEdOtherInput').value = profile.generalEducationOther || "";
@@ -1796,10 +1827,6 @@ function loadProfileForEditing(profileId) {
   document.getElementById('otPassingYearInput').value = profile.passingYear || "";
   document.getElementById('otGradeInput').value = profile.grade || "";
 
-  // Willingness to Contribute
-  const willingEl = document.getElementById('otWillingnessToContribute');
-  if (willingEl) willingEl.value = profile.willingnessToContribute || "";
-
   // Additional Qualifications
   if (Array.isArray(profile.additionalQualifications)) {
     profile.additionalQualifications.forEach(aq => {
@@ -1810,10 +1837,10 @@ function loadProfileForEditing(profileId) {
       if (chk) {
         chk.checked = true;
         const row = chk.closest('.ot-qual-row');
-        const idx = row.id.split('_')[1];
-        toggleAdditionalQualDetail(idx, true);
+        const idx = row?.id?.split('_')[1];
+        if (idx !== undefined && qualNameToFind !== 'No additional Qualifications') {
+          toggleAdditionalQualDetail(idx, true);
 
-        if (qualNameToFind !== 'No additional Qualifications') {
           const statusSel = row.querySelector('.ot-detail-status');
           if (statusSel) {
             statusSel.value = aq.status || "";
@@ -1835,7 +1862,7 @@ function loadProfileForEditing(profileId) {
     });
   }
 
-  // Section 3: Skills
+  // Section 4: Skills
   if (Array.isArray(profile.specializedSkills)) {
     profile.specializedSkills.forEach(skill => {
       if (skill.startsWith('Others:')) {
@@ -1859,7 +1886,11 @@ function loadProfileForEditing(profileId) {
   otStagedTrainings = Array.isArray(profile.trainingHistory) ? JSON.parse(JSON.stringify(profile.trainingHistory)) : [];
   renderStagedTrainingTable();
 
-  // Section 4: Entered-by
+  // Section 5: Willingness to contribute
+  const contribEl = document.getElementById('otWillingnessToContribute');
+  if (contribEl) contribEl.value = profile.willingnessToContribute || '';
+
+  // Section 6: Data entered By
   if (profile.enteredBy) {
     document.getElementById('otEnteredByName').value = profile.enteredBy.fullName || "";
     document.getElementById('otEnteredByDesignation').value = profile.enteredBy.designation || "";
@@ -1949,7 +1980,7 @@ function openProfilePreviewModal(profile) {
 
       <!-- Section 2 -->
       <div class="ot-preview-box">
-        <h4><i class="fa-solid fa-graduation-cap"></i> 2. Academic & Technical Credentials</h4>
+        <h4><i class="fa-solid fa-graduation-cap"></i> 2. Academic & Basic Technical Credentials</h4>
         <div class="form-grid-2" style="font-size: 0.9rem; margin-bottom: 12px;">
           <div><strong>General Education:</strong> ${escapeHtml(profile.generalEducation === 'Others' ? profile.generalEducationOther : profile.generalEducation)}</div>
           <div><strong>Basic Technical Qualification:</strong> <strong>${escapeHtml(profile.technicalQualification === 'Others' ? profile.technicalQualificationOther : profile.technicalQualification)}</strong></div>
@@ -1994,19 +2025,17 @@ function openProfilePreviewModal(profile) {
         </div>
       </div>
 
-      <!-- Willingness to Contribute -->
-      ${profile.willingnessToContribute ? `
+      <!-- Section 5 -->
       <div class="ot-preview-box">
-        <h4><i class="fa-solid fa-handshake-angle"></i> Willingness to Contribute Other than Basic Duties</h4>
-        <div style="font-size: 0.9rem; color: #1e293b; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0; line-height: 1.5;">
-          ${escapeHtml(profile.willingnessToContribute)}
+        <h4><i class="fa-solid fa-hands-helping"></i> 5. Willingness to Contribute Other than Basic Duties</h4>
+        <div style="font-size: 0.9rem; color: #1e293b; background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; white-space: pre-wrap;">
+          ${escapeHtml(profile.willingnessToContribute || 'None specified')}
         </div>
       </div>
-      ` : ''}
 
-      <!-- Data entered By Section -->
+      <!-- Section 6 -->
       <div class="ot-preview-box" style="background: #f0fdf4; border-color: #a7f3d0;">
-        <h4><i class="fa-solid fa-user-pen"></i> Data entered By</h4>
+        <h4><i class="fa-solid fa-user-pen"></i> 6. Data entered By</h4>
         <div class="form-grid-3" style="font-size: 0.85rem;">
           <div><strong>Data entered By:</strong> ${escapeHtml(profile.enteredBy?.fullName || 'N/A')}</div>
           <div><strong>Designation:</strong> ${escapeHtml(profile.enteredBy?.designation || 'N/A')}</div>
@@ -2171,7 +2200,7 @@ async function deleteOfficerProfile(profileId) {
         id: off.id,
         pen: off.officer_pen,
         officerFullName: off.officer_name,
-        officeCode: normalizeOfficeCode(off.office_name) || (off.office_name || '').split(' ')[0] || '',
+        officeCode: (off.office_name || '').split(' ')[0] || '',
         officeName: off.office_name || ''
       };
     }
@@ -2256,7 +2285,8 @@ function exportOfficersDirectoryDualCSV() {
     "PEN", "Full Name", "Designation", "Office Code", "Office Name",
     "General Education", "Basic Technical Qualification", "Institution", "Passing Year", "Grade",
     "Completed Additional Quals", "Pursuing Additional Quals", "Specialized Skills",
-    "Total Trainings Count", "Willingness to Contribute", "Status", "Data entered By Name", "Data entered By Designation", "Data entered By Mobile", "Last Updated IST"
+    "Willingness to Contribute",
+    "Total Trainings Count", "Status", "Entered By Name", "Entered By Designation", "Entered By Mobile", "Last Updated IST"
   ];
 
   const profileRows = otProfilesStore.map(p => {
@@ -2279,8 +2309,8 @@ function exportOfficersDirectoryDualCSV() {
       `"${compQuals.replace(/"/g, '""')}"`,
       `"${purQuals.replace(/"/g, '""')}"`,
       `"${skills.replace(/"/g, '""')}"`,
-      trCount,
       `"${(p.willingnessToContribute || '').replace(/"/g, '""')}"`,
+      trCount,
       p.status,
       `"${(p.enteredBy?.fullName || '').replace(/"/g, '""')}"`,
       `"${(p.enteredBy?.designation || '').replace(/"/g, '""')}"`,
@@ -2554,7 +2584,7 @@ function renderOfficeSummaryReport() {
   const detailsTbody = document.getElementById('otReportDetailsTableBody');
   if (detailsTbody) {
     if (submittedProfiles.length === 0) {
-      detailsTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No submitted officer profiles found for this office.</td></tr>`;
+      detailsTbody.innerHTML = `<tr><td colspan="9" style="text-align: center; color: var(--text-muted); padding: 24px;">No submitted officer profiles found for this office.</td></tr>`;
     } else {
       detailsTbody.innerHTML = submittedProfiles.map((p, idx) => {
         const addQualsList = (p.additionalQualifications || []).map(aq => `
@@ -2581,6 +2611,7 @@ function renderOfficeSummaryReport() {
             </td>
             <td><div style="font-size: 0.82rem; line-height: 1.4;">${addQualsList}</div></td>
             <td><div style="font-size: 0.82rem; line-height: 1.4;">${skillsList}</div></td>
+            <td><div style="font-size: 0.82rem; line-height: 1.4; color: #334155;">${escapeHtml(p.willingnessToContribute || 'None')}</div></td>
           </tr>
         `;
       }).join('');
@@ -3071,8 +3102,8 @@ function subscribeToRealtimeOfficerProfiles() {
             additionalQualifications: Array.isArray(newRec.additional_qualifications) ? newRec.additional_qualifications : [],
             specializedSkills: Array.isArray(newRec.specialized_skills) ? newRec.specialized_skills : [],
             customSkills: "",
-            trainingHistory: Array.isArray(newRec.training_history) ? newRec.training_history : [],
             willingnessToContribute: newRec.willingness_to_contribute || "",
+            trainingHistory: Array.isArray(newRec.training_history) ? newRec.training_history : [],
             enteredBy: {
               fullName: newRec.entered_by_name || "Reporting Officer",
               designation: newRec.entered_by_designation || "Officer",
@@ -3107,20 +3138,17 @@ function subscribeToRealtimeOfficerProfiles() {
         if (row && row.id === 'office_locks' && row.menu_visibility) {
           try {
             const locks = typeof row.menu_visibility === 'object' ? row.menu_visibility : JSON.parse(row.menu_visibility);
-            delete locks['DTC'];
             localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
             if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
               for (const k in otOfficeLocks) {
                 if (!locks[k]) delete otOfficeLocks[k];
               }
-              delete otOfficeLocks['DTC'];
               Object.assign(otOfficeLocks, locks);
             }
             if (window.otOfficeLocks) {
               for (const k in window.otOfficeLocks) {
                 if (!locks[k]) delete window.otOfficeLocks[k];
               }
-              delete window.otOfficeLocks['DTC'];
               Object.assign(window.otOfficeLocks, locks);
             }
             if (typeof window.renderAdminOfficeLocksTable === 'function') {
@@ -3172,8 +3200,8 @@ async function syncOfficerProfilesWithSupabase() {
         additionalQualifications: Array.isArray(row.additional_qualifications) ? row.additional_qualifications : [],
         specializedSkills: Array.isArray(row.specialized_skills) ? row.specialized_skills : [],
         customSkills: "",
-        trainingHistory: Array.isArray(row.training_history) ? row.training_history : [],
         willingnessToContribute: row.willingness_to_contribute || "",
+        trainingHistory: Array.isArray(row.training_history) ? row.training_history : [],
         enteredBy: {
           fullName: row.entered_by_name || "Reporting Officer",
           designation: row.entered_by_designation || "Officer",
@@ -3211,7 +3239,7 @@ async function syncOfficerProfilesWithSupabase() {
           officerFullName: row.officer_name,
           pen: row.officer_pen,
           designation: row.officer_designation,
-          officeCode: normalizeOfficeCode(row.office_name) || (row.office_name ? (row.office_name.split(' ')[0] || "KL01") : "KL01"),
+          officeCode: row.office_name ? (row.office_name.split(' ')[0] || "KL01") : "KL01",
           officeName: row.office_name || "MVD Office",
           generalEducation: "Plus Two",
           generalEducationOther: "",
@@ -3223,6 +3251,7 @@ async function syncOfficerProfilesWithSupabase() {
           additionalQualifications: [],
           specializedSkills: row.specialization ? [row.specialization] : [],
           customSkills: "",
+          willingnessToContribute: row.willingness_to_contribute || "",
           trainingHistory: row.training_details ? [{
             id: "tr_" + row.id,
             attended: row.training_attended || "Departmental Course",
@@ -3365,8 +3394,8 @@ async function saveOfficerQualificationToSupabase(record) {
       class_grade: record.grade || null,
       additional_qualifications: record.additionalQualifications || [],
       specialized_skills: record.specializedSkills || [],
-      training_history: record.trainingHistory || [],
       willingness_to_contribute: record.willingnessToContribute || null,
+      training_history: record.trainingHistory || [],
       entered_by_name: record.enteredBy?.fullName || 'Reporting Officer',
       entered_by_designation: record.enteredBy?.designation || 'Officer',
       entered_by_mobile: record.enteredBy?.mobile || '9447000000',
@@ -3403,6 +3432,7 @@ async function saveOfficerQualificationToSupabase(record) {
         qualification_other: record.technicalQualificationOther,
         specialization: (record.specializedSkills || []).join(', '),
         technical_certifications: (record.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', '),
+        willingness_to_contribute: record.willingnessToContribute || null,
         training_attended: (record.trainingHistory || []).map(t => t.attended).join('; '),
         training_institutes: (record.trainingHistory || []).map(t => t.conductedBy).join('; '),
         recent_training_year: record.passingYear || 2024,

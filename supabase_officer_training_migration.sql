@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.officer_profiles (
     -- Academic & Technical Credentials
     general_education TEXT NOT NULL DEFAULT 'Plus Two',
     general_education_other TEXT,
-    technical_qualification TEXT NOT NULL DEFAULT 'B.Tech' CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others')),
+    technical_qualification TEXT NOT NULL DEFAULT 'B.Tech',
     technical_qualification_other TEXT,
     institution TEXT,
     passing_year INTEGER,
@@ -35,7 +35,7 @@ CREATE TABLE IF NOT EXISTS public.officer_profiles (
     specialized_skills JSONB DEFAULT '[]'::jsonb,
     training_history JSONB DEFAULT '[]'::jsonb,
 
-    -- Willingness to Contribute (Other than Basic Duties)
+    -- Willingness to Contribute
     willingness_to_contribute TEXT,
 
     -- Submitter info (Entered By)
@@ -170,7 +170,8 @@ CREATE TABLE IF NOT EXISTS public.officer_qualifications (
     training_attended TEXT,
     training_institutes TEXT,
     recent_training_year INTEGER,
-    training_details TEXT
+    training_details TEXT,
+    willingness_to_contribute TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_officer_qual_pen ON public.officer_qualifications(officer_pen);
@@ -270,44 +271,5 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.officer_qualifications;
   END IF;
 END $$;
-
--- 13. Incremental Migration for Existing Installations
--- Ensures willingness_to_contribute column exists and technical qualification constraint is updated
-ALTER TABLE public.officer_profiles 
-    ADD COLUMN IF NOT EXISTS willingness_to_contribute TEXT;
-
--- Drop existing check constraint before data cleanup
-ALTER TABLE public.officer_profiles 
-    DROP CONSTRAINT IF EXISTS officer_profiles_technical_qualification_check;
-
--- Standardize existing values and handle NULLs
-UPDATE public.officer_profiles
-SET technical_qualification = 'B.Tech'
-WHERE LOWER(technical_qualification) = 'b.tech' OR technical_qualification IS NULL;
-
-UPDATE public.officer_profiles
-SET technical_qualification = 'Diploma'
-WHERE LOWER(technical_qualification) = 'diploma';
-
-UPDATE public.officer_profiles
-SET technical_qualification = 'Others'
-WHERE LOWER(technical_qualification) = 'others';
-
--- Safely migrate rows with removed values (PhD, M.Tech, etc.)
--- Preserves the original qualification name in technical_qualification_other
-UPDATE public.officer_profiles
-SET 
-    technical_qualification_other = COALESCE(NULLIF(technical_qualification_other, ''), technical_qualification),
-    technical_qualification = 'Others'
-WHERE technical_qualification NOT IN ('B.Tech', 'Diploma', 'Others');
-
--- Add updated CHECK constraint
-ALTER TABLE public.officer_profiles 
-    ADD CONSTRAINT officer_profiles_technical_qualification_check 
-    CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others'));
-
--- Reload PostgREST schema cache
-NOTIFY pgrst, 'reload schema';
-
 
 
