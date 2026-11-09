@@ -357,20 +357,51 @@ function otGetLoggedInEmail() {
   return (gUser && gUser.email) ? gUser.email.toLowerCase().trim() : '';
 }
 
+function normalizeOfficeCode(input) {
+  if (!input || typeof input !== 'string') return '';
+  const str = input.trim();
+  if (!str) return '';
+  const upper = str.toUpperCase();
+  if (upper.includes('CZ II') || upper.includes('CZ-II') || upper.includes('CZ 2') || upper.includes('CZ2')) {
+    return 'DTC CZ II';
+  }
+  if (upper.includes('CZ I') || upper.includes('CZ-I') || upper.includes('CZ 1') || upper.includes('CZ1')) {
+    return 'DTC CZ I';
+  }
+  if (upper.includes('DTC NZ') || upper.includes('OFFICE NZ') || upper.includes('NZ, KOZHIKKODE') || upper === 'DTC NZ' || upper === 'NZ') {
+    return 'DTC NZ';
+  }
+  if (upper.includes('DTC SZ') || upper.includes('OFFICE SZ') || upper.includes('SZ, THIRUVANANTHAPURAM') || upper === 'DTC SZ' || upper === 'SZ') {
+    return 'DTC SZ';
+  }
+  if (upper.startsWith('TCO')) {
+    return 'TCO';
+  }
+  if (/[—–-]/.test(str)) {
+    const parts = str.split(/\s+[—–-]\s+/);
+    if (parts.length > 1) {
+      const candidate = parts[0].trim().toUpperCase();
+      if (candidate) return candidate;
+    }
+  }
+  const m = str.match(/^(KLE\d{2}|KL\d{2}|\d{3})/i);
+  if (m) {
+    return m[1].toUpperCase();
+  }
+  return str.split(/[\s—–-]+/)[0].toUpperCase();
+}
+window.normalizeOfficeCode = normalizeOfficeCode;
+
 function getOfficeLockedEmail(officeCode) {
   if (!officeCode) return '';
-  const cleanCode = officeCode.trim();
-  const codePrefix = cleanCode.split(/[\s—–-]+/)[0].toUpperCase();
+  const normCode = normalizeOfficeCode(officeCode);
+  if (!normCode) return '';
 
-  // Direct registry in mvd_ot_office_locks (authoritative source of truth)
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-  if (locks[cleanCode]) return locks[cleanCode].toLowerCase().trim();
-  if (locks[codePrefix]) return locks[codePrefix].toLowerCase().trim();
-
   for (const [k, v] of Object.entries(locks)) {
     if (!v) continue;
-    const kPrefix = k.split(/[\s—–-]+/)[0].toUpperCase();
-    if (kPrefix === codePrefix || k.toUpperCase() === cleanCode.toUpperCase()) {
+    if (k.trim().toUpperCase() === 'DTC') continue;
+    if (normalizeOfficeCode(k) === normCode) {
       return v.toLowerCase().trim();
     }
   }
@@ -381,15 +412,16 @@ window.getOfficeLockedEmail = getOfficeLockedEmail;
 
 window.removeOfficeLock = function(code) {
   if (!code) return {};
-  const clean = code.trim();
-  const prefix = clean.split(/[\s—–-]+/)[0].toUpperCase();
+  const normCode = normalizeOfficeCode(code);
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
-  delete locks[clean];
-  delete locks[prefix];
-  for (const k of Object.keys(locks)) {
-    const kp = k.split(/[\s—–-]+/)[0].toUpperCase();
-    if (kp === prefix || k.toUpperCase() === clean.toUpperCase()) {
-      delete locks[k];
+  delete locks[code];
+  delete locks['DTC'];
+  if (normCode) {
+    delete locks[normCode];
+    for (const k of Object.keys(locks)) {
+      if (normalizeOfficeCode(k) === normCode) {
+        delete locks[k];
+      }
     }
   }
   localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
@@ -410,7 +442,8 @@ function getOfficeLinkedToUser(email) {
   const clean = email.toLowerCase().trim();
   const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
   for (const [code, owner] of Object.entries(locks)) {
-    if (owner && owner.toLowerCase().trim() === clean) return code;
+    if (code.trim().toUpperCase() === 'DTC') continue;
+    if (owner && owner.toLowerCase().trim() === clean) return normalizeOfficeCode(code);
   }
   return null;
 }
@@ -464,6 +497,7 @@ function checkOfficeAccessAndLock(officeCode) {
     return;
   }
 
+  const normCode = normalizeOfficeCode(officeCode);
   const currentEmail = otGetLoggedInEmail();
   const lockedEmail = getOfficeLockedEmail(officeCode);
 
@@ -521,7 +555,7 @@ function checkOfficeAccessAndLock(officeCode) {
     // Unlocked / Open office (first entry will lock to current account)
     toggleOfficerFormDisabled(false);
     if (authPanel) {
-      const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
+      const officeProfiles = otProfilesStore.filter(p => normalizeOfficeCode(p.officeCode) === normCode);
       if (officeProfiles.length > 0) {
         renderOfficeEditOptionList(officeCode);
       } else {
@@ -537,8 +571,8 @@ function checkOfficeAccessAndLock(officeCode) {
         alertBox.style.color = '#064e3b';
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
-            <span>Use this Gmail ID: <strong>${escapeHtml(currentEmail)}</strong> for entering all officers Details. This Gmail ID is assigned for this office.</span>
+            <i class="fa-solid fa-lock-open" style="color:#059669; font-size: 1.15rem;"></i>
+            <span>This office is <strong>Open</strong> for data entry. Signed in as <strong>${escapeHtml(currentEmail)}</strong> (will be assigned to this Gmail ID upon submitting the first officer profile).</span>
           </div>
         `;
       } else {
@@ -563,7 +597,8 @@ function renderOfficeEditOptionList(officeCode) {
   const panel = document.getElementById('otOfficeAuthorizedPanel');
   if (!panel) return;
 
-  const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
+  const normCode = normalizeOfficeCode(officeCode);
+  const officeProfiles = otProfilesStore.filter(p => normalizeOfficeCode(p.officeCode) === normCode);
   if (officeProfiles.length === 0) {
     panel.style.display = 'none';
     return;
@@ -632,7 +667,12 @@ async function startNewOfficerForOffice(officeCode) {
 
   await resetOfficerForm(true);
   const sel = document.getElementById('otMainOfficeSelect');
-  if (sel) sel.value = officeCode;
+  if (sel) {
+    sel.value = officeCode;
+    const selOpt = sel.querySelector(`option[value="${officeCode}"]`);
+    const sInput = document.getElementById('otOfficeSearchInput');
+    if (sInput && selOpt) sInput.value = selOpt.textContent;
+  }
   checkOfficeAccessAndLock(officeCode);
 
   const card = document.getElementById('officerTrainingFormCard');
@@ -1424,13 +1464,16 @@ async function handleSaveDraft() {
   const currentEmail = otGetLoggedInEmail();
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   if (data.officeCode) {
-    const lockedEmail = getOfficeLockedEmail(data.officeCode);
+    const normCode = normalizeOfficeCode(data.officeCode);
+    data.officeCode = normCode;
+    const lockedEmail = getOfficeLockedEmail(normCode);
     if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
       showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
       return;
     }
     if (!lockedEmail && currentEmail) {
-      otOfficeLocks[data.officeCode] = currentEmail;
+      delete otOfficeLocks['DTC'];
+      otOfficeLocks[normCode] = currentEmail;
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
       window.otOfficeLocks = otOfficeLocks;
       if (typeof saveOfficeLocksToSupabase === 'function') {
@@ -1484,13 +1527,16 @@ async function handleProfileSubmit(e) {
   const currentEmail = otGetLoggedInEmail();
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   if (data.officeCode) {
-    const lockedEmail = getOfficeLockedEmail(data.officeCode);
+    const normCode = normalizeOfficeCode(data.officeCode);
+    data.officeCode = normCode;
+    const lockedEmail = getOfficeLockedEmail(normCode);
     if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
       showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
       return;
     }
     if (!lockedEmail && currentEmail) {
-      otOfficeLocks[data.officeCode] = currentEmail;
+      delete otOfficeLocks['DTC'];
+      otOfficeLocks[normCode] = currentEmail;
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
       window.otOfficeLocks = otOfficeLocks;
       if (typeof saveOfficeLocksToSupabase === 'function') {
@@ -1662,7 +1708,7 @@ function loadProfileForEditing(profileId) {
     if (off) {
       profile = otProfilesStore.find(p => p.pen === off.officer_pen);
       if (!profile) {
-        const offCode = (off.office_name || '').split(' ')[0] || '';
+        const offCode = normalizeOfficeCode(off.office_name) || (off.office_name || '').split(' ')[0] || '';
         profile = {
           id: off.id || ('prof_' + (off.officer_pen || 'item')),
           pen: off.officer_pen || '',
@@ -2125,7 +2171,7 @@ async function deleteOfficerProfile(profileId) {
         id: off.id,
         pen: off.officer_pen,
         officerFullName: off.officer_name,
-        officeCode: (off.office_name || '').split(' ')[0] || '',
+        officeCode: normalizeOfficeCode(off.office_name) || (off.office_name || '').split(' ')[0] || '',
         officeName: off.office_name || ''
       };
     }
@@ -3061,17 +3107,20 @@ function subscribeToRealtimeOfficerProfiles() {
         if (row && row.id === 'office_locks' && row.menu_visibility) {
           try {
             const locks = typeof row.menu_visibility === 'object' ? row.menu_visibility : JSON.parse(row.menu_visibility);
+            delete locks['DTC'];
             localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
             if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
               for (const k in otOfficeLocks) {
                 if (!locks[k]) delete otOfficeLocks[k];
               }
+              delete otOfficeLocks['DTC'];
               Object.assign(otOfficeLocks, locks);
             }
             if (window.otOfficeLocks) {
               for (const k in window.otOfficeLocks) {
                 if (!locks[k]) delete window.otOfficeLocks[k];
               }
+              delete window.otOfficeLocks['DTC'];
               Object.assign(window.otOfficeLocks, locks);
             }
             if (typeof window.renderAdminOfficeLocksTable === 'function') {
@@ -3162,7 +3211,7 @@ async function syncOfficerProfilesWithSupabase() {
           officerFullName: row.officer_name,
           pen: row.officer_pen,
           designation: row.officer_designation,
-          officeCode: row.office_name ? (row.office_name.split(' ')[0] || "KL01") : "KL01",
+          officeCode: normalizeOfficeCode(row.office_name) || (row.office_name ? (row.office_name.split(' ')[0] || "KL01") : "KL01"),
           officeName: row.office_name || "MVD Office",
           generalEducation: "Plus Two",
           generalEducationOther: "",

@@ -276,20 +276,38 @@ END $$;
 ALTER TABLE public.officer_profiles 
     ADD COLUMN IF NOT EXISTS willingness_to_contribute TEXT;
 
-DO $$
-BEGIN
-    IF EXISTS (
-        SELECT 1 FROM pg_constraint WHERE conname = 'officer_profiles_technical_qualification_check'
-    ) THEN
-        ALTER TABLE public.officer_profiles DROP CONSTRAINT officer_profiles_technical_qualification_check;
-    END IF;
+-- Drop existing check constraint before data cleanup
+ALTER TABLE public.officer_profiles 
+    DROP CONSTRAINT IF EXISTS officer_profiles_technical_qualification_check;
 
-    ALTER TABLE public.officer_profiles 
-        ADD CONSTRAINT officer_profiles_technical_qualification_check 
-        CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others'));
-EXCEPTION
-    WHEN duplicate_object THEN NULL;
-END $$;
+-- Standardize existing values and handle NULLs
+UPDATE public.officer_profiles
+SET technical_qualification = 'B.Tech'
+WHERE LOWER(technical_qualification) = 'b.tech' OR technical_qualification IS NULL;
+
+UPDATE public.officer_profiles
+SET technical_qualification = 'Diploma'
+WHERE LOWER(technical_qualification) = 'diploma';
+
+UPDATE public.officer_profiles
+SET technical_qualification = 'Others'
+WHERE LOWER(technical_qualification) = 'others';
+
+-- Safely migrate rows with removed values (PhD, M.Tech, etc.)
+-- Preserves the original qualification name in technical_qualification_other
+UPDATE public.officer_profiles
+SET 
+    technical_qualification_other = COALESCE(NULLIF(technical_qualification_other, ''), technical_qualification),
+    technical_qualification = 'Others'
+WHERE technical_qualification NOT IN ('B.Tech', 'Diploma', 'Others');
+
+-- Add updated CHECK constraint
+ALTER TABLE public.officer_profiles 
+    ADD CONSTRAINT officer_profiles_technical_qualification_check 
+    CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others'));
+
+-- Reload PostgREST schema cache
+NOTIFY pgrst, 'reload schema';
 
 
 
