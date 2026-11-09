@@ -35,6 +35,9 @@ CREATE TABLE IF NOT EXISTS public.officer_profiles (
     specialized_skills JSONB DEFAULT '[]'::jsonb,
     training_history JSONB DEFAULT '[]'::jsonb,
 
+    -- Additional Duties / Contribution Willingness
+    willingness_to_contribute TEXT,
+
     -- Submitter info (Entered By)
     entered_by_name TEXT NOT NULL DEFAULT 'Reporting Officer',
     entered_by_designation TEXT NOT NULL DEFAULT 'Officer',
@@ -167,7 +170,8 @@ CREATE TABLE IF NOT EXISTS public.officer_qualifications (
     training_attended TEXT,
     training_institutes TEXT,
     recent_training_year INTEGER,
-    training_details TEXT
+    training_details TEXT,
+    willingness_to_contribute TEXT
 );
 
 CREATE INDEX IF NOT EXISTS idx_officer_qual_pen ON public.officer_qualifications(officer_pen);
@@ -233,10 +237,14 @@ GRANT ALL ON TABLE public.office_report_versions TO anon, authenticated, service
 GRANT ALL ON TABLE public.officer_audit_logs TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.officer_qualifications TO anon, authenticated, service_role;
 
--- 11. Reload PostgREST Schema Cache
+-- 11. Safe Idempotent Schema Alterations for Existing Deployments
+ALTER TABLE public.officer_profiles ADD COLUMN IF NOT EXISTS willingness_to_contribute TEXT;
+ALTER TABLE public.officer_qualifications ADD COLUMN IF NOT EXISTS willingness_to_contribute TEXT;
+
+-- 12. Reload PostgREST Schema Cache
 NOTIFY pgrst, 'reload schema';
 
--- 12. Enable Supabase Realtime Replication for Live Multi-Device Sync
+-- 13. Enable Supabase Realtime Replication for Live Multi-Device Sync
 DO $$
 BEGIN
   IF NOT EXISTS (
