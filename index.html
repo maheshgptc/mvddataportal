@@ -692,7 +692,7 @@
                   Select your MVD Office to initiate or update officer profiles. Each office is restricted to one authorized Gmail ID.
                 </p>
 
-                <div class="form-group" style="max-width: 650px;">
+                <div class="form-group">
                   <label for="otMainOfficeSelect"><i class="fa-solid fa-building"></i> Office Name (Code — Office Name) <span class="req-star">*</span></label>
                   <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)" oninput="handleOfficeSelectPicked(this)">
                     <option value="">-- Select Office (Code — Office Name) --</option>
@@ -708,7 +708,7 @@
               </div>
 
               <!-- 2. Official Identification & Current Posting -->
-              <div class="card-section sec-office" id="officerTrainingFormCard">
+              <div class="card-section sec-officer-profile" id="officerTrainingFormCard">
                 <div class="section-header">
                   <h2 class="section-title">
                     <i class="fa-solid fa-id-card"></i> 2. Official Identification &amp; Current Posting
@@ -727,7 +727,7 @@
                   <!-- PEN / Employee ID -->
                   <div class="form-group">
                     <label for="otPen"><i class="fa-solid fa-hashtag"></i> PEN / Employee ID <span class="req-star">*</span></label>
-                    <input type="text" id="otPen" class="form-control" required oninput="markFormDirty(true)">
+                    <input type="text" id="otPen" class="form-control" placeholder="6-digit PEN / Employee ID" required oninput="markFormDirty(true)">
                     <div class="field-error" id="err_otPen"></div>
                   </div>
 
@@ -747,7 +747,7 @@
               </div>
 
               <!-- 3. Academic & Technical Credentials -->
-              <div class="card-section sec-hardware">
+              <div class="card-section sec-qualification" id="otSectionCredentials">
                 <div class="section-header">
                   <h2 class="section-title">
                     <i class="fa-solid fa-graduation-cap"></i> 3. Academic &amp; Technical Credentials
@@ -755,8 +755,8 @@
                   <span class="section-tag">Qualifications</span>
                 </div>
 
-                <div class="ot-form-grid-2">
-                  <!-- General Education -->
+                <div class="form-grid-2">
+                  <!-- General Education Column -->
                   <div class="form-group">
                     <label for="otGenEdSelect"><i class="fa-solid fa-book-open"></i> General Education <span class="req-star">*</span></label>
                     <select id="otGenEdSelect" class="form-control" required onchange="handleGeneralEducationChange(this.value)">
@@ -766,18 +766,16 @@
                       <option value="Others">Others</option>
                     </select>
                     <div class="field-error" id="err_otGenEdSelect"></div>
+
+                    <!-- Conditional Specify Other General Education -->
+                    <div id="otGenEdOtherGroup" class="form-group" style="display: none; margin-top: 8px;">
+                      <label for="otGenEdOtherInput"><i class="fa-solid fa-pen"></i> Specify Other General Education <span class="req-star">*</span></label>
+                      <input type="text" id="otGenEdOtherInput" class="form-control" placeholder="e.g. CBSE 10th / ICSE / Matriculation" oninput="markFormDirty(true)">
+                      <div class="field-error" id="err_otGenEdOtherInput"></div>
+                    </div>
                   </div>
 
-                  <!-- Conditional Specify Other General Education -->
-                  <div id="otGenEdOtherGroup" class="form-group" style="display: none;">
-                    <label for="otGenEdOtherInput"><i class="fa-solid fa-pen"></i> Specify Other General Education <span class="req-star">*</span></label>
-                    <input type="text" id="otGenEdOtherInput" class="form-control" placeholder="e.g. CBSE 10th / ICSE / Matriculation" oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otGenEdOtherInput"></div>
-                  </div>
-                </div>
-
-                <div class="ot-form-grid-2" style="margin-top: 16px;">
-                  <!-- Basic Technical Qualification -->
+                  <!-- Basic Technical Qualification Column -->
                   <div class="form-group">
                     <label for="otTechQualSelect"><i class="fa-solid fa-award"></i> Basic Technical Qualification <span class="req-star">*</span></label>
                     <select id="otTechQualSelect" class="form-control" required onchange="handleTechnicalQualificationChange(this.value)">
@@ -787,21 +785,21 @@
                       <option value="Others">Others</option>
                     </select>
                     <div class="field-error" id="err_otTechQualSelect"></div>
-                  </div>
 
-                  <!-- Conditional Specify Other Basic Technical Qualification -->
-                  <div id="otTechQualOtherGroup" class="form-group" style="display: none;">
-                    <label for="otTechQualOtherInput"><i class="fa-solid fa-pen"></i> Specify Other Basic Technical Qualification <span class="req-star">*</span></label>
-                    <input type="text" id="otTechQualOtherInput" class="form-control" placeholder="Specify basic technical qualification" oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otTechQualOtherInput"></div>
+                    <!-- Conditional Specify Other Basic Technical Qualification -->
+                    <div id="otTechQualOtherGroup" class="form-group" style="display: none; margin-top: 8px;">
+                      <label for="otTechQualOtherInput"><i class="fa-solid fa-pen"></i> Specify Other Basic Technical Qualification <span class="req-star">*</span></label>
+                      <input type="text" id="otTechQualOtherInput" class="form-control" placeholder="Specify basic technical qualification" oninput="markFormDirty(true)">
+                      <div class="field-error" id="err_otTechQualOtherInput"></div>
+                    </div>
                   </div>
                 </div>
 
-                <div class="form-grid-3" style="margin-top: 16px;">
+                <div class="form-grid-3" style="margin-top: 20px;">
                   <!-- Institution / Board / University -->
                   <div class="form-group">
                     <label for="otTechInstitutionInput"><i class="fa-solid fa-building-columns"></i> Institution / Board / University</label>
-                    <input type="text" id="otTechInstitutionInput" class="form-control" placeholder="Relates to selected basic technical qualification" oninput="markFormDirty(true)">
+                    <input type="text" id="otTechInstitutionInput" class="form-control" placeholder="College or University name" oninput="markFormDirty(true)">
                   </div>
 
                   <!-- Year of Passing -->
@@ -966,7 +964,6 @@
                 <button type="submit" id="otBtnSubmitProfile" class="btn btn-primary btn-lg" style="background: #0B3B24; border-color: #062C1A;">
                   <i class="fa-solid fa-check"></i> Submit Profile
                 </button>
-              </div>
               </div>
 
             </form>
