@@ -224,17 +224,17 @@ const SEED_OFFICERS = [];
 // --- 4. DEFAULT PORTAL MODULES REGISTRY (INCLUDES OFFICER TRAINING) ---
 const DEFAULT_PORTAL_MODULES = [
   {
-    id: "it_equipment_list",
-    title: "IT Equipment List",
-    icon: "fa-desktop",
-    description: "Core module for office-wise inventory of Monitors, CPUs, Laptops, Printers, UPS, Batteries, OS, and System Age.",
-    visible: true
-  },
-  {
     id: "officer_training_qualification",
     title: "Officer Training & Qualification",
     icon: "fa-user-graduate",
     description: "Officer Profile, Qualifications, Skills and Training Records",
+    visible: true
+  },
+  {
+    id: "it_equipment_list",
+    title: "IT Equipment List",
+    icon: "fa-desktop",
+    description: "Core module for office-wise inventory of Monitors, CPUs, Laptops, Printers, UPS, Batteries, OS, and System Age.",
     visible: true
   }
 ];
@@ -243,7 +243,7 @@ const DEFAULT_PORTAL_MODULES = [
 let activeSession = 'public';
 let publicSubView = 'entry';
 let adminSubView = 'dashboard';
-let activeModuleId = 'it_equipment_list';
+let activeModuleId = 'officer_training_qualification';
 let isAdminAuthenticated = false;
 
 // Data Stores in LocalStorage with fallbacks
@@ -260,11 +260,16 @@ if (appSettings.adminPasscode === 'admin123') {
   localStorage.setItem('mvd_it_app_settings', JSON.stringify(appSettings));
 }
 
-// Ensure both core modules are loaded in registry
+// Ensure both core modules are loaded in registry with Officer Training first
 let storedModules = JSON.parse(localStorage.getItem('mvd_it_portal_modules')) || DEFAULT_PORTAL_MODULES;
 let portalModules = storedModules.filter(m => m.id === 'it_equipment_list' || m.id === 'officer_training_qualification' || !['network_infrastructure', 'software_licensing', 'hardware_ewaste'].includes(m.id));
-if (!portalModules.some(m => m.id === 'it_equipment_list')) portalModules.unshift(DEFAULT_PORTAL_MODULES[0]);
-if (!portalModules.some(m => m.id === 'officer_training_qualification')) portalModules.push(DEFAULT_PORTAL_MODULES[1]);
+if (!portalModules.some(m => m.id === 'officer_training_qualification')) portalModules.unshift(DEFAULT_PORTAL_MODULES[0]);
+if (!portalModules.some(m => m.id === 'it_equipment_list')) portalModules.push(DEFAULT_PORTAL_MODULES[1]);
+const otIdx = portalModules.findIndex(m => m.id === 'officer_training_qualification');
+if (otIdx > 0) {
+  const [otItem] = portalModules.splice(otIdx, 1);
+  portalModules.unshift(otItem);
+}
 localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
 
 // Chart Instances
@@ -502,12 +507,13 @@ function applyGoogleAuthSession(userObj) {
     itOfficerNameInput.value = userObj.name || '';
   }
 
-  const otEntryOfficerInput = document.getElementById('otEntryOfficerName');
+  const otEntryOfficerInput = document.getElementById('otEnteredByName') || document.getElementById('otEntryOfficerName');
   if (otEntryOfficerInput && !otEntryOfficerInput.value.trim()) {
     otEntryOfficerInput.value = userObj.name || '';
   }
 
   updateViewEnteredDataButtonVisibility();
+  selectModuleMenu(activeModuleId);
 }
 
 function logoutGoogleUser() {

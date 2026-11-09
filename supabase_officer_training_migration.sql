@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS public.officer_profiles (
     -- Academic & Technical Credentials
     general_education TEXT NOT NULL DEFAULT 'Plus Two',
     general_education_other TEXT,
-    technical_qualification TEXT NOT NULL DEFAULT 'B.Tech',
+    technical_qualification TEXT NOT NULL DEFAULT 'B.Tech' CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others')),
     technical_qualification_other TEXT,
     institution TEXT,
     passing_year INTEGER,
@@ -34,6 +34,9 @@ CREATE TABLE IF NOT EXISTS public.officer_profiles (
     additional_qualifications JSONB DEFAULT '[]'::jsonb,
     specialized_skills JSONB DEFAULT '[]'::jsonb,
     training_history JSONB DEFAULT '[]'::jsonb,
+
+    -- Willingness to Contribute (Other than Basic Duties)
+    willingness_to_contribute TEXT,
 
     -- Submitter info (Entered By)
     entered_by_name TEXT NOT NULL DEFAULT 'Reporting Officer',
@@ -267,5 +270,26 @@ BEGIN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.officer_qualifications;
   END IF;
 END $$;
+
+-- 13. Incremental Migration for Existing Installations
+-- Ensures willingness_to_contribute column exists and technical qualification constraint is updated
+ALTER TABLE public.officer_profiles 
+    ADD COLUMN IF NOT EXISTS willingness_to_contribute TEXT;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'officer_profiles_technical_qualification_check'
+    ) THEN
+        ALTER TABLE public.officer_profiles DROP CONSTRAINT officer_profiles_technical_qualification_check;
+    END IF;
+
+    ALTER TABLE public.officer_profiles 
+        ADD CONSTRAINT officer_profiles_technical_qualification_check 
+        CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others'));
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
+
 
 

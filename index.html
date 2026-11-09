@@ -139,7 +139,7 @@
         <!-- ==========================================================================
              MODULE 1: IT EQUIPMENT LIST PORTAL CONTAINER
              ========================================================================== -->
-        <div id="publicContainer">
+        <div id="publicContainer" style="display: none;">
           
           <div id="publicEntrySection">
             <!-- Form Header Toolbar -->
@@ -619,7 +619,7 @@
         <!-- ==========================================================================
              MODULE 2: OFFICER TRAINING & QUALIFICATION PORTAL CONTAINER
              ========================================================================== -->
-        <div id="officerTrainingContainer" style="display: none;">
+        <div id="officerTrainingContainer" style="display: block;">
           
           <!-- Module Main Header & Title Banner -->
           <div class="table-toolbar" style="background: white; padding: 20px 24px; border-radius: var(--radius-lg); border: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 16px; margin-bottom: 20px; box-shadow: var(--shadow-sm);">
@@ -707,45 +707,11 @@
                 <div id="otOfficeAuthorizedPanel" style="display: none; margin-top: 16px;"></div>
               </div>
 
-              <!-- 2. Entered By — Officer Details -->
-              <div class="card-section sec-remarks">
-                <div class="section-header">
-                  <h2 class="section-title">
-                    <i class="fa-solid fa-user-pen"></i> 2. Entered By — Officer Details
-                  </h2>
-                  <span class="section-tag">Audit Submitter Info</span>
-                </div>
-
-                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">
-                  Details of the officer entering or updating this record. Saved with authenticated user credentials.
-                </p>
-
-                <div class="form-grid-3">
-                  <div class="form-group">
-                    <label for="otEnteredByName"><i class="fa-solid fa-user"></i> Entered By — Officer Full Name <span class="req-star">*</span></label>
-                    <input type="text" id="otEnteredByName" class="form-control" placeholder="Reporting officer name" required oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otEnteredByName"></div>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="otEnteredByDesignation"><i class="fa-solid fa-user-tag"></i> Entered By — Designation <span class="req-star">*</span></label>
-                    <input type="text" id="otEnteredByDesignation" class="form-control" placeholder="e.g. Senior Superintendent / Junior Superintendent / Clerk" required oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otEnteredByDesignation"></div>
-                  </div>
-
-                  <div class="form-group">
-                    <label for="otEnteredByMobile"><i class="fa-solid fa-phone"></i> Entered By — Mobile Number <span class="req-star">*</span></label>
-                    <input type="tel" id="otEnteredByMobile" class="form-control" placeholder="10-digit Indian Mobile" maxlength="14" required oninput="markFormDirty(true)">
-                    <div class="field-error" id="err_otEnteredByMobile"></div>
-                  </div>
-                </div>
-              </div>
-
-              <!-- 3. Official Identification & Current Posting -->
+              <!-- 2. Official Identification & Current Posting -->
               <div class="card-section sec-office" id="officerTrainingFormCard">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-id-card"></i> 3. Official Identification &amp; Current Posting
+                    <i class="fa-solid fa-id-card"></i> 2. Official Identification &amp; Current Posting
                   </h2>
                   <span class="section-tag">Required *</span>
                 </div>
@@ -780,11 +746,11 @@
                 </div>
               </div>
 
-              <!-- 4. Academic & Technical Credentials -->
+              <!-- 3. Academic & Technical Credentials -->
               <div class="card-section sec-hardware">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-graduation-cap"></i> 4. Academic &amp; Technical Credentials
+                    <i class="fa-solid fa-graduation-cap"></i> 3. Academic &amp; Technical Credentials
                   </h2>
                   <span class="section-tag">Qualifications</span>
                 </div>
@@ -811,14 +777,11 @@
                 </div>
 
                 <div class="ot-form-grid-2" style="margin-top: 16px;">
-                  <!-- Technical Qualification -->
+                  <!-- Basic Technical Qualification -->
                   <div class="form-group">
-                    <label for="otTechQualSelect"><i class="fa-solid fa-award"></i> Technical Qualification <span class="req-star">*</span></label>
+                    <label for="otTechQualSelect"><i class="fa-solid fa-award"></i> Basic Technical Qualification <span class="req-star">*</span></label>
                     <select id="otTechQualSelect" class="form-control" required onchange="handleTechnicalQualificationChange(this.value)">
-                      <option value="">-- Choose Technical Qualification --</option>
-                      <option value="PhD with Postdoctoral Research">PhD with Postdoctoral Research</option>
-                      <option value="PhD">PhD</option>
-                      <option value="M.Tech">M.Tech</option>
+                      <option value="">-- Choose Basic Technical Qualification --</option>
                       <option value="B.Tech">B.Tech</option>
                       <option value="Diploma">Diploma</option>
                       <option value="Others">Others</option>
@@ -826,10 +789,10 @@
                     <div class="field-error" id="err_otTechQualSelect"></div>
                   </div>
 
-                  <!-- Conditional Specify Other Technical Qualification -->
+                  <!-- Conditional Specify Other Basic Technical Qualification -->
                   <div id="otTechQualOtherGroup" class="form-group" style="display: none;">
-                    <label for="otTechQualOtherInput"><i class="fa-solid fa-pen"></i> Specify Other Technical Qualification <span class="req-star">*</span></label>
-                    <input type="text" id="otTechQualOtherInput" class="form-control" placeholder="Specify technical qualification" oninput="markFormDirty(true)">
+                    <label for="otTechQualOtherInput"><i class="fa-solid fa-pen"></i> Specify Other Basic Technical Qualification <span class="req-star">*</span></label>
+                    <input type="text" id="otTechQualOtherInput" class="form-control" placeholder="Specify basic technical qualification" oninput="markFormDirty(true)">
                     <div class="field-error" id="err_otTechQualOtherInput"></div>
                   </div>
                 </div>
@@ -838,7 +801,7 @@
                   <!-- Institution / Board / University -->
                   <div class="form-group">
                     <label for="otTechInstitutionInput"><i class="fa-solid fa-building-columns"></i> Institution / Board / University</label>
-                    <input type="text" id="otTechInstitutionInput" class="form-control" placeholder="Relates to selected technical qualification" oninput="markFormDirty(true)">
+                    <input type="text" id="otTechInstitutionInput" class="form-control" placeholder="Relates to selected basic technical qualification" oninput="markFormDirty(true)">
                   </div>
 
                   <!-- Year of Passing -->
@@ -870,11 +833,11 @@
                 </div>
               </div>
 
-              <!-- 5. Specialized Skills & In-Service Trainings -->
+              <!-- 4. Specialized Skills & In-Service Trainings -->
               <div class="card-section sec-network">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-bolt"></i> 5. Specialized Skills &amp; In-Service Trainings
+                    <i class="fa-solid fa-bolt"></i> 4. Specialized Skills &amp; In-Service Trainings
                   </h2>
                   <span class="section-tag">Competencies &amp; Training</span>
                 </div>
@@ -934,22 +897,76 @@
                   <!-- Mobile Responsive Training Cards -->
                   <div id="otTrainingCardsMobile" style="margin-top: 12px;"></div>
                 </div>
+              </div>
 
-                <!-- Form Action Buttons -->
-                <div style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; align-items: center;">
-                  <button type="button" class="btn btn-secondary" onclick="resetOfficerForm()">
-                    <i class="fa-solid fa-xmark"></i> Cancel
-                  </button>
-                  <button type="button" id="otBtnSaveDraft" class="btn btn-outline" onclick="handleSaveDraft()" style="font-weight: 700; border-color: #cbd5e1;">
-                    <i class="fa-solid fa-file-arrow-down"></i> Save Draft
-                  </button>
-                  <button type="button" class="btn btn-outline" onclick="handleProfilePreview()" style="font-weight: 700;">
-                    <i class="fa-solid fa-eye"></i> Preview Profile
-                  </button>
-                  <button type="submit" id="otBtnSubmitProfile" class="btn btn-primary btn-lg" style="background: #0B3B24; border-color: #062C1A;">
-                    <i class="fa-solid fa-check"></i> Submit Profile
-                  </button>
+              <!-- 5. Willingness to Contribute Other than Basic Duties -->
+              <div class="card-section sec-contribution" id="otContributionSection">
+                <div class="section-header">
+                  <h2 class="section-title">
+                    <i class="fa-solid fa-handshake-angle"></i> 5. Are you willing to contribute other than Basic duties? If yes, please specify
+                  </h2>
+                  <span class="section-tag">Optional</span>
                 </div>
+
+                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">
+                  Specify departmental activities or specialized areas you are interested in contributing to beyond regular duties.
+                </p>
+
+                <div class="form-group">
+                  <textarea id="otWillingnessToContribute" class="form-control" rows="3" placeholder="eg: Willing to take road safety class, Willing to work with Media cell etc." oninput="markFormDirty(true)"></textarea>
+                  <div class="field-error" id="err_otWillingnessToContribute"></div>
+                </div>
+              </div>
+
+              <!-- 6. Data entered By -->
+              <div class="card-section sec-remarks" id="otDataEnteredBySection">
+                <div class="section-header">
+                  <h2 class="section-title">
+                    <i class="fa-solid fa-user-pen"></i> 6. Data entered By
+                  </h2>
+                  <span class="section-tag">Audit Submitter Info</span>
+                </div>
+
+                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">
+                  Details of the officer entering or updating this record. Saved with authenticated user credentials.
+                </p>
+
+                <div class="form-grid-3">
+                  <div class="form-group">
+                    <label for="otEnteredByName"><i class="fa-solid fa-user"></i> Data entered By — Officer Full Name <span class="req-star">*</span></label>
+                    <input type="text" id="otEnteredByName" class="form-control" placeholder="Reporting officer name" required oninput="markFormDirty(true)">
+                    <div class="field-error" id="err_otEnteredByName"></div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="otEnteredByDesignation"><i class="fa-solid fa-user-tag"></i> Designation <span class="req-star">*</span></label>
+                    <input type="text" id="otEnteredByDesignation" class="form-control" placeholder="e.g. Senior Superintendent / Junior Superintendent / Clerk" required oninput="markFormDirty(true)">
+                    <div class="field-error" id="err_otEnteredByDesignation"></div>
+                  </div>
+
+                  <div class="form-group">
+                    <label for="otEnteredByMobile"><i class="fa-solid fa-phone"></i> Mobile Number <span class="req-star">*</span></label>
+                    <input type="tel" id="otEnteredByMobile" class="form-control" placeholder="10-digit Indian Mobile" maxlength="14" required oninput="markFormDirty(true)">
+                    <div class="field-error" id="err_otEnteredByMobile"></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Form Action Buttons -->
+              <div style="margin-top: 28px; padding-top: 18px; border-top: 1px solid var(--border-color); display: flex; justify-content: flex-end; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <button type="button" class="btn btn-secondary" onclick="resetOfficerForm()">
+                  <i class="fa-solid fa-xmark"></i> Cancel
+                </button>
+                <button type="button" id="otBtnSaveDraft" class="btn btn-outline" onclick="handleSaveDraft()" style="font-weight: 700; border-color: #cbd5e1;">
+                  <i class="fa-solid fa-file-arrow-down"></i> Save Draft
+                </button>
+                <button type="button" class="btn btn-outline" onclick="handleProfilePreview()" style="font-weight: 700;">
+                  <i class="fa-solid fa-eye"></i> Preview Profile
+                </button>
+                <button type="submit" id="otBtnSubmitProfile" class="btn btn-primary btn-lg" style="background: #0B3B24; border-color: #062C1A;">
+                  <i class="fa-solid fa-check"></i> Submit Profile
+                </button>
+              </div>
               </div>
 
             </form>
@@ -1065,7 +1082,7 @@
                 </div>
 
                 <div style="background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 8px; padding: 10px 16px; font-size: 0.85rem;">
-                  <strong>Technical Qualification-wise Officer Counts:</strong>
+                  <strong>Basic Technical Qualification-wise Officer Counts:</strong>
                   <div id="otSummTechQualPills" style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px;"></div>
                   <small style="color: var(--text-muted); display: block; margin-top: 6px; font-style: italic;">
                     * Note: Individual officers are counted once per category. Qualification and skill domains may overlap across officers.
@@ -1087,7 +1104,7 @@
                         <th style="min-width: 100px;">PEN / ID</th>
                         <th style="min-width: 90px;">Designation</th>
                         <th style="min-width: 100px;">General Education</th>
-                        <th style="min-width: 220px;">Technical Qualification, Institution, Passing Year &amp; Grade</th>
+                        <th style="min-width: 220px;">Basic Technical Qualification, Institution, Passing Year &amp; Grade</th>
                         <th style="min-width: 180px;">Additional Qualifications &amp; Status</th>
                         <th style="min-width: 160px;">Specialized Skills</th>
                       </tr>
@@ -1774,12 +1791,9 @@
 
                   <!-- Technical Qualification Filter -->
                   <div class="form-group">
-                    <label><i class="fa-solid fa-award"></i> Technical Qualification</label>
+                    <label><i class="fa-solid fa-award"></i> Basic Technical Qualification</label>
                     <select id="otDirTechQualFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
-                      <option value="ALL">-- All Technical Qualifications --</option>
-                      <option value="PhD with Postdoctoral Research">PhD with Postdoctoral Research</option>
-                      <option value="PhD">PhD</option>
-                      <option value="M.Tech">M.Tech</option>
+                      <option value="ALL">-- All Basic Technical Qualifications --</option>
                       <option value="B.Tech">B.Tech</option>
                       <option value="Diploma">Diploma</option>
                       <option value="Others">Others</option>
@@ -1793,16 +1807,23 @@
                     <label><i class="fa-solid fa-certificate"></i> Additional Qualification</label>
                     <select id="otDirAddQualFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
                       <option value="ALL">-- All Additional Qualifications --</option>
+                      <option value="No additional Qualifications">No additional Qualifications</option>
+                      <option value="PHD with Post Doctoral research">PHD with Post Doctoral research</option>
+                      <option value="PHD">PHD</option>
+                      <option value="M.Tech">M.Tech</option>
                       <option value="LLB">LLB</option>
-                      <option value="LLM (Constitutional Law)">LLM (Constitutional Law)</option>
-                      <option value="MBA (Public Policy)">MBA (Public Policy)</option>
+                      <option value="LLM">LLM</option>
+                      <option value="MBA">MBA</option>
                       <option value="PGDeG (e-Governance)">PGDeG (e-Governance)</option>
                       <option value="Safety Engineering">Safety Engineering</option>
                       <option value="Safety Engineering Diploma">Safety Engineering Diploma</option>
                       <option value="PG Diploma in Cyber Law">PG Diploma in Cyber Law</option>
-                      <option value="MCA (Computer Applications)">MCA</option>
+                      <option value="MCA (Computer Applications)">MCA (Computer Applications)</option>
+                      <option value="Auto-CAD Certification">Auto-CAD Certification</option>
+                      <option value="Certificate in Automotive Mechatronics">Certificate in Automotive Mechatronics</option>
                       <option value="B.Sc. Computer Science">B.Sc. Computer Science</option>
                       <option value="Certified Data Analyst">Certified Data Analyst</option>
+                      <option value="Others — Specify">Others — Specify</option>
                     </select>
                   </div>
 
@@ -1864,7 +1885,7 @@
                       <th style="min-width: 170px;">Officer Name &amp; PEN</th>
                       <th>Designation</th>
                       <th>Office</th>
-                      <th>Technical Qualification</th>
+                      <th>Basic Technical Qualification</th>
                       <th>Additional Qualifications</th>
                       <th>Specialized Skills</th>
                       <th>Status</th>

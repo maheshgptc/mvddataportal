@@ -113,7 +113,7 @@ CREATE TABLE IF NOT EXISTS officer_profiles (
     -- Academic & Technical Credentials
     general_education TEXT NOT NULL CHECK (general_education IN ('SSLC', 'Plus Two', 'Others')),
     general_education_other TEXT,
-    technical_qualification TEXT NOT NULL CHECK (technical_qualification IN ('PhD with Postdoctoral Research', 'PhD', 'M.Tech', 'B.Tech', 'Diploma', 'Others')),
+    technical_qualification TEXT NOT NULL CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others')),
     technical_qualification_other TEXT,
     institution TEXT,
     passing_year INTEGER,
@@ -123,6 +123,9 @@ CREATE TABLE IF NOT EXISTS officer_profiles (
     additional_qualifications JSONB DEFAULT '[]'::jsonb,
     specialized_skills JSONB DEFAULT '[]'::jsonb,
     training_history JSONB DEFAULT '[]'::jsonb,
+
+    -- Willingness to Contribute (Other than Basic Duties)
+    willingness_to_contribute TEXT,
 
     -- Submitter info (Entered By)
     entered_by_name TEXT NOT NULL,
@@ -360,6 +363,27 @@ GRANT ALL ON TABLE public.office_report_versions TO anon, authenticated, service
 GRANT ALL ON TABLE public.officer_audit_logs TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.officer_qualifications TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.mvd_app_settings TO anon, authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
+-- Incremental Migration for Existing Installations
+-- ----------------------------------------------------------------------------
+ALTER TABLE public.officer_profiles 
+    ADD COLUMN IF NOT EXISTS willingness_to_contribute TEXT;
+
+DO $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM pg_constraint WHERE conname = 'officer_profiles_technical_qualification_check'
+    ) THEN
+        ALTER TABLE public.officer_profiles DROP CONSTRAINT officer_profiles_technical_qualification_check;
+    END IF;
+
+    ALTER TABLE public.officer_profiles 
+        ADD CONSTRAINT officer_profiles_technical_qualification_check 
+        CHECK (technical_qualification IN ('B.Tech', 'Diploma', 'Others'));
+EXCEPTION
+    WHEN duplicate_object THEN NULL;
+END $$;
 
 -- ----------------------------------------------------------------------------
 -- Reload PostgREST Schema Cache

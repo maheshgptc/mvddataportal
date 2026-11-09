@@ -161,18 +161,19 @@ const DESIGNATION_OPTIONS = ["RTO", "Joint RTO", "MVI", "AMVI"];
 const GENERAL_ED_OPTIONS = ["SSLC", "Plus Two", "Others"];
 
 const TECH_QUAL_OPTIONS = [
-  "PhD with Postdoctoral Research",
-  "PhD",
-  "M.Tech",
   "B.Tech",
   "Diploma",
   "Others"
 ];
 
 const ADDITIONAL_QUAL_OPTIONS = [
+  "No additional Qualifications",
+  "PHD with Post Doctoral research",
+  "PHD",
+  "M.Tech",
   "LLB",
-  "LLM (Constitutional Law)",
-  "MBA (Public Policy)",
+  "LLM",
+  "MBA",
   "PGDeG (e-Governance)",
   "Safety Engineering",
   "Safety Engineering Diploma",
@@ -612,11 +613,34 @@ function renderOfficeEditOptionList(officeCode) {
   panel.style.display = 'block';
 }
 
-function startNewOfficerForOffice(officeCode) {
-  resetOfficerForm();
+async function startNewOfficerForOffice(officeCode) {
+  const confirmFn = window.showCustomConfirm || (typeof showCustomConfirm === 'function' ? showCustomConfirm : null);
+  let confirmed = false;
+  if (confirmFn) {
+    confirmed = await confirmFn({
+      title: 'Add Officer',
+      message: 'Do you want to add another Officer?',
+      confirmText: 'Yes',
+      cancelText: 'Cancel',
+      isDanger: false
+    });
+  } else {
+    confirmed = window.confirm('Do you want to add another Officer?');
+  }
+
+  if (!confirmed) return;
+
+  await resetOfficerForm(true);
   const sel = document.getElementById('otMainOfficeSelect');
   if (sel) sel.value = officeCode;
   checkOfficeAccessAndLock(officeCode);
+
+  const card = document.getElementById('officerTrainingFormCard');
+  if (card) {
+    card.scrollIntoView({ behavior: 'smooth' });
+  }
+  const nameInput = document.getElementById('otFullName');
+  if (nameInput) nameInput.focus();
 }
 
 // --- 5. INITIALIZATION & MODULE ACTIVATION ---
@@ -807,13 +831,15 @@ function renderAdditionalQualOptions() {
 
   container.innerHTML = ADDITIONAL_QUAL_OPTIONS.map((qual, idx) => {
     const isOther = qual === 'Others — Specify';
+    const isNone = qual === 'No additional Qualifications';
     return `
       <div class="ot-qual-row" id="otQualRow_${idx}">
         <label class="ot-checkbox-label">
           <input type="checkbox" class="ot-add-qual-chk" value="${escapeHtml(qual)}" onchange="toggleAdditionalQualDetail(${idx}, this.checked)">
-          <span class="ot-qual-name">${escapeHtml(qual)}</span>
+          <span class="ot-qual-name" style="${isNone ? 'font-weight: 700; color: #047857;' : ''}">${escapeHtml(qual)}</span>
         </label>
 
+        ${isNone ? '' : `
         <!-- Dynamic Expandable Details for this Qualification -->
         <div class="ot-qual-detail-panel" id="otQualDetail_${idx}" style="display: none;">
           <div class="form-grid-3">
@@ -852,6 +878,7 @@ function renderAdditionalQualOptions() {
             </div>
           ` : ''}
         </div>
+        `}
       </div>
     `;
   }).join('');
@@ -859,6 +886,25 @@ function renderAdditionalQualOptions() {
 
 function toggleAdditionalQualDetail(idx, isChecked) {
   markFormDirty(true);
+  const qual = ADDITIONAL_QUAL_OPTIONS[idx];
+
+  if (qual === 'No additional Qualifications') {
+    if (isChecked) {
+      // Uncheck all other qualifications and hide their panels
+      document.querySelectorAll('.ot-add-qual-chk').forEach(c => {
+        if (c.value !== 'No additional Qualifications') {
+          c.checked = false;
+        }
+      });
+      document.querySelectorAll('.ot-qual-detail-panel').forEach(p => p.style.display = 'none');
+    }
+    return;
+  } else if (isChecked) {
+    // If checking any other qualification, uncheck "No additional Qualifications"
+    const noneChk = document.querySelector('.ot-add-qual-chk[value="No additional Qualifications"]');
+    if (noneChk) noneChk.checked = false;
+  }
+
   const panel = document.getElementById(`otQualDetail_${idx}`);
   if (panel) {
     panel.style.display = isChecked ? 'block' : 'none';
@@ -1189,6 +1235,17 @@ function extractOfficerFormData(status = 'submitted') {
   qualRows.forEach((row, idx) => {
     const chk = row.querySelector('.ot-add-qual-chk');
     if (chk && chk.checked) {
+      if (chk.value === 'No additional Qualifications') {
+        additionalQuals.push({
+          qualification: 'No additional Qualifications',
+          status: 'Completed',
+          institution: '',
+          year: null,
+          remarks: ''
+        });
+        return;
+      }
+
       const isOther = chk.value === 'Others — Specify';
       const customName = isOther ? (row.querySelector('.ot-detail-custom-name')?.value || "").trim() : chk.value;
       const compStatus = row.querySelector('.ot-detail-status')?.value || "";
@@ -1242,7 +1299,10 @@ function extractOfficerFormData(status = 'submitted') {
     specializedSkills.push(`Others: ${customSkills}`);
   }
 
-  // Section 4: Entered-By Details
+  // Section 4: Willingness to Contribute
+  const willingnessToContribute = (document.getElementById('otWillingnessToContribute')?.value || "").trim();
+
+  // Section 5: Data entered By Details
   const enteredByName = (document.getElementById('otEnteredByName')?.value || "").trim();
   const enteredByDesig = (document.getElementById('otEnteredByDesignation')?.value || "").trim();
   const rawMobile = (document.getElementById('otEnteredByMobile')?.value || "").trim();
@@ -1275,11 +1335,11 @@ function extractOfficerFormData(status = 'submitted') {
       isValid = false;
     }
     if (!techQual) {
-      setFieldError('otTechQualSelect', "Technical Qualification is required");
+      setFieldError('otTechQualSelect', "Basic Technical Qualification is required");
       isValid = false;
     }
     if (techQual === 'Others' && !techQualOther) {
-      setFieldError('otTechQualOtherInput', "Specify other Technical Qualification");
+      setFieldError('otTechQualOtherInput', "Specify other Basic Technical Qualification");
       isValid = false;
     }
 
@@ -1290,11 +1350,11 @@ function extractOfficerFormData(status = 'submitted') {
     }
 
     if (!enteredByName) {
-      setFieldError('otEnteredByName', "Entered-By Officer Full Name is required");
+      setFieldError('otEnteredByName', "Data entered By — Officer Full Name is required");
       isValid = false;
     }
     if (!enteredByDesig) {
-      setFieldError('otEnteredByDesignation', "Entered-By Designation is required");
+      setFieldError('otEnteredByDesignation', "Data entered By — Designation is required");
       isValid = false;
     }
     if (!normalizedMobile || normalizedMobile.length !== 10) {
@@ -1337,6 +1397,7 @@ function extractOfficerFormData(status = 'submitted') {
     specializedSkills,
     customSkills,
     trainingHistory: [...otStagedTrainings],
+    willingnessToContribute,
     enteredBy: {
       fullName: enteredByName,
       designation: enteredByDesig,
@@ -1533,8 +1594,8 @@ function saveOfficerRecordToStore(profile) {
   }
 }
 
-async function resetOfficerForm() {
-  if (otFormDirty) {
+async function resetOfficerForm(force = false) {
+  if (!force && otFormDirty) {
     const ok = await (window.showCustomConfirm || showCustomConfirm)({
       title: 'Discard Changes',
       message: 'You have unsaved changes. Are you sure you want to discard them?',
@@ -1569,6 +1630,9 @@ async function resetOfficerForm() {
   if (genEdGroup) genEdGroup.style.display = 'none';
   const techQualGroup = document.getElementById('otTechQualOtherGroup');
   if (techQualGroup) techQualGroup.style.display = 'none';
+
+  const willingEl = document.getElementById('otWillingnessToContribute');
+  if (willingEl) willingEl.value = '';
 
   renderStagedTrainingTable();
   prefillEnteredByDetails();
@@ -1643,7 +1707,7 @@ function loadProfileForEditing(profileId) {
     return;
   }
 
-  resetOfficerForm();
+  resetOfficerForm(true);
   otEditingProfileId = profile.id;
   otOriginalEditingPen = profile.pen;
   document.getElementById('otFormActionTitle').innerHTML = `<i class="fa-solid fa-user-pen"></i> Edit Profile: ${escapeHtml(profile.officerFullName)} (PEN: ${escapeHtml(profile.pen)})`;
@@ -1686,6 +1750,10 @@ function loadProfileForEditing(profileId) {
   document.getElementById('otPassingYearInput').value = profile.passingYear || "";
   document.getElementById('otGradeInput').value = profile.grade || "";
 
+  // Willingness to Contribute
+  const willingEl = document.getElementById('otWillingnessToContribute');
+  if (willingEl) willingEl.value = profile.willingnessToContribute || "";
+
   // Additional Qualifications
   if (Array.isArray(profile.additionalQualifications)) {
     profile.additionalQualifications.forEach(aq => {
@@ -1699,21 +1767,23 @@ function loadProfileForEditing(profileId) {
         const idx = row.id.split('_')[1];
         toggleAdditionalQualDetail(idx, true);
 
-        const statusSel = row.querySelector('.ot-detail-status');
-        if (statusSel) {
-          statusSel.value = aq.status || "";
-          handleQualStatusChange(idx, aq.status);
-        }
-        const instIn = row.querySelector('.ot-detail-inst');
-        if (instIn) instIn.value = aq.institution || "";
-        const yrIn = row.querySelector('.ot-detail-year');
-        if (yrIn) yrIn.value = aq.year || "";
-        const remIn = row.querySelector('.ot-detail-remarks');
-        if (remIn) remIn.value = aq.remarks || "";
+        if (qualNameToFind !== 'No additional Qualifications') {
+          const statusSel = row.querySelector('.ot-detail-status');
+          if (statusSel) {
+            statusSel.value = aq.status || "";
+            handleQualStatusChange(idx, aq.status);
+          }
+          const instIn = row.querySelector('.ot-detail-inst');
+          if (instIn) instIn.value = aq.institution || "";
+          const yrIn = row.querySelector('.ot-detail-year');
+          if (yrIn) yrIn.value = aq.year || "";
+          const remIn = row.querySelector('.ot-detail-remarks');
+          if (remIn) remIn.value = aq.remarks || "";
 
-        if (!isKnown) {
-          const custNameIn = row.querySelector('.ot-detail-custom-name');
-          if (custNameIn) custNameIn.value = aq.qualification;
+          if (!isKnown) {
+            const custNameIn = row.querySelector('.ot-detail-custom-name');
+            if (custNameIn) custNameIn.value = aq.qualification;
+          }
         }
       }
     });
@@ -1836,7 +1906,7 @@ function openProfilePreviewModal(profile) {
         <h4><i class="fa-solid fa-graduation-cap"></i> 2. Academic & Technical Credentials</h4>
         <div class="form-grid-2" style="font-size: 0.9rem; margin-bottom: 12px;">
           <div><strong>General Education:</strong> ${escapeHtml(profile.generalEducation === 'Others' ? profile.generalEducationOther : profile.generalEducation)}</div>
-          <div><strong>Technical Qualification:</strong> <strong>${escapeHtml(profile.technicalQualification === 'Others' ? profile.technicalQualificationOther : profile.technicalQualification)}</strong></div>
+          <div><strong>Basic Technical Qualification:</strong> <strong>${escapeHtml(profile.technicalQualification === 'Others' ? profile.technicalQualificationOther : profile.technicalQualification)}</strong></div>
           <div><strong>Institution / Board / University:</strong> ${escapeHtml(profile.institution || 'N/A')}</div>
           <div><strong>Passing Year & Grade:</strong> ${escapeHtml(profile.passingYear || 'N/A')} (${escapeHtml(profile.grade || 'N/A')})</div>
         </div>
@@ -1878,11 +1948,21 @@ function openProfilePreviewModal(profile) {
         </div>
       </div>
 
-      <!-- Section 4 -->
+      <!-- Willingness to Contribute -->
+      ${profile.willingnessToContribute ? `
+      <div class="ot-preview-box">
+        <h4><i class="fa-solid fa-handshake-angle"></i> Willingness to Contribute Other than Basic Duties</h4>
+        <div style="font-size: 0.9rem; color: #1e293b; background: #f8fafc; padding: 10px 14px; border-radius: 6px; border: 1px solid #e2e8f0; line-height: 1.5;">
+          ${escapeHtml(profile.willingnessToContribute)}
+        </div>
+      </div>
+      ` : ''}
+
+      <!-- Data entered By Section -->
       <div class="ot-preview-box" style="background: #f0fdf4; border-color: #a7f3d0;">
-        <h4><i class="fa-solid fa-user-pen"></i> 4. Entered By — Officer Details</h4>
+        <h4><i class="fa-solid fa-user-pen"></i> Data entered By</h4>
         <div class="form-grid-3" style="font-size: 0.85rem;">
-          <div><strong>Entered By:</strong> ${escapeHtml(profile.enteredBy?.fullName || 'N/A')}</div>
+          <div><strong>Data entered By:</strong> ${escapeHtml(profile.enteredBy?.fullName || 'N/A')}</div>
           <div><strong>Designation:</strong> ${escapeHtml(profile.enteredBy?.designation || 'N/A')}</div>
           <div><strong>Mobile:</strong> 📞 ${escapeHtml(profile.enteredBy?.mobile || 'N/A')}</div>
         </div>
@@ -2128,9 +2208,9 @@ function exportOfficersDirectoryDualCSV() {
   // 1. Primary Profiles CSV
   const profileHeaders = [
     "PEN", "Full Name", "Designation", "Office Code", "Office Name",
-    "General Education", "Technical Qualification", "Institution", "Passing Year", "Grade",
+    "General Education", "Basic Technical Qualification", "Institution", "Passing Year", "Grade",
     "Completed Additional Quals", "Pursuing Additional Quals", "Specialized Skills",
-    "Total Trainings Count", "Status", "Entered By Name", "Entered By Designation", "Entered By Mobile", "Last Updated IST"
+    "Total Trainings Count", "Willingness to Contribute", "Status", "Data entered By Name", "Data entered By Designation", "Data entered By Mobile", "Last Updated IST"
   ];
 
   const profileRows = otProfilesStore.map(p => {
@@ -2154,6 +2234,7 @@ function exportOfficersDirectoryDualCSV() {
       `"${purQuals.replace(/"/g, '""')}"`,
       `"${skills.replace(/"/g, '""')}"`,
       trCount,
+      `"${(p.willingnessToContribute || '').replace(/"/g, '""')}"`,
       p.status,
       `"${(p.enteredBy?.fullName || '').replace(/"/g, '""')}"`,
       `"${(p.enteredBy?.designation || '').replace(/"/g, '""')}"`,
@@ -2945,6 +3026,7 @@ function subscribeToRealtimeOfficerProfiles() {
             specializedSkills: Array.isArray(newRec.specialized_skills) ? newRec.specialized_skills : [],
             customSkills: "",
             trainingHistory: Array.isArray(newRec.training_history) ? newRec.training_history : [],
+            willingnessToContribute: newRec.willingness_to_contribute || "",
             enteredBy: {
               fullName: newRec.entered_by_name || "Reporting Officer",
               designation: newRec.entered_by_designation || "Officer",
@@ -3042,6 +3124,7 @@ async function syncOfficerProfilesWithSupabase() {
         specializedSkills: Array.isArray(row.specialized_skills) ? row.specialized_skills : [],
         customSkills: "",
         trainingHistory: Array.isArray(row.training_history) ? row.training_history : [],
+        willingnessToContribute: row.willingness_to_contribute || "",
         enteredBy: {
           fullName: row.entered_by_name || "Reporting Officer",
           designation: row.entered_by_designation || "Officer",
@@ -3234,6 +3317,7 @@ async function saveOfficerQualificationToSupabase(record) {
       additional_qualifications: record.additionalQualifications || [],
       specialized_skills: record.specializedSkills || [],
       training_history: record.trainingHistory || [],
+      willingness_to_contribute: record.willingnessToContribute || null,
       entered_by_name: record.enteredBy?.fullName || 'Reporting Officer',
       entered_by_designation: record.enteredBy?.designation || 'Officer',
       entered_by_mobile: record.enteredBy?.mobile || '9447000000',
