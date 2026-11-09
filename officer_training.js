@@ -166,7 +166,6 @@ const TECH_QUAL_OPTIONS = [
 ];
 
 const ADDITIONAL_QUAL_OPTIONS = [
-  "No additional Qualifications",
   "PHD with Post Doctoral research",
   "PHD",
   "M.Tech",
@@ -182,7 +181,8 @@ const ADDITIONAL_QUAL_OPTIONS = [
   "Certificate in Automotive Mechatronics",
   "B.Sc. Computer Science",
   "Certified Data Analyst",
-  "Others — Specify"
+  "Others — Specify",
+  "No additional Qualifications"
 ];
 
 const SPECIALIZED_SKILL_OPTIONS = [
@@ -2591,15 +2591,8 @@ function switchRoleSimulator(role) {
 function renderRoleSwitcherUI() {
   const container = document.getElementById('otRoleIndicatorPill');
   if (container) {
-    const roleLabels = {
-      data_entry: "Data Entry User",
-      head_of_office: "Head of Office (RTO)",
-      dispatch_user: "Office Dispatch User",
-      admin: "Commissionerate Administrator"
-    };
-    container.innerHTML = `
-      <i class="fa-solid fa-user-shield"></i> Current Simulation Role: <strong>${roleLabels[otCurrentRole] || otCurrentRole}</strong>
-    `;
+    container.style.display = 'none';
+    container.innerHTML = '';
   }
 
   // Active button highlight in Role Switcher section

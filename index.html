@@ -636,9 +636,6 @@
               <span id="otUnsavedBadge" class="badge badge-warning" style="display: none; padding: 6px 12px; font-size: 0.82rem;">
                 <i class="fa-solid fa-triangle-exclamation"></i> Unsaved Changes
               </span>
-              <span id="otRoleIndicatorPill" class="badge badge-info" style="padding: 6px 12px; font-size: 0.82rem;">
-                <i class="fa-solid fa-user-shield"></i> Role: Head of Office (RTO)
-              </span>
             </div>
           </div>
 
@@ -680,61 +677,93 @@
               </div>
             </div>
 
-            <!-- Officer Profile(s) Registered for this Office Section -->
-            <div class="card-section" id="otOfficeRegisteredOfficersSection" style="margin-bottom: 24px; border: 1.5px solid #cbd5e1;">
-              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
-                <div>
-                  <h3 class="section-title" style="margin: 0; font-size: 1.05rem;">
-                    <i class="fa-solid fa-users" style="color: #047857;"></i> Officer Profile(s) Registered for this Office
-                  </h3>
-                  <span id="otOfficeRegisteredSubtitle" style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-top: 3px;">
-                    Select an office above or below to view registered officers.
-                  </span>
-                </div>
-                <div style="display: flex; gap: 10px; align-items: center;">
-                  <span id="otOfficeRegisteredCountBadge" class="badge badge-info" style="padding: 6px 12px; font-size: 0.82rem;">0 Profiled Officers</span>
-                  <button type="button" class="btn btn-success btn-sm" onclick="openAddAnotherOfficerModal()" style="background: #047857; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-user-plus"></i> + Add Another Officer
-                  </button>
-                </div>
-              </div>
-
-              <div class="data-table-container" style="margin-top: 14px;">
-                <table class="data-table" id="otOfficeRegisteredTable">
-                  <thead>
-                    <tr>
-                      <th style="width: 40px; text-align: center;">#</th>
-                      <th style="min-width: 170px;">Officer Name &amp; PEN</th>
-                      <th style="min-width: 110px;">Designation</th>
-                      <th style="min-width: 160px;">Basic Technical Qualification</th>
-                      <th style="min-width: 180px;">Additional Qualifications</th>
-                      <th style="width: 110px; text-align: center;">Status</th>
-                      <th style="width: 130px; text-align: center;">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody id="otOfficeRegisteredTableBody">
-                    <tr>
-                      <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">
-                        Please select an office to view registered officers.
-                      </td>
-                    </tr>
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
             <form id="otOfficerForm" onsubmit="handleProfileSubmit(event)">
               
-              <!-- 1. Official Identification & Current Posting -->
-              <div class="card-section sec-office" id="officerTrainingFormCard">
+              <!-- 1. Select Office -->
+              <div class="card-section sec-office" id="otOfficeSelectSection" style="margin-bottom: 24px;">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-id-card"></i> 1. Official Identification &amp; Current Posting
+                    <i class="fa-solid fa-building"></i> 1. Select Office
                   </h2>
                   <span class="section-tag">Required *</span>
                 </div>
 
-                <div class="ot-form-grid-2">
+                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px;">
+                  Select your MVD Office to initiate or update officer profiles. Each office is restricted to its authorized data entry user.
+                </p>
+
+                <div class="form-group searchable-select-wrapper" style="max-width: 650px;">
+                  <label for="otMainOfficeSelect"><i class="fa-solid fa-building"></i> Office Name (Code — Office Name) <span class="req-star">*</span></label>
+                  <div class="office-search-field">
+                    <i class="fa-solid fa-magnifying-glass"></i>
+                    <input type="text" id="otOfficeSearchInput" class="form-control" placeholder="Search office by code or name..." oninput="handleOfficeSearchFilter(this, 'otMainOfficeSelect')" onblur="handleOfficeSearchBlur(this, 'otMainOfficeSelect')" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleOfficeSearchBlur(this, 'otMainOfficeSelect');}">
+                  </div>
+                  <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)" oninput="handleOfficeSelectPicked(this)" style="margin-top: 4px;">
+                    <option value="">-- Select Office (Code — Office Name) --</option>
+                  </select>
+                  <div class="field-error" id="err_otMainOfficeSelect"></div>
+                </div>
+
+                <!-- Office Lock & Access Alert Banner -->
+                <div id="otOfficeLockAlert" class="reflection-alert" style="display: none; margin-top: 16px;"></div>
+
+                <!-- Existing Profiles & Edit Option for Authorized Account -->
+                <div id="otOfficeAuthorizedPanel" style="display: none; margin-top: 16px;"></div>
+              </div>
+
+              <!-- Officer Profile(s) Registered for this Office Section -->
+              <div class="card-section" id="otOfficeRegisteredOfficersSection" style="margin-bottom: 24px; border: 1.5px solid #cbd5e1;">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+                  <div>
+                    <h3 class="section-title" style="margin: 0; font-size: 1.05rem;">
+                      <i class="fa-solid fa-users" style="color: #047857;"></i> Officer Profile(s) Registered for this Office
+                    </h3>
+                    <span id="otOfficeRegisteredSubtitle" style="font-size: 0.82rem; color: var(--text-muted); display: block; margin-top: 3px;">
+                      Select an office above to view registered officers.
+                    </span>
+                  </div>
+                  <div style="display: flex; gap: 10px; align-items: center;">
+                    <span id="otOfficeRegisteredCountBadge" class="badge badge-info" style="padding: 6px 12px; font-size: 0.82rem;">0 Profiled Officers</span>
+                    <button type="button" class="btn btn-success btn-sm" onclick="openAddAnotherOfficerModal()" style="background: #047857; border: none; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                      <i class="fa-solid fa-user-plus"></i> + Add Another Officer
+                    </button>
+                  </div>
+                </div>
+
+                <div class="data-table-container" style="margin-top: 14px;">
+                  <table class="data-table" id="otOfficeRegisteredTable">
+                    <thead>
+                      <tr>
+                        <th style="width: 40px; text-align: center;">#</th>
+                        <th style="min-width: 170px;">Officer Name &amp; PEN</th>
+                        <th style="min-width: 110px;">Designation</th>
+                        <th style="min-width: 160px;">Basic Technical Qualification</th>
+                        <th style="min-width: 180px;">Additional Qualifications</th>
+                        <th style="width: 110px; text-align: center;">Status</th>
+                        <th style="width: 130px; text-align: center;">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody id="otOfficeRegisteredTableBody">
+                      <tr>
+                        <td colspan="7" style="text-align: center; color: var(--text-muted); padding: 20px;">
+                          Please select an office above to view registered officers.
+                        </td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+
+              <!-- 2. Official Identification & Current Posting -->
+              <div class="card-section sec-office" id="officerTrainingFormCard">
+                <div class="section-header">
+                  <h2 class="section-title">
+                    <i class="fa-solid fa-id-card"></i> 2. Official Identification &amp; Current Posting
+                  </h2>
+                  <span class="section-tag">Required *</span>
+                </div>
+
+                <div class="form-grid-3">
                   <!-- Officer Full Name -->
                   <div class="form-group">
                     <label for="otFullName"><i class="fa-solid fa-user"></i> Officer Full Name <span class="req-star">*</span></label>
@@ -748,9 +777,7 @@
                     <input type="text" id="otPen" class="form-control" placeholder="e.g. 058723 (Preserves leading zeros, unique per officer)" required oninput="markFormDirty(true)">
                     <div class="field-error" id="err_otPen"></div>
                   </div>
-                </div>
 
-                <div class="ot-form-grid-2" style="margin-top: 16px;">
                   <!-- Current Designation (4 options only) -->
                   <div class="form-group">
                     <label for="otDesignationSelect"><i class="fa-solid fa-user-shield"></i> Current Designation <span class="req-star">*</span></label>
@@ -763,27 +790,14 @@
                     </select>
                     <div class="field-error" id="err_otDesignationSelect"></div>
                   </div>
-
-                  <!-- Searchable Office Dropdown -->
-                  <div class="form-group searchable-select-wrapper">
-                    <label for="otMainOfficeSelect"><i class="fa-solid fa-building"></i> Office Name (Code — Office Name) <span class="req-star">*</span></label>
-                    <div class="office-search-field">
-                      <i class="fa-solid fa-magnifying-glass"></i>
-                      <input type="text" id="otOfficeSearchInput" class="form-control" placeholder="Search office by code or name..." oninput="handleOfficeSearchFilter(this, 'otMainOfficeSelect')" onblur="handleOfficeSearchBlur(this, 'otMainOfficeSelect')" onkeydown="if(event.key==='Enter'){event.preventDefault(); handleOfficeSearchBlur(this, 'otMainOfficeSelect');}">
-                    </div>
-                    <select id="otMainOfficeSelect" class="form-control" required onchange="handleOfficeSelectPicked(this)" style="margin-top: 4px;">
-                      <option value="">-- Select Office (Code — Office Name) --</option>
-                    </select>
-                    <div class="field-error" id="err_otMainOfficeSelect"></div>
-                  </div>
                 </div>
               </div>
 
-              <!-- 2. Academic & Technical Credentials -->
+              <!-- 3. Academic & Basic Technical Credentials -->
               <div class="card-section sec-hardware">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-graduation-cap"></i> 2. Academic &amp; Technical Credentials
+                    <i class="fa-solid fa-graduation-cap"></i> 3. Academic &amp; Basic Technical Credentials
                   </h2>
                   <span class="section-tag">Qualifications</span>
                 </div>
@@ -866,11 +880,11 @@
                 </div>
               </div>
 
-              <!-- 3. Specialized Skills & In-Service Trainings -->
+              <!-- 4. Specialized Skills & In-Service Trainings -->
               <div class="card-section sec-network">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-bolt"></i> 3. Specialized Skills &amp; In-Service Trainings
+                    <i class="fa-solid fa-bolt"></i> 4. Specialized Skills &amp; In-Service Trainings
                   </h2>
                   <span class="section-tag">Competencies &amp; Training</span>
                 </div>
@@ -932,11 +946,11 @@
                 </div>
               </div>
 
-              <!-- 4. Willingness to Contribute Beyond Basic Duties -->
+              <!-- 5. Willingness to Contribute Beyond Basic Duties -->
               <div class="card-section sec-contribution" id="otContributionSection">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-hand-holding-heart" style="color: #047857;"></i> 4. Are you willing to contribute other than Basic duties? If yes, please specify
+                    <i class="fa-solid fa-hand-holding-heart" style="color: #047857;"></i> 5. Are you willing to contribute other than Basic duties? If yes, please specify
                   </h2>
                   <span class="section-tag" style="background: #e0f2fe; color: #0369a1;">Optional</span>
                 </div>
@@ -950,11 +964,11 @@
                 </div>
               </div>
 
-              <!-- 5. Data entered By (Moved to Very Bottom) -->
+              <!-- 6. Data entered By (Moved to Very Bottom) -->
               <div class="card-section sec-remarks">
                 <div class="section-header">
                   <h2 class="section-title">
-                    <i class="fa-solid fa-user-pen"></i> 5. Data entered By
+                    <i class="fa-solid fa-user-pen"></i> 6. Data entered By
                   </h2>
                   <span class="section-tag">Audit Submitter Info</span>
                 </div>
@@ -1415,6 +1429,47 @@
           </div>
         </div>
 
+        <!-- Admin Edit Office Lock Modal -->
+        <div id="adminEditOfficeLockModal" class="modal-overlay" style="display: none; z-index: 100000;">
+          <div class="modal-card" style="max-width: 500px; padding: 24px;">
+            <div class="modal-header" style="border-bottom: 2px solid var(--primary-600); padding-bottom: 12px;">
+              <h3 style="color: var(--primary-900); margin: 0; font-size: 1.15rem;">
+                <i class="fa-solid fa-user-lock" style="color: var(--primary-600);"></i> Edit Authorised Data Entry User
+              </h3>
+              <button type="button" class="btn btn-outline btn-sm" onclick="closeEditOfficeLockModal()"><i class="fa-solid fa-xmark"></i></button>
+            </div>
+
+            <form onsubmit="handleSaveOfficeLock(event)">
+              <input type="hidden" id="editLockOfficeCode">
+              
+              <div style="background: #f1f5f9; padding: 12px 16px; border-radius: 8px; margin: 16px 0;">
+                <div style="font-size: 0.8rem; text-transform: uppercase; color: var(--text-muted); font-weight: 700;">Target MVD Office</div>
+                <div id="editLockOfficeDisplay" style="font-size: 1.05rem; font-weight: 700; color: #0f172a; margin-top: 2px;"></div>
+              </div>
+
+              <div class="form-group" style="margin-bottom: 16px;">
+                <label for="editLockEmailInput"><i class="fa-solid fa-envelope"></i> Authorised Gmail ID <span class="req-star">*</span></label>
+                <input type="email" id="editLockEmailInput" class="form-control" placeholder="e.g. officer.kl01@gmail.com" required>
+                <small style="color: var(--text-muted); font-size: 0.8rem; margin-top: 4px; display: block;">
+                  Only this Google account will be authorized to enter and edit officer profiles for this office.
+                </small>
+              </div>
+
+              <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 24px; padding-top: 14px; border-top: 1px solid var(--border-color);">
+                <button type="button" class="btn btn-outline btn-danger btn-sm" onclick="handleClearCurrentOfficeLock()">
+                  <i class="fa-solid fa-unlock"></i> Clear Lock (Open Office)
+                </button>
+                <div style="display: flex; gap: 8px;">
+                  <button type="button" class="btn btn-secondary" onclick="closeEditOfficeLockModal()">Cancel</button>
+                  <button type="submit" class="btn btn-primary" id="btnSaveOfficeLock">
+                    <i class="fa-solid fa-check"></i> Save Authorised User
+                  </button>
+                </div>
+              </div>
+            </form>
+          </div>
+        </div>
+
         <!-- ==========================================================================
              ADMIN SESSION CONTAINER
              ========================================================================== -->
@@ -1439,6 +1494,9 @@
             <div style="display: flex; gap: 12px; margin-top: 20px; flex-wrap: wrap;">
               <button class="btn btn-outline" id="btnAdminNavDashboard" onclick="switchAdminSubView('dashboard')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-chart-pie"></i> Executive Dashboard
+              </button>
+              <button class="btn btn-outline" id="btnAdminNavOfficeLocks" onclick="switchAdminSubView('officelocks')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
+                <i class="fa-solid fa-user-lock"></i> Authorised Data Entry Users
               </button>
               <button class="btn btn-outline" id="btnAdminNavSummary" onclick="switchAdminSubView('summary')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-table-list"></i> IT Summary Report
@@ -1837,7 +1895,6 @@
                     <label><i class="fa-solid fa-certificate"></i> Additional Qualification</label>
                     <select id="otDirAddQualFilter" class="form-control" onchange="renderAdminOfficersDirectory()">
                       <option value="ALL">-- All Additional Qualifications --</option>
-                      <option value="No additional Qualifications">No additional Qualifications</option>
                       <option value="PHD with Post Doctoral research">PHD with Post Doctoral research</option>
                       <option value="PHD">PHD</option>
                       <option value="M.Tech">M.Tech</option>
@@ -1851,6 +1908,7 @@
                       <option value="MCA (Computer Applications)">MCA</option>
                       <option value="B.Sc. Computer Science">B.Sc. Computer Science</option>
                       <option value="Certified Data Analyst">Certified Data Analyst</option>
+                      <option value="No additional Qualifications">No additional Qualifications</option>
                     </select>
                   </div>
 
@@ -2081,6 +2139,105 @@
               </p>
 
               <div id="menuManagerContainer" class="form-grid-2"></div>
+            </div>
+          </div>
+
+          <!-- ADMIN AUTHORISED DATA ENTRY USERS SUBVIEW -->
+          <div id="adminOfficeLocksSubView" style="display: none;">
+            <div class="card-section">
+              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                <div>
+                  <h3 class="section-title" style="margin: 0; font-size: 1.25rem;">
+                    <i class="fa-solid fa-user-shield" style="color: var(--primary-600);"></i> Authorised Data Entry Users — Office Access Registry
+                  </h3>
+                  <p style="font-size: 0.85rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                    Manage designated Gmail accounts for data entry across all 105 MVD offices. Data entry and editing for each office is restricted exclusively to its assigned Gmail ID.
+                  </p>
+                </div>
+                <div style="display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                  <button type="button" class="btn btn-outline btn-danger btn-sm" onclick="clearAllOfficeLocks()" id="btnClearAllOfficeLocks" title="Clear all office locks simultaneously">
+                    <i class="fa-solid fa-unlock-keyhole"></i> Clear All Locks
+                  </button>
+                  <button type="button" class="btn btn-outline btn-sm" onclick="exportOfficeLocksCSV()">
+                    <i class="fa-solid fa-file-csv"></i> Export Access List CSV
+                  </button>
+                </div>
+              </div>
+
+              <!-- Summary KPI Cards -->
+              <div class="form-grid-3" style="margin-top: 18px;">
+                <div class="metric-card" style="border-left: 4px solid var(--primary-600);">
+                  <div class="metric-icon" style="background: #e0f2fe; color: #0284c7;"><i class="fa-solid fa-building"></i></div>
+                  <div class="metric-content">
+                    <h4>Total MVD Offices</h4>
+                    <div class="metric-value" id="kpiTotalOfficeLocks">105</div>
+                    <div class="metric-sub">Statewide offices in master list</div>
+                  </div>
+                </div>
+                <div class="metric-card" style="border-left: 4px solid #059669;">
+                  <div class="metric-icon" style="background: #dcfce7; color: #16a34a;"><i class="fa-solid fa-lock"></i></div>
+                  <div class="metric-content">
+                    <h4>Assigned / Locked Offices</h4>
+                    <div class="metric-value" id="kpiAssignedOfficeLocks" style="color: #16a34a;">0</div>
+                    <div class="metric-sub">Restricted to designated Gmail ID</div>
+                  </div>
+                </div>
+                <div class="metric-card" style="border-left: 4px solid #d97706;">
+                  <div class="metric-icon" style="background: #fef3c7; color: #d97706;"><i class="fa-solid fa-lock-open"></i></div>
+                  <div class="metric-content">
+                    <h4>Open / Unassigned Offices</h4>
+                    <div class="metric-value" id="kpiOpenOfficeLocks" style="color: #d97706;">105</div>
+                    <div class="metric-sub">Available for first entry lock</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Search & Filters Toolbar -->
+              <div class="table-toolbar" style="margin-top: 20px; display: flex; gap: 12px; flex-wrap: wrap; align-items: center;">
+                <div style="flex: 1; min-width: 260px; position: relative;">
+                  <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                  <input type="text" id="adminOfficeLockSearchInput" class="form-control" placeholder="Search office code, office name, or Gmail ID..." oninput="renderAdminOfficeLocksTable()" style="padding-left: 36px;">
+                </div>
+                <div style="min-width: 220px;">
+                  <select id="adminOfficeLockCategoryFilter" class="form-control" onchange="renderAdminOfficeLocksTable()">
+                    <option value="ALL">-- All Office Categories --</option>
+                    <option value="Commissionerate & Deputy Transport Commissioners (DTC)">Commissionerate &amp; DTC</option>
+                    <option value="Regional Transport Offices (RTO)">RTO Offices</option>
+                    <option value="Sub Regional Transport Offices (Sub-RTO)">Sub-RTO Offices</option>
+                    <option value="Enforcement RTO Offices">Enforcement RTOs</option>
+                  </select>
+                </div>
+                <div style="min-width: 180px;">
+                  <select id="adminOfficeLockStatusFilter" class="form-control" onchange="renderAdminOfficeLocksTable()">
+                    <option value="ALL">-- All Access Statuses --</option>
+                    <option value="LOCKED">Assigned / Locked Only</option>
+                    <option value="OPEN">Open / Unassigned Only</option>
+                  </select>
+                </div>
+                <button type="button" class="btn btn-secondary btn-sm" onclick="resetAdminOfficeLocksFilters()">
+                  <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                </button>
+              </div>
+
+              <!-- Table of All Offices with Editable Options -->
+              <div class="data-table-container" style="margin-top: 16px;">
+                <table class="data-table" id="adminOfficeLocksTable">
+                  <thead>
+                    <tr>
+                      <th style="width: 50px; text-align: center;">#</th>
+                      <th style="min-width: 100px;">Code</th>
+                      <th style="min-width: 220px;">Office Name</th>
+                      <th style="min-width: 180px;">Category</th>
+                      <th style="min-width: 240px;">Authorised Gmail ID</th>
+                      <th style="width: 130px; text-align: center;">Status</th>
+                      <th style="width: 160px; text-align: center;">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="adminOfficeLocksTableBody">
+                    <!-- Populated dynamically -->
+                  </tbody>
+                </table>
+              </div>
             </div>
           </div>
 
