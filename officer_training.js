@@ -1,0 +1,3415 @@
+/**
+ * ============================================================================
+ * KERALA MOTOR VEHICLES DEPARTMENT (MVD)
+ * OFFICER TRAINING & QUALIFICATION MODULE
+ * 
+ * Features:
+ *  - Official Identification & Current Posting (RTO, Joint RTO, MVI, AMVI)
+ *  - Categorized Searchable Office Master (Commissionerate, RTO, Sub-RTO, Enforcement)
+ *  - Academic & Technical Credentials (SSLC/Plus Two/Others, PhD/M.Tech/B.Tech/Diploma/Others, Grade)
+ *  - Dynamic Additional Qualifications (Completed vs Pursuing status, Institutions, Expected/Passing Year, Remarks)
+ *  - 17 Specialized Skills + Custom Skills
+ *  - Repeatable In-Service Training History (Hours, Days, Weeks, Months, sorted latest first)
+ *  - Entered-By Officer Details with 10-digit Mobile (+91 normalization)
+ *  - Save Draft, Live Validation, Dirty Form warning, PEN Uniqueness
+ *  - Profile Preview, Single Profile Print & PDF Download
+ *  - Administrative Directory with 7 Filters, Pagination & Dual CSV Export (Profiles & Trainings)
+ *  - Office-wise Summary Report with Overlap Handling, Excluded Drafts Count, Reporting Cut-off
+ *  - Head of Office Digital Verification with Statutory Certification
+ *  - Immutable Report Snapshots with Auto "Reverification Required" on roster changes
+ *  - Outward / Dispatch Forwarding Workflow with Outward Number & Date Validation
+ *  - Role-Based Access Control (Data Entry, Head of Office, Dispatcher, Admin)
+ *  - Audit Trail in Asia/Kolkata (IST)
+ *  - Supabase Cloud Persistence with LocalStorage Fallback
+ * ============================================================================
+ */
+
+// --- 1. MASTER DATA: OFFICES & DESIGNATIONS ---
+
+const OT_OFFICE_GROUPS = {
+  "Commissionerate & DTC Offices": [
+    { code: "TCO", name: "Transport Commissionerate" },
+    { code: "DTC CZ I", name: "DTC CZ I, Thrissur" },
+    { code: "DTC CZ II", name: "DTC Office CZ II, Ernakulam" },
+    { code: "DTC NZ", name: "DTC Office NZ, Kozhikkode" },
+    { code: "DTC SZ", name: "DTC Office SZ, Thiruvananthapuram" }
+  ],
+  "RTO Offices": [
+    { code: "KL01", name: "RTO, Thiruvananthapuram" },
+    { code: "KL02", name: "RTO, Kollam" },
+    { code: "KL03", name: "RTO, Pathanamthitta" },
+    { code: "KL04", name: "RTO, Alappuzha" },
+    { code: "KL05", name: "RTO, Kottayam" },
+    { code: "KL06", name: "RTO, Idukki" },
+    { code: "KL07", name: "RTO, Ernakulam" },
+    { code: "KL08", name: "RTO, Thrissur" },
+    { code: "KL09", name: "RTO, Palakkad" },
+    { code: "KL10", name: "RTO, Malappuram" },
+    { code: "KL11", name: "RTO, Kozhikode" },
+    { code: "KL12", name: "RTO, Wayanad" },
+    { code: "KL13", name: "RTO, Kannur" },
+    { code: "KL14", name: "RTO, Kasaragod" },
+    { code: "KL15", name: "RTO NS, Thiruvananthapuram" },
+    { code: "KL16", name: "RTO, Attingal" },
+    { code: "KL17", name: "RTO, Muvattupuzha" },
+    { code: "KL18", name: "RTO, Vadakara" }
+  ],
+  "Sub-RTO Offices": [
+    { code: "KL19", name: "SRTO, Parassala" },
+    { code: "KL20", name: "SRTO, Neyyattinkara" },
+    { code: "KL21", name: "SRTO, Nedumangad" },
+    { code: "KL22", name: "SRTO, Kazhakuttam" },
+    { code: "KL23", name: "SRTO, Karunagapally" },
+    { code: "KL24", name: "SRTO, Kottarakkara" },
+    { code: "KL25", name: "SRTO, Punalur" }, // Corrected as per specification (was Punalal)
+    { code: "KL26", name: "SRTO, Adoor" },
+    { code: "KL27", name: "SRTO, Thiruvalla" },
+    { code: "KL28", name: "SRTO, Mallappally" },
+    { code: "KL29", name: "SRTO, Kayamkulam" },
+    { code: "KL30", name: "SRTO, Chengannur" },
+    { code: "KL31", name: "SRTO, Mavelikkara" },
+    { code: "KL32", name: "SRTO, Cherthala" },
+    { code: "KL33", name: "SRTO, Changanacherry" },
+    { code: "KL34", name: "SRTO, Kanjirapally" },
+    { code: "KL35", name: "SRTO, Pala" },
+    { code: "KL36", name: "SRTO, Vaikom" },
+    { code: "KL37", name: "SRTO, Vandiperiyar" },
+    { code: "KL38", name: "SRTO, Thodupuzha" },
+    { code: "KL39", name: "SRTO, Tripunithura" },
+    { code: "KL40", name: "SRTO, Perumbavoor" },
+    { code: "KL41", name: "SRTO, Aluva" },
+    { code: "KL42", name: "SRTO, North Paravoor" },
+    { code: "KL43", name: "SRTO, Mattancherry" },
+    { code: "KL44", name: "SRTO, Kothamangalam" },
+    { code: "KL45", name: "SRTO, Irinjalakuda" },
+    { code: "KL46", name: "SRTO, Guruvayoor" },
+    { code: "KL47", name: "SRTO, Kodungallur" },
+    { code: "KL48", name: "SRTO, Wadakkanchery" },
+    { code: "KL49", name: "SRTO, Alathur" },
+    { code: "KL50", name: "SRTO, Mannarkkad" },
+    { code: "KL51", name: "SRTO, Ottappalam" },
+    { code: "KL52", name: "SRTO, Pattambi" },
+    { code: "KL53", name: "SRTO, Perinthalmanna" },
+    { code: "KL54", name: "SRTO, Ponnani" },
+    { code: "KL55", name: "SRTO, Tirur" },
+    { code: "KL56", name: "SRTO, Koyilandy" },
+    { code: "KL57", name: "SRTO, Koduvally" },
+    { code: "KL58", name: "SRTO, Thalassery" },
+    { code: "KL59", name: "SRTO, Taliparamba" },
+    { code: "KL60", name: "SRTO, Kanhangad" },
+    { code: "KL61", name: "SRTO, Kunnathoor" },
+    { code: "KL62", name: "SRTO, Ranni" },
+    { code: "KL63", name: "SRTO, Angamaly" },
+    { code: "KL64", name: "SRTO, Chalakudy" },
+    { code: "KL65", name: "SRTO, Thirurangadi" },
+    { code: "KL66", name: "SRTO, Kuttanad" },
+    { code: "KL67", name: "SRTO, Uzhavoor" },
+    { code: "KL68", name: "SRTO, Devikulam" },
+    { code: "KL69", name: "SRTO, Udumpanchola" },
+    { code: "KL70", name: "SRTO, Chittur" },
+    { code: "KL71", name: "SRTO, Nilambur" },
+    { code: "KL72", name: "SRTO, Mananthavady" },
+    { code: "KL73", name: "SRTO, SulthanBathery" },
+    { code: "KL74", name: "SRTO, Kattakada" },
+    { code: "KL75", name: "SRTO, Thriprayar" },
+    { code: "KL76", name: "SRTO, Nanmanda" },
+    { code: "KL77", name: "SRTO, Perambra" },
+    { code: "KL78", name: "SRTO, Iritty" },
+    { code: "KL79", name: "SRTO, Vellarikundu" },
+    { code: "KL80", name: "SRTO, Pathanapuram" },
+    { code: "KL81", name: "SRTO, Varkala" },
+    { code: "KL82", name: "SRTO, Chadayamangalam" },
+    { code: "KL83", name: "SRTO, Konni" },
+    { code: "KL84", name: "SRTO, Kondotty" },
+    { code: "KL85", name: "SRTO, Ramanattukara(Feroke)" },
+    { code: "KL86", name: "SRTO, Payyanur" }
+  ],
+  "Enforcement RTO Offices": [
+    { code: "KLE01", name: "RTO Enforcement, Thiruvananthapuram" },
+    { code: "KLE02", name: "RTO Enforcement, Kollam" },
+    { code: "KLE03", name: "RTO Enforcement, Pathanamthitta" },
+    { code: "KLE04", name: "RTO Enforcement, Alappuzha" },
+    { code: "KLE05", name: "RTO Enforcement, Kottayam" },
+    { code: "KLE06", name: "RTO Enforcement, Idukki" },
+    { code: "KLE07", name: "RTO Enforcement, Ernakulam" },
+    { code: "KLE08", name: "RTO Enforcement, Thrissur" },
+    { code: "KLE09", name: "RTO Enforcement, Palakkad" },
+    { code: "KLE10", name: "RTO Enforcement, Malappuram" },
+    { code: "KLE11", name: "RTO Enforcement, Kozhikode" },
+    { code: "KLE12", name: "RTO Enforcement, Wayanad" },
+    { code: "KLE13", name: "RTO Enforcement, Kannur" },
+    { code: "KLE14", name: "RTO Enforcement, Kasaragod" }
+  ]
+};
+
+// Flattened lookup array
+const ALL_MVD_OFFICES = [];
+Object.entries(OT_OFFICE_GROUPS).forEach(([category, list]) => {
+  list.forEach(item => {
+    ALL_MVD_OFFICES.push({
+      code: item.code,
+      name: item.name,
+      displayName: `${item.code} — ${item.name}`,
+      category
+    });
+  });
+});
+window.ALL_MVD_OFFICES = ALL_MVD_OFFICES;
+
+const DESIGNATION_OPTIONS = ["RTO", "Joint RTO", "MVI", "AMVI"];
+
+const GENERAL_ED_OPTIONS = ["SSLC", "Plus Two", "Others"];
+
+const TECH_QUAL_OPTIONS = [
+  "PhD with Postdoctoral Research",
+  "PhD",
+  "M.Tech",
+  "B.Tech",
+  "Diploma",
+  "Others"
+];
+
+const ADDITIONAL_QUAL_OPTIONS = [
+  "LLB",
+  "LLM (Constitutional Law)",
+  "MBA (Public Policy)",
+  "PGDeG (e-Governance)",
+  "Safety Engineering",
+  "Safety Engineering Diploma",
+  "PG Diploma in Cyber Law",
+  "MCA (Computer Applications)",
+  "Auto-CAD Certification",
+  "Certificate in Automotive Mechatronics",
+  "B.Sc. Computer Science",
+  "Certified Data Analyst",
+  "Others — Specify"
+];
+
+const SPECIALIZED_SKILL_OPTIONS = [
+  "Legal & Prosecution",
+  "Accident Investigation",
+  "IT & Software",
+  "AIS Standards & Homologation",
+  "EV Architecture",
+  "Data Analytics",
+  "Radar & Speed Enforcement",
+  "MV Act & Statutory Rules",
+  "Vehicle Fitness Inspection",
+  "Policy Drafting",
+  "Heavy Commercial Vehicle Brake Systems",
+  "Field Enforcement",
+  "Hazardous Goods Transport",
+  "PESO Regulations",
+  "Transport Administration",
+  "Vehicle Homologation",
+  "Heavy Equipment Inspection",
+  "Others — Specify"
+];
+
+// --- 2. SAMPLE SEED DATA (Cleaned - No hardcoded or dummy officers) ---
+const SEED_OFFICER_PROFILES = [];
+
+// --- 3. STATE CONTROLLER ---
+let otProfilesStore = (JSON.parse(localStorage.getItem('mvd_ot_profiles_store')) || [])
+  .filter(p => p && p.id && !p.id.startsWith('prof_kl01_') && !p.id.startsWith('prof_kl07_') && !p.id.startsWith('off_seed_'));
+localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+
+let otReportSnapshotsStore = JSON.parse(localStorage.getItem('mvd_ot_report_snapshots')) || {};
+let otAuditLogs = JSON.parse(localStorage.getItem('mvd_ot_audit_logs')) || [];
+
+// Office Lock Registry: Maps officeCode => authorized Gmail ID
+let otOfficeLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks')) || {};
+window.otOfficeLocks = otOfficeLocks;
+
+// Active Session Roles:
+// 'data_entry' | 'head_of_office' | 'dispatch_user' | 'admin'
+let otCurrentRole = localStorage.getItem('mvd_ot_current_role') || 'head_of_office';
+let otActiveSubTab = 'form'; // 'form' | 'directory' | 'report' | 'roles'
+let otFormDirty = false;
+let otEditingProfileId = null;
+let otOriginalEditingPen = null;
+
+// Temporary staging for repeatable training records during form entry
+let otStagedTrainings = [];
+let otEditingTrainingIndex = -1;
+
+// Custom Qualifications staging
+let otCustomQualificationsCount = 0;
+
+// Administrative directory filter state
+let otDirFilter = {
+  search: "",
+  office: "ALL",
+  designation: "ALL",
+  techQual: "ALL",
+  addQual: "ALL",
+  status: "ALL",
+  skill: "ALL",
+  trainingYear: "ALL",
+  page: 1,
+  pageSize: 10
+};
+
+// --- 4. FORMATTING & HELPER UTILITIES ---
+
+function otFormatIST(isoString) {
+  if (!isoString) return "N/A";
+  try {
+    const d = new Date(isoString);
+    if (isNaN(d.getTime())) return isoString;
+    return d.toLocaleString('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: 'short',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true
+    });
+  } catch (e) {
+    return isoString;
+  }
+}
+
+function otNormalizePhone(phone) {
+  if (!phone) return "";
+  let clean = phone.toString().replace(/[^0-9]/g, "");
+  if (clean.length === 12 && clean.startsWith("91")) {
+    clean = clean.substring(2);
+  }
+  return clean;
+}
+
+function otSanitizePEN(pen) {
+  if (!pen) return "";
+  // Trim outer spaces without stripping internal leading zeros
+  return pen.toString().trim();
+}
+
+function otLogAudit(action, profileOrReportRef, details) {
+  const user = otGetCurrentUser();
+  const entry = {
+    id: "log_" + Date.now() + "_" + Math.random().toString(36).substring(2, 6),
+    action,
+    reference: profileOrReportRef,
+    userRole: otCurrentRole,
+    userName: user.name,
+    userEmail: user.email,
+    timestamp: new Date().toISOString(),
+    details: details || {}
+  };
+  otAuditLogs.unshift(entry);
+  if (otAuditLogs.length > 500) otAuditLogs.pop();
+  localStorage.setItem('mvd_ot_audit_logs', JSON.stringify(otAuditLogs));
+  if (typeof saveOfficerAuditLogToSupabase === 'function') {
+    saveOfficerAuditLogToSupabase(entry);
+  }
+}
+
+function otGetCurrentUser() {
+  const gUser = window.googleAuthUser || JSON.parse(localStorage.getItem('mvd_google_user_session') || "null");
+
+  return {
+    name: (gUser && gUser.name) ? gUser.name : "",
+    email: (gUser && gUser.email) ? gUser.email : "",
+    role: otCurrentRole,
+    assignedOfficeCode: "",
+    assignedOfficeName: ""
+  };
+}
+
+// Check permission logic
+function otHasPermission(action) {
+  const role = otCurrentRole;
+  if (role === 'admin') return true; // Commissionerate admin can do everything
+
+  switch (action) {
+    case 'create_draft':
+    case 'submit_profile':
+    case 'edit_profile':
+      return role === 'data_entry' || role === 'head_of_office';
+    case 'verify_report':
+      return role === 'head_of_office'; // Restricted to Head of Office / In-Charge
+    case 'forward_report':
+      return true; // Direct forwarding to Transport Commissionerate
+    case 'view_all_offices':
+      return role === 'admin';
+    default:
+      return false;
+  }
+}
+
+// --- ACCESS CONTROL & OFFICE LOCKING UTILITIES ---
+
+function clearFieldError(fieldId) {
+  if (!fieldId) return;
+  const field = document.getElementById(fieldId);
+  const errContainer = document.getElementById(`err_${fieldId}`);
+  if (field) field.classList.remove('is-invalid');
+  if (errContainer) errContainer.textContent = '';
+}
+window.clearFieldError = clearFieldError;
+
+function otGetLoggedInEmail() {
+  const gUser = window.googleAuthUser || JSON.parse(localStorage.getItem('mvd_google_user_session') || "null");
+  return (gUser && gUser.email) ? gUser.email.toLowerCase().trim() : '';
+}
+
+function getOfficeLockedEmail(officeCode) {
+  if (!officeCode) return '';
+  const cleanCode = officeCode.trim();
+  const codePrefix = cleanCode.split(/[\s—–-]+/)[0].toUpperCase();
+
+  // Direct registry in mvd_ot_office_locks (authoritative source of truth)
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  if (locks[cleanCode]) return locks[cleanCode].toLowerCase().trim();
+  if (locks[codePrefix]) return locks[codePrefix].toLowerCase().trim();
+
+  for (const [k, v] of Object.entries(locks)) {
+    if (!v) continue;
+    const kPrefix = k.split(/[\s—–-]+/)[0].toUpperCase();
+    if (kPrefix === codePrefix || k.toUpperCase() === cleanCode.toUpperCase()) {
+      return v.toLowerCase().trim();
+    }
+  }
+
+  return '';
+}
+window.getOfficeLockedEmail = getOfficeLockedEmail;
+
+window.removeOfficeLock = function(code) {
+  if (!code) return {};
+  const clean = code.trim();
+  const prefix = clean.split(/[\s—–-]+/)[0].toUpperCase();
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  delete locks[clean];
+  delete locks[prefix];
+  for (const k of Object.keys(locks)) {
+    const kp = k.split(/[\s—–-]+/)[0].toUpperCase();
+    if (kp === prefix || k.toUpperCase() === clean.toUpperCase()) {
+      delete locks[k];
+    }
+  }
+  localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+  otOfficeLocks = locks;
+  window.otOfficeLocks = locks;
+  return locks;
+};
+
+window.removeAllOfficeLocks = function() {
+  localStorage.setItem('mvd_ot_office_locks', JSON.stringify({}));
+  otOfficeLocks = {};
+  window.otOfficeLocks = {};
+  return {};
+};
+
+function getOfficeLinkedToUser(email) {
+  if (!email) return null;
+  const clean = email.toLowerCase().trim();
+  const locks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+  for (const [code, owner] of Object.entries(locks)) {
+    if (owner && owner.toLowerCase().trim() === clean) return code;
+  }
+  return null;
+}
+
+function toggleOfficerFormDisabled(disabled) {
+  const form = document.getElementById('otOfficerForm');
+  if (!form) return;
+  const elements = form.querySelectorAll('input:not(#otMainOfficeSelect), select:not(#otMainOfficeSelect), textarea');
+  elements.forEach(el => {
+    el.disabled = disabled;
+    if (disabled) {
+      el.style.opacity = '0.6';
+      el.style.cursor = 'not-allowed';
+    } else {
+      el.style.opacity = '';
+      el.style.cursor = '';
+    }
+  });
+
+  const submitBtn = document.getElementById('otBtnSubmitProfile');
+  const draftBtn = document.getElementById('otBtnSaveDraft');
+  const prevBtn = document.querySelector('button[onclick="handleProfilePreview()"]');
+  if (submitBtn) {
+    submitBtn.disabled = disabled;
+    submitBtn.style.opacity = disabled ? '0.6' : '';
+    submitBtn.style.cursor = disabled ? 'not-allowed' : '';
+  }
+  if (draftBtn) {
+    draftBtn.disabled = disabled;
+    draftBtn.style.opacity = disabled ? '0.6' : '';
+    draftBtn.style.cursor = disabled ? 'not-allowed' : '';
+  }
+  if (prevBtn) {
+    prevBtn.disabled = disabled;
+    prevBtn.style.opacity = disabled ? '0.6' : '';
+    prevBtn.style.cursor = disabled ? 'not-allowed' : '';
+  }
+}
+
+function checkOfficeAccessAndLock(officeCode) {
+  const alertBox = document.getElementById('otOfficeLockAlert');
+  const authPanel = document.getElementById('otOfficeAuthorizedPanel');
+
+  if (!officeCode) {
+    if (alertBox) {
+      alertBox.style.display = 'none';
+      alertBox.innerHTML = '';
+    }
+    if (authPanel) authPanel.style.display = 'none';
+    toggleOfficerFormDisabled(false);
+    return;
+  }
+
+  const currentEmail = otGetLoggedInEmail();
+  const lockedEmail = getOfficeLockedEmail(officeCode);
+
+  if (lockedEmail) {
+    if (currentEmail && lockedEmail.toLowerCase() === currentEmail.toLowerCase()) {
+      // Authorized User
+      toggleOfficerFormDisabled(false);
+      if (alertBox) {
+        alertBox.className = 'reflection-alert alert-authorized';
+        alertBox.style.display = 'flex';
+        alertBox.style.background = '#f0fdf4';
+        alertBox.style.borderColor = '#86efac';
+        alertBox.style.color = '#064e3b';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
+            <span>Use this Gmail ID: <strong>${escapeHtml(currentEmail)}</strong> for entering all officers Details. This Gmail ID is assigned for this office.</span>
+          </div>
+        `;
+      }
+      renderOfficeEditOptionList(officeCode);
+    } else {
+      // Locked to another account: PREVENT ACCESS IMMEDIATELY!
+      toggleOfficerFormDisabled(true);
+      if (authPanel) authPanel.style.display = 'none';
+
+      // Clear input fields so unauthorized user cannot edit or submit
+      if (document.getElementById('otFullName')) document.getElementById('otFullName').value = '';
+      if (document.getElementById('otPen')) document.getElementById('otPen').value = '';
+      if (document.getElementById('otDesignationSelect')) document.getElementById('otDesignationSelect').value = '';
+
+      const alertMsg = `This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`;
+      if (alertBox) {
+        alertBox.className = 'reflection-alert alert-restricted';
+        alertBox.style.display = 'flex';
+        alertBox.style.background = '#fef2f2';
+        alertBox.style.borderColor = '#ef4444';
+        alertBox.style.color = '#991b1b';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: flex-start; gap: 12px; padding: 4px 0; width: 100%;">
+            <i class="fa-solid fa-triangle-exclamation" style="color:#dc2626; font-size: 1.4rem; flex-shrink: 0; margin-top: 2px;"></i>
+            <div style="font-size: 0.95rem; line-height: 1.5; color: #991b1b;">
+              <div style="font-weight: 800; font-size: 1rem; margin-bottom: 4px; color: #b91c1c;">
+                <i class="fa-solid fa-lock"></i> Access Restricted
+              </div>
+              <div>This office is entered by <strong>${escapeHtml(lockedEmail)}</strong>. Please login with <strong>${escapeHtml(lockedEmail)}</strong> to add and edit details.</div>
+            </div>
+          </div>
+        `;
+        alertBox.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      }
+      showToast(alertMsg, 'error');
+    }
+  } else {
+    // Unlocked / Open office (first entry will lock to current account)
+    toggleOfficerFormDisabled(false);
+    if (authPanel) {
+      const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
+      if (officeProfiles.length > 0) {
+        renderOfficeEditOptionList(officeCode);
+      } else {
+        authPanel.style.display = 'none';
+      }
+    }
+    if (alertBox) {
+      if (currentEmail) {
+        alertBox.className = 'reflection-alert alert-authorized';
+        alertBox.style.display = 'flex';
+        alertBox.style.background = '#f0fdf4';
+        alertBox.style.borderColor = '#86efac';
+        alertBox.style.color = '#064e3b';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
+            <span>Use this Gmail ID: <strong>${escapeHtml(currentEmail)}</strong> for entering all officers Details. This Gmail ID is assigned for this office.</span>
+          </div>
+        `;
+      } else {
+        alertBox.className = 'reflection-alert alert-unlocked';
+        alertBox.style.display = 'flex';
+        alertBox.style.background = '#eff6ff';
+        alertBox.style.borderColor = '#93c5fd';
+        alertBox.style.color = '#1e40af';
+        alertBox.innerHTML = `
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-lock-open" style="color:#2563eb; font-size: 1.1rem;"></i>
+            <span>This office is Open for data entry. Please sign in with your Google account to submit.</span>
+          </div>
+        `;
+      }
+    }
+  }
+}
+window.checkOfficeAccessAndLock = checkOfficeAccessAndLock;
+
+function renderOfficeEditOptionList(officeCode) {
+  const panel = document.getElementById('otOfficeAuthorizedPanel');
+  if (!panel) return;
+
+  const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
+  if (officeProfiles.length === 0) {
+    panel.style.display = 'none';
+    return;
+  }
+
+  panel.innerHTML = `
+    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 10px;">
+      <div style="font-weight: 700; color: #064e3b; font-size: 0.92rem;">
+        <i class="fa-solid fa-user-check"></i> ${officeProfiles.length} Officer Profile(s) Registered for this Office
+      </div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="startNewOfficerForOffice('${officeCode}')" style="font-size: 0.8rem; padding: 4px 10px; background: white;">
+        <i class="fa-solid fa-plus"></i> Add Another Officer
+      </button>
+    </div>
+    <div class="data-table-container" style="max-height: 220px; overflow-y: auto; background: white; border-radius: 6px; border: 1px solid #d1fae5;">
+      <table class="data-table" style="font-size: 0.85rem; margin: 0;">
+        <thead>
+          <tr style="background: #f0fdf4;">
+            <th>Officer Full Name</th>
+            <th>PEN</th>
+            <th>Designation</th>
+            <th>Status</th>
+            <th style="text-align: right;">Action</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${officeProfiles.map(p => `
+            <tr>
+              <td><strong>${escapeHtml(p.officerFullName)}</strong></td>
+              <td><code>${escapeHtml(p.pen)}</code></td>
+              <td>${escapeHtml(p.designation)}</td>
+              <td><span class="badge ${p.status === 'submitted' ? 'badge-working' : 'badge-warning'}" style="font-size: 0.75rem;">${escapeHtml(p.status.toUpperCase())}</span></td>
+              <td style="text-align: right;">
+                <button type="button" class="btn btn-primary btn-sm" onclick="loadProfileForEditing('${p.id}')" style="padding: 3px 10px; font-size: 0.78rem;">
+                  <i class="fa-solid fa-pen-to-square"></i> Edit
+                </button>
+                <button type="button" class="btn btn-danger btn-sm" onclick="deleteOfficerProfile('${p.id}')" style="padding: 3px 10px; font-size: 0.78rem; margin-left: 6px;">
+                  <i class="fa-solid fa-trash"></i> Delete
+                </button>
+              </td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
+  `;
+  panel.style.display = 'block';
+}
+
+function startNewOfficerForOffice(officeCode) {
+  resetOfficerForm();
+  const sel = document.getElementById('otMainOfficeSelect');
+  if (sel) sel.value = officeCode;
+  checkOfficeAccessAndLock(officeCode);
+}
+
+// --- 5. INITIALIZATION & MODULE ACTIVATION ---
+
+function initOfficerTrainingModule() {
+  console.log("Initializing Officer Training & Qualification Module...");
+  populateSearchableOfficeDropdowns();
+  renderAdditionalQualOptions();
+  renderSpecializedSkillsOptions();
+  renderStagedTrainingTable();
+  initUnsavedChangesProtection();
+  prefillEnteredByDetails();
+  renderRoleSwitcherUI();
+
+  // Attach instant validation listeners to main office dropdown
+  const officeSelect = document.getElementById('otMainOfficeSelect');
+  if (officeSelect) {
+    officeSelect.onchange = function() { handleOfficeSelectPicked(this); };
+    officeSelect.oninput = function() { handleOfficeSelectPicked(this); };
+    if (officeSelect.value) {
+      checkOfficeAccessAndLock(officeSelect.value);
+    }
+  }
+
+  // Load from Supabase in background
+  syncOfficerProfilesWithSupabase();
+  if (typeof syncOfficeLocksFromSupabase === 'function') {
+    syncOfficeLocksFromSupabase();
+  }
+
+  // Subscribe to live Realtime updates from Supabase
+  subscribeToRealtimeOfficerProfiles();
+}
+
+// Window beforeunload prompt if unsaved changes exist
+function initUnsavedChangesProtection() {
+  window.addEventListener('beforeunload', (e) => {
+    if (otFormDirty) {
+      e.preventDefault();
+      e.returnValue = "You have unsaved officer profile changes. Are you sure you want to leave?";
+      return e.returnValue;
+    }
+  });
+}
+
+function markFormDirty(dirty = true) {
+  otFormDirty = dirty;
+  const badge = document.getElementById('otUnsavedBadge');
+  if (badge) {
+    badge.style.display = dirty ? 'inline-flex' : 'none';
+  }
+}
+
+// --- 6. SEARCHABLE OFFICE DROPDOWN ENGINE ---
+
+function populateSearchableOfficeDropdowns() {
+  const selects = [
+    document.getElementById('otMainOfficeSelect'),
+    document.getElementById('otReportOfficeSelect'),
+    document.getElementById('otDirOfficeFilter')
+  ];
+
+  selects.forEach(sel => {
+    if (!sel) return;
+    const isFilter = sel.id === 'otDirOfficeFilter';
+    sel.innerHTML = isFilter ? '<option value="ALL">-- All MVD Offices (Statewide) --</option>' : '<option value="">-- Select Office (Code — Name) --</option>';
+
+    Object.entries(OT_OFFICE_GROUPS).forEach(([groupName, offices]) => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupName;
+      offices.forEach(off => {
+        const opt = document.createElement('option');
+        opt.value = off.code;
+        opt.textContent = `${off.code} — ${off.name}`;
+        optgroup.appendChild(opt);
+      });
+      sel.appendChild(optgroup);
+    });
+  });
+}
+
+function handleOfficeSearchFilter(inputEl, targetSelectId) {
+  const q = (inputEl.value || "").toLowerCase().trim();
+  const sel = document.getElementById(targetSelectId);
+  if (!sel) return;
+
+  const optgroups = sel.querySelectorAll('optgroup');
+  let matchCount = 0;
+  let exactMatchOpt = null;
+  let firstMatchOpt = null;
+
+  optgroups.forEach(group => {
+    let groupHasMatch = false;
+    const options = group.querySelectorAll('option');
+    options.forEach(opt => {
+      const text = opt.textContent.toLowerCase();
+      const code = opt.value.toLowerCase();
+      const cleanCode = code.replace(/[^a-z0-9]/g, '');
+      const cleanQ = q.replace(/[^a-z0-9]/g, '');
+      const matches = !q || text.includes(q) || code.includes(q) || cleanCode.includes(cleanQ);
+      opt.style.display = matches ? '' : 'none';
+      if (matches && opt.value) {
+        groupHasMatch = true;
+        matchCount++;
+        if (!firstMatchOpt) firstMatchOpt = opt;
+        if (code === q || cleanCode === cleanQ || text === q) {
+          exactMatchOpt = opt;
+        }
+      }
+    });
+    group.style.display = groupHasMatch ? '' : 'none';
+  });
+
+  // If user typed an exact code match (e.g. KL01, KLE01, TCO), auto-select it immediately
+  if (exactMatchOpt) {
+    sel.value = exactMatchOpt.value;
+    clearFieldError(targetSelectId);
+    clearFieldError(inputEl.id);
+    markFormDirty(true);
+  }
+}
+
+function handleOfficeSearchBlur(inputEl, targetSelectId) {
+  const q = (inputEl.value || "").toLowerCase().trim();
+  const sel = document.getElementById(targetSelectId);
+  if (!sel || !q) return;
+
+  // If already selected and matches visible option, update text and return
+  if (sel.value) {
+    const selectedOpt = sel.options[sel.selectedIndex];
+    if (selectedOpt && selectedOpt.style.display !== 'none' && selectedOpt.value) {
+      inputEl.value = selectedOpt.textContent;
+      clearFieldError(targetSelectId);
+      clearFieldError(inputEl.id);
+      return;
+    }
+  }
+
+  // Auto-pick first visible matching option
+  const visibleOptions = Array.from(sel.querySelectorAll('option')).filter(o => o.value && o.style.display !== 'none');
+  if (visibleOptions.length > 0) {
+    sel.value = visibleOptions[0].value;
+    inputEl.value = visibleOptions[0].textContent;
+    clearFieldError(targetSelectId);
+    clearFieldError(inputEl.id);
+    markFormDirty(true);
+  } else {
+    // Check against ALL_MVD_OFFICES
+    const cleanQ = q.replace(/[^a-z0-9]/g, '');
+    const m = ALL_MVD_OFFICES.find(o => 
+      o.code.toLowerCase() === q || 
+      o.code.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanQ ||
+      o.name.toLowerCase().includes(q) || 
+      `${o.code} ${o.name}`.toLowerCase().includes(q)
+    );
+    if (m) {
+      sel.value = m.code;
+      inputEl.value = `${m.code} — ${m.name}`;
+      clearFieldError(targetSelectId);
+      clearFieldError(inputEl.id);
+      markFormDirty(true);
+    }
+  }
+}
+
+function handleOfficeSelectPicked(sel) {
+  let val = '';
+  if (typeof sel === 'string') {
+    val = sel;
+    const el = document.getElementById('otMainOfficeSelect');
+    if (el && el.value !== val) el.value = val;
+  } else if (sel && sel.value !== undefined) {
+    val = sel.value;
+  }
+  const el = document.getElementById('otMainOfficeSelect');
+  if (el) clearFieldError(el.id);
+  markFormDirty(true);
+
+  checkOfficeAccessAndLock(val);
+}
+window.handleOfficeSelectPicked = handleOfficeSelectPicked;
+
+// --- 7. DYNAMIC FORM RENDERING (ADDITIONAL QUALIFICATIONS & SKILLS) ---
+
+function renderAdditionalQualOptions() {
+  const container = document.getElementById('otAddQualContainer');
+  if (!container) return;
+
+  container.innerHTML = ADDITIONAL_QUAL_OPTIONS.map((qual, idx) => {
+    const isOther = qual === 'Others — Specify';
+    return `
+      <div class="ot-qual-row" id="otQualRow_${idx}">
+        <label class="ot-checkbox-label">
+          <input type="checkbox" class="ot-add-qual-chk" value="${escapeHtml(qual)}" onchange="toggleAdditionalQualDetail(${idx}, this.checked)">
+          <span class="ot-qual-name">${escapeHtml(qual)}</span>
+        </label>
+
+        <!-- Dynamic Expandable Details for this Qualification -->
+        <div class="ot-qual-detail-panel" id="otQualDetail_${idx}" style="display: none;">
+          <div class="form-grid-3">
+            <div class="form-group">
+              <label><i class="fa-solid fa-list-check"></i> Completion Status <span class="req-star">*</span></label>
+              <select class="form-control ot-detail-status" onchange="handleQualStatusChange(${idx}, this.value)">
+                <option value="">-- Choose Status --</option>
+                <option value="Completed">Completed</option>
+                <option value="Pursuing">Pursuing</option>
+              </select>
+              <div class="field-error" id="err_qual_status_${idx}"></div>
+            </div>
+
+            <div class="form-group">
+              <label><i class="fa-solid fa-building-columns"></i> Institution / Board / University</label>
+              <input type="text" class="form-control ot-detail-inst" placeholder="e.g. CLI Mumbai, ILI New Delhi, University of Kerala">
+            </div>
+
+            <div class="form-group">
+              <label class="ot-detail-year-label" id="lbl_qual_year_${idx}"><i class="fa-regular fa-calendar"></i> Year of Passing / Expected</label>
+              <input type="number" class="form-control ot-detail-year" min="1970" max="2040" placeholder="e.g. 2024">
+              <div class="field-error" id="err_qual_year_${idx}"></div>
+            </div>
+          </div>
+
+          <div class="form-group" style="margin-top: 10px;">
+            <label><i class="fa-solid fa-note-sticky"></i> Remarks / Specialization</label>
+            <input type="text" class="form-control ot-detail-remarks" placeholder="e.g. Evening Batch, Distance Education, First Class">
+          </div>
+
+          ${isOther ? `
+            <div class="form-group" style="margin-top: 10px; background: #fffbe6; padding: 10px; border-radius: 6px; border: 1px solid #ffe58f;">
+              <label style="color: #b45309; font-weight: 700;"><i class="fa-solid fa-plus-circle"></i> Custom Qualification Name <span class="req-star">*</span></label>
+              <input type="text" class="form-control ot-detail-custom-name" placeholder="Specify exact degree / diploma / certification name">
+              <div class="field-error" id="err_qual_custom_${idx}"></div>
+            </div>
+          ` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function toggleAdditionalQualDetail(idx, isChecked) {
+  markFormDirty(true);
+  const panel = document.getElementById(`otQualDetail_${idx}`);
+  if (panel) {
+    panel.style.display = isChecked ? 'block' : 'none';
+  }
+}
+
+function handleQualStatusChange(idx, status) {
+  markFormDirty(true);
+  const label = document.getElementById(`lbl_qual_year_${idx}`);
+  const currentYear = new Date().getFullYear();
+  if (label) {
+    if (status === 'Completed') {
+      label.innerHTML = `<i class="fa-regular fa-calendar-check"></i> Year of Passing (Max ${currentYear})`;
+    } else if (status === 'Pursuing') {
+      label.innerHTML = `<i class="fa-regular fa-calendar-plus"></i> Expected Completion Year (Allows Future)`;
+    } else {
+      label.innerHTML = `<i class="fa-regular fa-calendar"></i> Year of Passing / Expected`;
+    }
+  }
+}
+
+function renderSpecializedSkillsOptions() {
+  const container = document.getElementById('otSpecializedSkillsContainer');
+  if (!container) return;
+
+  container.innerHTML = SPECIALIZED_SKILL_OPTIONS.map((skill, idx) => {
+    const isOther = skill === 'Others — Specify';
+    return `
+      <label class="ot-skill-pill ${isOther ? 'ot-skill-other-pill' : ''}" id="otSkillPill_${idx}">
+        <input type="checkbox" class="ot-skill-chk" value="${escapeHtml(skill)}" onchange="handleSkillSelectionChange(this, ${isOther})">
+        <span>${escapeHtml(skill)}</span>
+      </label>
+    `;
+  }).join('');
+}
+
+function handleSkillSelectionChange(chk, isOther) {
+  markFormDirty(true);
+  const pill = chk.closest('.ot-skill-pill');
+  if (chk.checked) {
+    pill.classList.add('active');
+  } else {
+    pill.classList.remove('active');
+  }
+
+  if (isOther) {
+    const customGroup = document.getElementById('otCustomSkillsGroup');
+    if (customGroup) {
+      customGroup.style.display = chk.checked ? 'block' : 'none';
+    }
+  }
+}
+
+// Conditional fields for Section 2 (General & Technical Qualifications)
+function handleGeneralEducationChange(val) {
+  markFormDirty(true);
+  const group = document.getElementById('otGenEdOtherGroup');
+  const input = document.getElementById('otGenEdOtherInput');
+  const show = val === 'Others';
+  if (group) group.style.display = show ? 'block' : 'none';
+  if (input && !show) input.value = '';
+}
+
+function handleTechnicalQualificationChange(val) {
+  markFormDirty(true);
+  const group = document.getElementById('otTechQualOtherGroup');
+  const input = document.getElementById('otTechQualOtherInput');
+  const show = val === 'Others';
+  if (group) group.style.display = show ? 'block' : 'none';
+  if (input && !show) input.value = '';
+}
+
+// --- 8. REPEATABLE IN-SERVICE TRAINING TABLE ENGINE ---
+
+function renderStagedTrainingTable() {
+  const tbody = document.getElementById('otTrainingTableBody');
+  const mobileContainer = document.getElementById('otTrainingCardsMobile');
+  if (!tbody) return;
+
+  // Sort staged trainings latest first
+  otStagedTrainings.sort((a, b) => (b.monthYear || "").localeCompare(a.monthYear || ""));
+
+  if (otStagedTrainings.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="6" style="text-align: center; color: var(--text-muted); padding: 24px;">
+          <i class="fa-regular fa-folder-open" style="font-size: 1.5rem; color: #cbd5e1; display: block; margin-bottom: 6px;"></i>
+          <strong>No training records added</strong>. Click <em>"+ Add Training"</em> below to record in-service training history.
+        </td>
+      </tr>
+    `;
+    if (mobileContainer) {
+      mobileContainer.innerHTML = `<div style="text-align: center; color: var(--text-muted); padding: 16px;">No training records added.</div>`;
+    }
+    return;
+  }
+
+  tbody.innerHTML = otStagedTrainings.map((tr, idx) => `
+    <tr>
+      <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+      <td><strong>${escapeHtml(tr.attended)}</strong></td>
+      <td>${escapeHtml(tr.conductedBy)}</td>
+      <td><span class="badge badge-info">${tr.durationValue} ${escapeHtml(tr.durationUnit)}</span></td>
+      <td><strong><i class="fa-regular fa-calendar-check"></i> ${escapeHtml(tr.monthYear)}</strong></td>
+      <td style="text-align: center;">
+        <div style="display: flex; gap: 6px; justify-content: center;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="editStagedTraining(${idx})" title="Edit Training">
+            <i class="fa-solid fa-pen"></i> Edit
+          </button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeStagedTraining(${idx})" title="Remove Training">
+            <i class="fa-solid fa-trash"></i>
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+
+  // Mobile responsive cards
+  if (mobileContainer) {
+    mobileContainer.innerHTML = otStagedTrainings.map((tr, idx) => `
+      <div class="ot-mobile-training-card">
+        <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+          <strong style="color: var(--primary-900); font-size: 0.95rem;">${escapeHtml(tr.attended)}</strong>
+          <span class="badge badge-info">${tr.durationValue} ${escapeHtml(tr.durationUnit)}</span>
+        </div>
+        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 4px;">
+          <i class="fa-solid fa-landmark"></i> Conducted by: ${escapeHtml(tr.conductedBy)}
+        </div>
+        <div style="font-size: 0.82rem; color: #047857; margin-top: 4px;">
+          <i class="fa-regular fa-calendar"></i> Month & Year: <strong>${escapeHtml(tr.monthYear)}</strong>
+        </div>
+        <div style="margin-top: 10px; display: flex; gap: 8px;">
+          <button type="button" class="btn btn-outline btn-sm" onclick="editStagedTraining(${idx})"><i class="fa-solid fa-pen"></i> Edit</button>
+          <button type="button" class="btn btn-danger btn-sm" onclick="removeStagedTraining(${idx})"><i class="fa-solid fa-trash"></i> Remove</button>
+        </div>
+      </div>
+    `).join('');
+  }
+}
+
+function openAddTrainingModal() {
+  otEditingTrainingIndex = -1;
+  document.getElementById('otTrainingModalTitle').innerHTML = '<i class="fa-solid fa-plus-circle"></i> Add In-Service Training Record';
+  document.getElementById('otTrAttendedInput').value = '';
+  document.getElementById('otTrConductedByInput').value = '';
+  document.getElementById('otTrDurationValInput').value = '';
+  document.getElementById('otTrDurationUnitSelect').value = 'Days';
+
+  // Set max month to current month (prevent future dates)
+  const now = new Date();
+  const ym = now.toISOString().substring(0, 7);
+  const myInput = document.getElementById('otTrMonthYearInput');
+  if (myInput) {
+    myInput.max = ym;
+    myInput.value = ym;
+  }
+
+  document.getElementById('otTrainingModal').style.display = 'flex';
+}
+
+function editStagedTraining(idx) {
+  otEditingTrainingIndex = idx;
+  const tr = otStagedTrainings[idx];
+  if (!tr) return;
+
+  document.getElementById('otTrainingModalTitle').innerHTML = '<i class="fa-solid fa-pen"></i> Edit In-Service Training Record';
+  document.getElementById('otTrAttendedInput').value = tr.attended || '';
+  document.getElementById('otTrConductedByInput').value = tr.conductedBy || '';
+  document.getElementById('otTrDurationValInput').value = tr.durationValue || '';
+  document.getElementById('otTrDurationUnitSelect').value = tr.durationUnit || 'Days';
+
+  const myInput = document.getElementById('otTrMonthYearInput');
+  const ym = new Date().toISOString().substring(0, 7);
+  if (myInput) {
+    myInput.max = ym;
+    myInput.value = tr.monthYear || ym;
+  }
+
+  document.getElementById('otTrainingModal').style.display = 'flex';
+}
+
+function closeTrainingModal() {
+  document.getElementById('otTrainingModal').style.display = 'none';
+}
+
+function saveStagedTrainingModal(e) {
+  if (e) e.preventDefault();
+  const attended = document.getElementById('otTrAttendedInput').value.trim();
+  const conductedBy = document.getElementById('otTrConductedByInput').value.trim();
+  const durVal = parseFloat(document.getElementById('otTrDurationValInput').value) || 0;
+  const durUnit = document.getElementById('otTrDurationUnitSelect').value;
+  const monthYear = document.getElementById('otTrMonthYearInput').value;
+
+  if (!attended) {
+    showToast("Please enter Training Attended", "warning");
+    return;
+  }
+  if (!conductedBy) {
+    showToast("Please enter Training Conducted By", "warning");
+    return;
+  }
+  if (durVal <= 0) {
+    showToast("Please enter a positive numeric value for Duration of Training", "warning");
+    return;
+  }
+  if (!monthYear) {
+    showToast("Please enter Month & Year of Training", "warning");
+    return;
+  }
+
+  // Prevent future dates
+  const currentYM = new Date().toISOString().substring(0, 7);
+  if (monthYear > currentYM) {
+    showToast("Future dates are not allowed for attended training.", "warning");
+    return;
+  }
+
+  const record = {
+    id: otEditingTrainingIndex >= 0 ? otStagedTrainings[otEditingTrainingIndex].id : "tr_" + Date.now(),
+    attended,
+    conductedBy,
+    durationValue: durVal,
+    durationUnit: durUnit,
+    monthYear
+  };
+
+  if (otEditingTrainingIndex >= 0) {
+    otStagedTrainings[otEditingTrainingIndex] = record;
+  } else {
+    otStagedTrainings.push(record);
+  }
+
+  markFormDirty(true);
+  closeTrainingModal();
+  renderStagedTrainingTable();
+}
+
+async function removeStagedTraining(idx) {
+  const ok = await (window.showCustomConfirm || showCustomConfirm)({
+    title: 'Remove Training Record',
+    message: 'Are you sure you want to remove this training record?',
+    confirmText: 'Remove',
+    isDanger: true
+  });
+  if (!ok) return;
+  otStagedTrainings.splice(idx, 1);
+  markFormDirty(true);
+  renderStagedTrainingTable();
+}
+
+// --- 9. SECTION 4: ENTERED-BY DETAILS & PREFILL ---
+
+function prefillEnteredByDetails() {
+  const user = otGetCurrentUser();
+  const nameInput = document.getElementById('otEnteredByName');
+  const desigInput = document.getElementById('otEnteredByDesignation');
+  const mobInput = document.getElementById('otEnteredByMobile');
+
+  if (nameInput && !nameInput.value.trim()) {
+    nameInput.value = user.name || "";
+  }
+  if (desigInput && !desigInput.value.trim()) {
+    desigInput.value = "";
+  }
+  if (mobInput && !mobInput.value.trim()) {
+    mobInput.value = "";
+  }
+}
+
+// --- 10. FORM SUBMISSION, VALIDATION & DRAFT SAVING ---
+
+function clearFieldErrors() {
+  document.querySelectorAll('.field-error').forEach(el => el.textContent = '');
+  document.querySelectorAll('.is-invalid').forEach(el => el.classList.remove('is-invalid'));
+}
+
+function setFieldError(fieldId, errorMsg) {
+  const field = document.getElementById(fieldId);
+  const errContainer = document.getElementById(`err_${fieldId}`);
+  if (field) field.classList.add('is-invalid');
+  if (errContainer) errContainer.textContent = errorMsg;
+}
+
+function extractOfficerFormData(status = 'submitted') {
+  clearFieldErrors();
+  let isValid = true;
+
+  // Section 1: Identification & Current Posting
+  const fullName = (document.getElementById('otFullName')?.value || "").trim();
+  const rawPen = (document.getElementById('otPen')?.value || "").trim();
+  const pen = otSanitizePEN(rawPen);
+  const designation = document.getElementById('otDesignationSelect')?.value || "";
+  let officeCode = document.getElementById('otMainOfficeSelect')?.value || "";
+  if (!officeCode) {
+    const sInput = document.getElementById('otOfficeSearchInput');
+    const q = (sInput?.value || "").toLowerCase().trim();
+    if (q) {
+      const cleanQ = q.replace(/[^a-z0-9]/g, '');
+      const match = ALL_MVD_OFFICES.find(o => 
+        o.code.toLowerCase() === q || 
+        o.code.toLowerCase().replace(/[^a-z0-9]/g, '') === cleanQ ||
+        o.name.toLowerCase().includes(q) || 
+        `${o.code} ${o.name}`.toLowerCase().includes(q)
+      );
+      if (match) {
+        officeCode = match.code;
+        const sel = document.getElementById('otMainOfficeSelect');
+        if (sel) sel.value = match.code;
+        if (sInput) sInput.value = `${match.code} — ${match.name}`;
+      }
+    }
+  }
+  const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode);
+  const officeName = officeObj ? officeObj.name : "";
+
+  // Section 2: Academic & Technical
+  const genEd = document.getElementById('otGenEdSelect')?.value || "";
+  const genEdOther = (document.getElementById('otGenEdOtherInput')?.value || "").trim();
+  const techQual = document.getElementById('otTechQualSelect')?.value || "";
+  const techQualOther = (document.getElementById('otTechQualOtherInput')?.value || "").trim();
+  const institution = (document.getElementById('otTechInstitutionInput')?.value || "").trim();
+  const passingYearVal = parseInt(document.getElementById('otPassingYearInput')?.value) || null;
+  const grade = (document.getElementById('otGradeInput')?.value || "").trim();
+
+  // Additional Qualifications
+  const additionalQuals = [];
+  const qualRows = document.querySelectorAll('.ot-qual-row');
+  qualRows.forEach((row, idx) => {
+    const chk = row.querySelector('.ot-add-qual-chk');
+    if (chk && chk.checked) {
+      const isOther = chk.value === 'Others — Specify';
+      const customName = isOther ? (row.querySelector('.ot-detail-custom-name')?.value || "").trim() : chk.value;
+      const compStatus = row.querySelector('.ot-detail-status')?.value || "";
+      const inst = (row.querySelector('.ot-detail-inst')?.value || "").trim();
+      const yr = parseInt(row.querySelector('.ot-detail-year')?.value) || null;
+      const rem = (row.querySelector('.ot-detail-remarks')?.value || "").trim();
+
+      if (status === 'submitted') {
+        if (!compStatus) {
+          const errEl = row.querySelector(`#err_qual_status_${idx}`);
+          if (errEl) errEl.textContent = "Status is required (Completed / Pursuing)";
+          isValid = false;
+        }
+        if (isOther && !customName) {
+          const errEl = row.querySelector(`#err_qual_custom_${idx}`);
+          if (errEl) errEl.textContent = "Specify the custom qualification name";
+          isValid = false;
+        }
+        const currentYear = new Date().getFullYear();
+        if (compStatus === 'Completed' && yr && yr > currentYear) {
+          const errEl = row.querySelector(`#err_qual_year_${idx}`);
+          if (errEl) errEl.textContent = `Passing year cannot be in the future (Max ${currentYear})`;
+          isValid = false;
+        }
+      }
+
+      additionalQuals.push({
+        qualification: customName || chk.value,
+        status: compStatus,
+        institution: inst,
+        year: yr,
+        remarks: rem
+      });
+    }
+  });
+
+  // Section 3: Specialized Skills
+  const specializedSkills = [];
+  document.querySelectorAll('.ot-skill-chk:checked').forEach(cb => {
+    if (cb.value !== 'Others — Specify') {
+      specializedSkills.push(cb.value);
+    }
+  });
+  const customSkills = (document.getElementById('otCustomSkillsInput')?.value || "").trim();
+  const otherSkillChecked = document.querySelector('.ot-skill-chk[value="Others — Specify"]')?.checked;
+  if (status === 'submitted' && otherSkillChecked && !customSkills) {
+    setFieldError('otCustomSkillsInput', "Please enter the custom specialized skills");
+    isValid = false;
+  }
+  if (otherSkillChecked && customSkills) {
+    specializedSkills.push(`Others: ${customSkills}`);
+  }
+
+  // Section 4: Entered-By Details
+  const enteredByName = (document.getElementById('otEnteredByName')?.value || "").trim();
+  const enteredByDesig = (document.getElementById('otEnteredByDesignation')?.value || "").trim();
+  const rawMobile = (document.getElementById('otEnteredByMobile')?.value || "").trim();
+  const normalizedMobile = otNormalizePhone(rawMobile);
+
+  // Validation strictly for 'submitted' (Drafts allow saving partial data)
+  if (status === 'submitted') {
+    if (!fullName) {
+      setFieldError('otFullName', "Officer Full Name is required");
+      isValid = false;
+    }
+    if (!pen) {
+      setFieldError('otPen', "PEN / Employee ID is required");
+      isValid = false;
+    }
+    if (!designation) {
+      setFieldError('otDesignationSelect', "Current Designation is required");
+      isValid = false;
+    }
+    if (!officeCode) {
+      setFieldError('otMainOfficeSelect', "Office Selection is required");
+      isValid = false;
+    }
+    if (!genEd) {
+      setFieldError('otGenEdSelect', "General Education is required");
+      isValid = false;
+    }
+    if (genEd === 'Others' && !genEdOther) {
+      setFieldError('otGenEdOtherInput', "Specify other General Education");
+      isValid = false;
+    }
+    if (!techQual) {
+      setFieldError('otTechQualSelect', "Technical Qualification is required");
+      isValid = false;
+    }
+    if (techQual === 'Others' && !techQualOther) {
+      setFieldError('otTechQualOtherInput', "Specify other Technical Qualification");
+      isValid = false;
+    }
+
+    const currentYear = new Date().getFullYear();
+    if (passingYearVal && passingYearVal > currentYear) {
+      setFieldError('otPassingYearInput', `Passing year cannot be in the future (Max ${currentYear})`);
+      isValid = false;
+    }
+
+    if (!enteredByName) {
+      setFieldError('otEnteredByName', "Entered-By Officer Full Name is required");
+      isValid = false;
+    }
+    if (!enteredByDesig) {
+      setFieldError('otEnteredByDesignation', "Entered-By Designation is required");
+      isValid = false;
+    }
+    if (!normalizedMobile || normalizedMobile.length !== 10) {
+      setFieldError('otEnteredByMobile', "Please enter a valid 10-digit Indian Mobile Number");
+      isValid = false;
+    }
+
+    // Check unique PEN (Prevent duplicate profile creation)
+    const existingWithPen = otProfilesStore.find(p => p.pen === pen && p.id !== otEditingProfileId);
+    if (existingWithPen) {
+      setFieldError('otPen', `An officer profile already exists with PEN: "${pen}" (${existingWithPen.officerFullName})`);
+      isValid = false;
+    }
+  }
+
+  // If saving draft, PEN is at least required to identify record
+  if (status === 'draft' && !pen) {
+    setFieldError('otPen', "Please enter PEN / Employee ID to save a draft");
+    return { isValid: false, data: null };
+  }
+
+  const currentUser = otGetCurrentUser();
+  const nowISO = new Date().toISOString();
+
+  const data = {
+    id: otEditingProfileId || "prof_" + pen + "_" + Date.now().toString(36),
+    officerFullName: fullName,
+    pen,
+    designation,
+    officeCode,
+    officeName,
+    generalEducation: genEd,
+    generalEducationOther: genEdOther,
+    technicalQualification: techQual,
+    technicalQualificationOther: techQualOther,
+    institution,
+    passingYear: passingYearVal,
+    grade,
+    additionalQualifications: additionalQuals,
+    specializedSkills,
+    customSkills,
+    trainingHistory: [...otStagedTrainings],
+    enteredBy: {
+      fullName: enteredByName,
+      designation: enteredByDesig,
+      mobile: normalizedMobile,
+      userId: currentUser.email,
+      timestamp: nowISO
+    },
+    status,
+    createdAt: otEditingProfileId ? (otProfilesStore.find(p => p.id === otEditingProfileId)?.createdAt || nowISO) : nowISO,
+    updatedAt: nowISO,
+    version: otEditingProfileId ? ((otProfilesStore.find(p => p.id === otEditingProfileId)?.version || 1) + 1) : 1
+  };
+
+  return { isValid, data };
+}
+
+async function handleSaveDraft() {
+  const { isValid, data } = extractOfficerFormData('draft');
+  if (!isValid || !data) {
+    showToast("Please provide at least PEN / Employee ID to save a draft.", "warning");
+    return;
+  }
+
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  if (data.officeCode) {
+    const lockedEmail = getOfficeLockedEmail(data.officeCode);
+    if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
+      showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
+      return;
+    }
+    if (!lockedEmail && currentEmail) {
+      otOfficeLocks[data.officeCode] = currentEmail;
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+      window.otOfficeLocks = otOfficeLocks;
+      if (typeof saveOfficeLocksToSupabase === 'function') {
+        saveOfficeLocksToSupabase(otOfficeLocks);
+      }
+    }
+  }
+
+  const draftBtn = document.getElementById('otBtnSaveDraft');
+  const origBtnContent = draftBtn ? draftBtn.innerHTML : '';
+  if (draftBtn) {
+    draftBtn.disabled = true;
+    draftBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Saving...';
+  }
+
+  try {
+    saveOfficerRecordToStore(data);
+    markFormDirty(false);
+    otLogAudit('SAVE_DRAFT', data.pen, { officer: data.officerFullName, office: data.officeCode });
+
+    const result = await saveOfficerQualificationToSupabase(data);
+    if (result && result.success) {
+      showToast(`Draft for PEN: ${data.pen} saved successfully!`, "success");
+    } else {
+      showToast(`Draft saved locally for PEN: ${data.pen}`, "info");
+    }
+    if (data.officeCode) checkOfficeAccessAndLock(data.officeCode);
+  } catch (err) {
+    console.warn("Draft save error:", err);
+    showToast(`Draft saved locally for PEN: ${data.pen}`, "info");
+  } finally {
+    if (draftBtn) {
+      draftBtn.disabled = false;
+      draftBtn.innerHTML = origBtnContent;
+    }
+  }
+}
+
+async function handleProfileSubmit(e) {
+  if (e) e.preventDefault();
+  const { isValid, data } = extractOfficerFormData('submitted');
+
+  if (!isValid || !data) {
+    showToast("Validation failed. Please correct the highlighted errors.", "error");
+    // Scroll to first error
+    const firstErr = document.querySelector('.is-invalid');
+    if (firstErr) firstErr.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    return;
+  }
+
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  if (data.officeCode) {
+    const lockedEmail = getOfficeLockedEmail(data.officeCode);
+    if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
+      showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
+      return;
+    }
+    if (!lockedEmail && currentEmail) {
+      otOfficeLocks[data.officeCode] = currentEmail;
+      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+      window.otOfficeLocks = otOfficeLocks;
+      if (typeof saveOfficeLocksToSupabase === 'function') {
+        saveOfficeLocksToSupabase(otOfficeLocks);
+      }
+    }
+  }
+
+  const submitBtn = document.getElementById('otBtnSubmitProfile');
+  const origBtnContent = submitBtn ? submitBtn.innerHTML : '';
+  if (submitBtn) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Submitting profile...';
+  }
+
+  try {
+    // Check if office has an existing verified report: if so, mark that report for reverification
+    triggerReverificationCheck(data.officeCode);
+
+    // If PEN changed during editing, permanently delete the old PEN row from Supabase first
+    if (otOriginalEditingPen && otOriginalEditingPen !== data.pen) {
+      await deleteOfficerFromSupabase(otEditingProfileId, otOriginalEditingPen);
+    }
+
+    saveOfficerRecordToStore(data);
+    markFormDirty(false);
+    otLogAudit(otEditingProfileId ? 'UPDATE_PROFILE' : 'CREATE_PROFILE', data.pen, { officer: data.officerFullName, designation: data.designation, office: data.officeCode });
+
+    const result = await saveOfficerQualificationToSupabase(data);
+
+    if (result && result.success) {
+      showToast(`Officer Profile for "${data.officerFullName}" (PEN: ${data.pen}) saved successfully!`, "success");
+    } else {
+      const errMsg = result?.error?.message || "Sync warning";
+      showToast(`Saved locally, but server returned notice: ${errMsg}`, "warning");
+      console.warn("Supabase save error:", result?.error);
+    }
+
+    otOriginalEditingPen = null;
+
+    // Refresh directory and office tables
+    renderAdminOfficersDirectory();
+    renderOfficeSummaryReport();
+    if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+    resetOfficerForm();
+    if (data.officeCode) {
+      const officeSel = document.getElementById('otMainOfficeSelect');
+      if (officeSel) officeSel.value = data.officeCode;
+      checkOfficeAccessAndLock(data.officeCode);
+    }
+  } catch (err) {
+    console.error("Profile submit error:", err);
+    showToast(`Submission error: ${err.message}`, "error");
+  } finally {
+    if (submitBtn) {
+      submitBtn.disabled = false;
+      submitBtn.innerHTML = origBtnContent;
+    }
+  }
+}
+
+function saveOfficerRecordToStore(profile) {
+  const existingIdx = otProfilesStore.findIndex(p => p.id === profile.id || p.pen === profile.pen);
+  if (existingIdx >= 0) {
+    otProfilesStore[existingIdx] = profile;
+  } else {
+    otProfilesStore.unshift(profile);
+  }
+  localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+
+  // Sync to officersStore in app.js
+  if (typeof officersStore !== 'undefined') {
+    const offIdx = officersStore.findIndex(o => o.id === profile.id || o.officer_pen === profile.pen);
+    const mappedOff = {
+      id: profile.id,
+      office_name: profile.officeName ? `${profile.officeCode} ${profile.officeName}` : profile.officeCode,
+      officer_name: profile.officerFullName,
+      officer_pen: profile.pen,
+      officer_designation: profile.designation,
+      educational_qualification: profile.technicalQualification || profile.generalEducation || 'Plus Two',
+      qualification_other: profile.technicalQualificationOther || '',
+      specialization: (profile.specializedSkills || []).join(', ') || 'General',
+      technical_certifications: (profile.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', ') || 'None',
+      training_attended: (profile.trainingHistory || []).map(t => t.attended).join('; ') || 'None',
+      training_institutes: (profile.trainingHistory || []).map(t => t.conductedBy).join('; ') || 'MVD',
+      recent_training_year: profile.passingYear || 2024,
+      training_details: JSON.stringify(profile.trainingHistory || []),
+      officer_mobile: profile.enteredBy?.mobile || '9447000000',
+      officer_email: profile.enteredBy?.userId || '',
+      entry_officer_name: profile.enteredBy?.fullName || '',
+      entry_officer_designation: profile.enteredBy?.designation || '',
+      entry_officer_mobile: profile.enteredBy?.mobile || '',
+      created_at: profile.updatedAt || new Date().toISOString()
+    };
+    if (offIdx >= 0) {
+      officersStore[offIdx] = mappedOff;
+    } else {
+      officersStore.push(mappedOff);
+    }
+    localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
+  }
+}
+
+async function resetOfficerForm() {
+  if (otFormDirty) {
+    const ok = await (window.showCustomConfirm || showCustomConfirm)({
+      title: 'Discard Changes',
+      message: 'You have unsaved changes. Are you sure you want to discard them?',
+      confirmText: 'Discard',
+      isDanger: true
+    });
+    if (!ok) return;
+  }
+
+  otEditingProfileId = null;
+  otOriginalEditingPen = null;
+  otStagedTrainings = [];
+  otEditingTrainingIndex = -1;
+  markFormDirty(false);
+  clearFieldErrors();
+
+  document.getElementById('otOfficerForm').reset();
+  document.getElementById('otFormActionTitle').innerHTML = '<i class="fa-solid fa-user-plus"></i> Register New Officer Profile';
+  document.getElementById('otBtnCancelEdit').style.display = 'none';
+
+  // Deselect additional qual panels & skills
+  document.querySelectorAll('.ot-add-qual-chk').forEach(c => c.checked = false);
+  document.querySelectorAll('.ot-qual-detail-panel').forEach(p => p.style.display = 'none');
+  document.querySelectorAll('.ot-skill-chk').forEach(c => {
+    c.checked = false;
+    c.closest('.ot-skill-pill')?.classList.remove('active');
+  });
+
+  const customGroup = document.getElementById('otCustomSkillsGroup');
+  if (customGroup) customGroup.style.display = 'none';
+  const genEdGroup = document.getElementById('otGenEdOtherGroup');
+  if (genEdGroup) genEdGroup.style.display = 'none';
+  const techQualGroup = document.getElementById('otTechQualOtherGroup');
+  if (techQualGroup) techQualGroup.style.display = 'none';
+
+  renderStagedTrainingTable();
+  prefillEnteredByDetails();
+
+  const sInput = document.getElementById('otOfficeSearchInput');
+  if (sInput) sInput.value = '';
+  const sel = document.getElementById('otMainOfficeSelect');
+  if (sel) {
+    sel.querySelectorAll('option, optgroup').forEach(el => el.style.display = '');
+  }
+
+  const alertBox = document.getElementById('otOfficeLockAlert');
+  if (alertBox) alertBox.style.display = 'none';
+  const authPanel = document.getElementById('otOfficeAuthorizedPanel');
+  if (authPanel) authPanel.style.display = 'none';
+  toggleOfficerFormDisabled(false);
+}
+
+function cancelOfficerEdit() {
+  resetOfficerForm();
+}
+
+function loadProfileForEditing(profileId) {
+  let profile = otProfilesStore.find(p => p.id === profileId || p.pen === profileId);
+  if (!profile && typeof officersStore !== 'undefined') {
+    const off = officersStore.find(o => o.id === profileId || o.officer_pen === profileId);
+    if (off) {
+      profile = otProfilesStore.find(p => p.pen === off.officer_pen);
+      if (!profile) {
+        const offCode = (off.office_name || '').split(' ')[0] || '';
+        profile = {
+          id: off.id || ('prof_' + (off.officer_pen || 'item')),
+          pen: off.officer_pen || '',
+          officerFullName: off.officer_name || '',
+          designation: off.officer_designation || 'AMVI',
+          officeCode: offCode,
+          officeName: off.office_name || '',
+          generalEducation: 'Plus Two',
+          technicalQualification: off.educational_qualification || 'Diploma',
+          technicalQualificationOther: off.qualification_other || '',
+          institution: '',
+          passingYear: off.recent_training_year || 2024,
+          grade: 'First Class',
+          additionalQualifications: [],
+          specializedSkills: off.specialization ? off.specialization.split(',').map(s => s.trim()) : [],
+          trainingHistory: [],
+          enteredBy: {
+            fullName: off.entry_officer_name || 'Admin',
+            designation: off.entry_officer_designation || 'Superintendent',
+            mobile: off.entry_officer_mobile || '9447000000'
+          },
+          status: 'submitted',
+          version: 1
+        };
+        otProfilesStore.push(profile);
+      }
+    }
+  }
+  if (!profile) {
+    showToast("Profile not found", "error");
+    return;
+  }
+
+  // Permission check: Admin or Authorized User or role permission
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const lockedEmail = getOfficeLockedEmail(profile.officeCode);
+  const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
+
+  if (lockedEmail && !isAdmin && !isAuthorized && !otHasPermission('edit_profile')) {
+    showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, "error");
+    return;
+  }
+
+  resetOfficerForm();
+  otEditingProfileId = profile.id;
+  otOriginalEditingPen = profile.pen;
+  document.getElementById('otFormActionTitle').innerHTML = `<i class="fa-solid fa-user-pen"></i> Edit Profile: ${escapeHtml(profile.officerFullName)} (PEN: ${escapeHtml(profile.pen)})`;
+  document.getElementById('otBtnCancelEdit').style.display = 'inline-flex';
+
+  // Section 1: Entered By Details
+  if (profile.enteredBy) {
+    const nameEl = document.getElementById('otEnteredByName');
+    const desigEl = document.getElementById('otEnteredByDesignation');
+    const mobEl = document.getElementById('otEnteredByMobile');
+    if (nameEl) nameEl.value = profile.enteredBy.fullName || "";
+    if (desigEl) desigEl.value = profile.enteredBy.designation || "";
+    if (mobEl) mobEl.value = profile.enteredBy.mobile || "";
+  }
+
+  // Section 2: Identification & Office
+  document.getElementById('otFullName').value = profile.officerFullName || "";
+  document.getElementById('otPen').value = profile.pen || "";
+  document.getElementById('otDesignationSelect').value = profile.designation || "";
+  document.getElementById('otMainOfficeSelect').value = profile.officeCode || "";
+  const sInput = document.getElementById('otOfficeSearchInput');
+  if (sInput) {
+    const selOpt = document.getElementById('otMainOfficeSelect')?.querySelector(`option[value="${profile.officeCode}"]`);
+    sInput.value = selOpt ? selOpt.textContent : (profile.officeCode ? `${profile.officeCode} — ${profile.officeName || ''}` : '');
+  }
+
+  toggleOfficerFormDisabled(false);
+  checkOfficeAccessAndLock(profile.officeCode);
+
+  // Section 2
+  document.getElementById('otGenEdSelect').value = profile.generalEducation || "";
+  handleGeneralEducationChange(profile.generalEducation);
+  document.getElementById('otGenEdOtherInput').value = profile.generalEducationOther || "";
+
+  document.getElementById('otTechQualSelect').value = profile.technicalQualification || "";
+  handleTechnicalQualificationChange(profile.technicalQualification);
+  document.getElementById('otTechQualOtherInput').value = profile.technicalQualificationOther || "";
+
+  document.getElementById('otTechInstitutionInput').value = profile.institution || "";
+  document.getElementById('otPassingYearInput').value = profile.passingYear || "";
+  document.getElementById('otGradeInput').value = profile.grade || "";
+
+  // Additional Qualifications
+  if (Array.isArray(profile.additionalQualifications)) {
+    profile.additionalQualifications.forEach(aq => {
+      const isKnown = ADDITIONAL_QUAL_OPTIONS.includes(aq.qualification);
+      const qualNameToFind = isKnown ? aq.qualification : "Others — Specify";
+
+      const chk = document.querySelector(`.ot-add-qual-chk[value="${qualNameToFind}"]`);
+      if (chk) {
+        chk.checked = true;
+        const row = chk.closest('.ot-qual-row');
+        const idx = row.id.split('_')[1];
+        toggleAdditionalQualDetail(idx, true);
+
+        const statusSel = row.querySelector('.ot-detail-status');
+        if (statusSel) {
+          statusSel.value = aq.status || "";
+          handleQualStatusChange(idx, aq.status);
+        }
+        const instIn = row.querySelector('.ot-detail-inst');
+        if (instIn) instIn.value = aq.institution || "";
+        const yrIn = row.querySelector('.ot-detail-year');
+        if (yrIn) yrIn.value = aq.year || "";
+        const remIn = row.querySelector('.ot-detail-remarks');
+        if (remIn) remIn.value = aq.remarks || "";
+
+        if (!isKnown) {
+          const custNameIn = row.querySelector('.ot-detail-custom-name');
+          if (custNameIn) custNameIn.value = aq.qualification;
+        }
+      }
+    });
+  }
+
+  // Section 3: Skills
+  if (Array.isArray(profile.specializedSkills)) {
+    profile.specializedSkills.forEach(skill => {
+      if (skill.startsWith('Others:')) {
+        const otherChk = document.querySelector('.ot-skill-chk[value="Others — Specify"]');
+        if (otherChk) {
+          otherChk.checked = true;
+          handleSkillSelectionChange(otherChk, true);
+          document.getElementById('otCustomSkillsInput').value = skill.replace('Others:', '').trim();
+        }
+      } else {
+        const chk = document.querySelector(`.ot-skill-chk[value="${skill}"]`);
+        if (chk) {
+          chk.checked = true;
+          handleSkillSelectionChange(chk, false);
+        }
+      }
+    });
+  }
+
+  // Training History
+  otStagedTrainings = Array.isArray(profile.trainingHistory) ? JSON.parse(JSON.stringify(profile.trainingHistory)) : [];
+  renderStagedTrainingTable();
+
+  // Section 4: Entered-by
+  if (profile.enteredBy) {
+    document.getElementById('otEnteredByName').value = profile.enteredBy.fullName || "";
+    document.getElementById('otEnteredByDesignation').value = profile.enteredBy.designation || "";
+    document.getElementById('otEnteredByMobile').value = profile.enteredBy.mobile || "";
+  }
+
+  // Switch to Form Tab
+  if (typeof selectModuleMenu === 'function') {
+    selectModuleMenu('officer_training_qualification');
+  } else if (typeof switchPortalModule === 'function') {
+    switchPortalModule('officer_training_qualification');
+  }
+  switchOfficerSubTab('form');
+  document.getElementById('officerTrainingFormCard')?.scrollIntoView({ behavior: 'smooth' });
+  showToast(`Loaded profile for editing: ${profile.officerFullName}`, "info");
+}
+window.loadProfileForEditing = loadProfileForEditing;
+
+// --- 11. PROFILE PREVIEW & SINGLE PROFILE PRINT / PDF DOWNLOAD ---
+
+function handleProfilePreview() {
+  const { data } = extractOfficerFormData('preview');
+  if (!data) {
+    showToast("Please enter basic officer identification details to preview.", "warning");
+    return;
+  }
+  openProfilePreviewModal(data);
+}
+
+function openProfilePreviewModal(profile) {
+  const modal = document.getElementById('otProfilePreviewModal');
+  const body = document.getElementById('otProfilePreviewBody');
+  if (!modal || !body) return;
+
+  const qualBadges = (profile.additionalQualifications || []).map(aq => `
+    <div style="background: #f8fafc; border: 1px solid #e2e8f0; padding: 10px 14px; border-radius: 6px; margin-bottom: 6px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <strong style="color: var(--primary-900);">${escapeHtml(aq.qualification)}</strong>
+        <span class="badge ${aq.status === 'Completed' ? 'badge-working' : 'badge-warning'}">
+          ${aq.status === 'Completed' ? '<i class="fa-solid fa-check-circle"></i> COMPLETED' : '<i class="fa-solid fa-clock"></i> PURSUING'}
+        </span>
+      </div>
+      <div style="font-size: 0.83rem; color: #475569; margin-top: 4px;">
+        ${aq.institution ? `<i class="fa-solid fa-building-columns"></i> ${escapeHtml(aq.institution)} • ` : ''}
+        ${aq.year ? `Year: <strong>${aq.year}</strong> • ` : ''}
+        ${aq.remarks ? `Remarks: <em>${escapeHtml(aq.remarks)}</em>` : ''}
+      </div>
+    </div>
+  `).join('');
+
+  const skillPills = (profile.specializedSkills || []).map(s => `
+    <span class="badge badge-info" style="font-size: 0.82rem; padding: 4px 10px; margin: 2px;">
+      <i class="fa-solid fa-check"></i> ${escapeHtml(s)}
+    </span>
+  `).join('');
+
+  const trainingRows = (profile.trainingHistory && profile.trainingHistory.length > 0) ? profile.trainingHistory.map((tr, i) => `
+    <tr>
+      <td style="text-align: center;">${i + 1}</td>
+      <td><strong>${escapeHtml(tr.attended)}</strong></td>
+      <td>${escapeHtml(tr.conductedBy)}</td>
+      <td>${tr.durationValue} ${escapeHtml(tr.durationUnit)}</td>
+      <td><strong>${escapeHtml(tr.monthYear)}</strong></td>
+    </tr>
+  `).join('') : `<tr><td colspan="5" style="text-align: center; color: var(--text-muted);">No training records recorded.</td></tr>`;
+
+  body.innerHTML = `
+    <div class="ot-preview-container">
+      
+      <!-- Top Emblem Bar -->
+      <div style="text-align: center; border-bottom: 3px solid #0B3B24; padding-bottom: 14px; margin-bottom: 18px;">
+        <h2 style="font-size: 1.25rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Kerala</h2>
+        <h4 style="font-size: 0.98rem; color: #047857; margin: 4px 0 0 0; font-weight: 700;">OFFICER TRAINING & QUALIFICATION PROFILE</h4>
+        <span style="font-size: 0.78rem; color: #64748b;">Official Service & Technical Qualifications Record</span>
+      </div>
+
+      <!-- Section 1 -->
+      <div class="ot-preview-box">
+        <h4><i class="fa-solid fa-id-card"></i> 1. Official Identification & Current Posting</h4>
+        <div class="form-grid-2" style="font-size: 0.9rem;">
+          <div><strong>Officer Full Name:</strong> ${escapeHtml(profile.officerFullName)}</div>
+          <div><strong>PEN / Employee ID:</strong> <span class="badge badge-info" style="font-size: 0.9rem;">${escapeHtml(profile.pen)}</span></div>
+          <div><strong>Current Designation:</strong> <span class="badge badge-working">${escapeHtml(profile.designation)}</span></div>
+          <div><strong>Current Office:</strong> <strong>${escapeHtml(profile.officeCode)} — ${escapeHtml(profile.officeName)}</strong></div>
+        </div>
+      </div>
+
+      <!-- Section 2 -->
+      <div class="ot-preview-box">
+        <h4><i class="fa-solid fa-graduation-cap"></i> 2. Academic & Technical Credentials</h4>
+        <div class="form-grid-2" style="font-size: 0.9rem; margin-bottom: 12px;">
+          <div><strong>General Education:</strong> ${escapeHtml(profile.generalEducation === 'Others' ? profile.generalEducationOther : profile.generalEducation)}</div>
+          <div><strong>Technical Qualification:</strong> <strong>${escapeHtml(profile.technicalQualification === 'Others' ? profile.technicalQualificationOther : profile.technicalQualification)}</strong></div>
+          <div><strong>Institution / Board / University:</strong> ${escapeHtml(profile.institution || 'N/A')}</div>
+          <div><strong>Passing Year & Grade:</strong> ${escapeHtml(profile.passingYear || 'N/A')} (${escapeHtml(profile.grade || 'N/A')})</div>
+        </div>
+
+        <div style="margin-top: 10px;">
+          <strong style="font-size: 0.88rem; color: #0f172a;">Additional Qualifications:</strong>
+          <div style="margin-top: 6px;">
+            ${qualBadges || '<span style="color: var(--text-muted); font-size: 0.85rem;">None recorded</span>'}
+          </div>
+        </div>
+      </div>
+
+      <!-- Section 3 -->
+      <div class="ot-preview-box">
+        <h4><i class="fa-solid fa-star"></i> 3. Specialized Skills & In-Service Trainings</h4>
+        <div style="margin-bottom: 12px;">
+          <strong style="font-size: 0.88rem; color: #0f172a;">Specialized Skills Recorded:</strong>
+          <div style="margin-top: 6px; display: flex; flex-wrap: wrap; gap: 4px;">
+            ${skillPills || '<span style="color: var(--text-muted); font-size: 0.85rem;">None recorded</span>'}
+          </div>
+        </div>
+
+        <div>
+          <strong style="font-size: 0.88rem; color: #0f172a;">In-Service Training History:</strong>
+          <table class="data-table" style="margin-top: 6px; font-size: 0.82rem;">
+            <thead>
+              <tr>
+                <th style="width: 40px;">#</th>
+                <th>Training Attended</th>
+                <th>Conducted By</th>
+                <th>Duration</th>
+                <th>Month & Year</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${trainingRows}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- Section 4 -->
+      <div class="ot-preview-box" style="background: #f0fdf4; border-color: #a7f3d0;">
+        <h4><i class="fa-solid fa-user-pen"></i> 4. Entered By — Officer Details</h4>
+        <div class="form-grid-3" style="font-size: 0.85rem;">
+          <div><strong>Entered By:</strong> ${escapeHtml(profile.enteredBy?.fullName || 'N/A')}</div>
+          <div><strong>Designation:</strong> ${escapeHtml(profile.enteredBy?.designation || 'N/A')}</div>
+          <div><strong>Mobile:</strong> 📞 ${escapeHtml(profile.enteredBy?.mobile || 'N/A')}</div>
+        </div>
+        <div style="margin-top: 8px; font-size: 0.78rem; color: #047857;">
+          <i class="fa-regular fa-clock"></i> Timestamp (IST): ${otFormatIST(profile.updatedAt || profile.createdAt)}
+          • Status: <strong>${profile.status === 'submitted' ? 'SUBMITTED' : 'DRAFT'}</strong>
+        </div>
+      </div>
+
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+}
+
+function closeProfilePreviewModal() {
+  document.getElementById('otProfilePreviewModal').style.display = 'none';
+}
+
+function printCurrentProfilePreview() {
+  document.body.classList.add('printing-modal');
+  const modal = document.getElementById('otProfilePreviewModal');
+  if (modal) modal.classList.add('print-active');
+  window.print();
+  setTimeout(() => {
+    document.body.classList.remove('printing-modal');
+    if (modal) modal.classList.remove('print-active');
+  }, 1000);
+}
+
+// --- 12. ADMINISTRATIVE DIRECTORY & FILTER LISTING ---
+
+function renderAdminOfficersDirectory() {
+  const tbody = document.getElementById('otDirTableBody');
+  const countEl = document.getElementById('otDirResultCount');
+  if (!tbody) return;
+
+  const q = (document.getElementById('otDirSearchInput')?.value || "").toLowerCase().trim();
+  const office = document.getElementById('otDirOfficeFilter')?.value || "ALL";
+  const designation = document.getElementById('otDirDesignationFilter')?.value || "ALL";
+  const techQual = document.getElementById('otDirTechQualFilter')?.value || "ALL";
+  const addQual = document.getElementById('otDirAddQualFilter')?.value || "ALL";
+  const status = document.getElementById('otDirStatusFilter')?.value || "ALL"; // 'draft' | 'submitted' | 'ALL'
+  const skill = document.getElementById('otDirSkillFilter')?.value || "ALL";
+  const trYear = document.getElementById('otDirTrainingYearFilter')?.value || "ALL";
+
+  // Filter profiles
+  let filtered = otProfilesStore.filter(p => {
+    if (q) {
+      const hay = `${p.officerFullName} ${p.pen} ${p.officeCode} ${p.officeName} ${p.institution || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    if (office !== "ALL" && p.officeCode !== office) return false;
+    if (designation !== "ALL" && p.designation !== designation) return false;
+    if (techQual !== "ALL" && p.technicalQualification !== techQual) return false;
+    if (status !== "ALL" && p.status !== status) return false;
+
+    if (addQual !== "ALL") {
+      const hasQual = (p.additionalQualifications || []).some(aq => aq.qualification === addQual || (addQual === 'Others — Specify' && !ADDITIONAL_QUAL_OPTIONS.includes(aq.qualification)));
+      if (!hasQual) return false;
+    }
+
+    if (skill !== "ALL") {
+      const hasSkill = (p.specializedSkills || []).some(s => s === skill || s.includes(skill));
+      if (!hasSkill) return false;
+    }
+
+    if (trYear !== "ALL") {
+      const hasTrYear = (p.trainingHistory || []).some(t => t.monthYear && t.monthYear.startsWith(trYear));
+      if (!hasTrYear) return false;
+    }
+
+    return true;
+  });
+
+  if (countEl) countEl.textContent = `${filtered.length} Officers Found`;
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="9" style="text-align: center; color: var(--text-muted); padding: 32px;">
+          <i class="fa-solid fa-user-xmark" style="font-size: 2rem; color: #cbd5e1; display: block; margin-bottom: 8px;"></i>
+          No officer profiles matched your filter criteria.
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((p, idx) => {
+    const qualBadges = (p.additionalQualifications || []).map(aq => `
+      <span class="badge ${aq.status === 'Completed' ? 'badge-working' : 'badge-warning'}" style="font-size: 0.72rem; padding: 1px 6px; margin: 1px;">
+        ${escapeHtml(aq.qualification)} (${aq.status})
+      </span>
+    `).join(' ');
+
+    const skillsStr = (p.specializedSkills || []).slice(0, 2).map(s => escapeHtml(s)).join(', ') + ((p.specializedSkills || []).length > 2 ? ` (+${p.specializedSkills.length - 2} more)` : '');
+
+    return `
+      <tr>
+        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+        <td>
+          <div style="font-weight: 800; color: #0f172a;">${escapeHtml(p.officerFullName)}</div>
+          <div style="font-size: 0.78rem; color: #0284c7; font-weight: 700;"><i class="fa-solid fa-hashtag"></i> PEN: ${escapeHtml(p.pen)}</div>
+        </td>
+        <td><span class="badge badge-info">${escapeHtml(p.designation)}</span></td>
+        <td>
+          <div style="font-size: 0.84rem; font-weight: 700; color: #0f172a;">${escapeHtml(p.officeCode)}</div>
+          <div style="font-size: 0.76rem; color: #475569;">${escapeHtml(p.officeName)}</div>
+        </td>
+        <td>
+          <strong>${escapeHtml(p.technicalQualification === 'Others' ? p.technicalQualificationOther : p.technicalQualification)}</strong>
+          ${p.institution ? `<br><small style="color: #64748b;">${escapeHtml(p.institution)}</small>` : ''}
+        </td>
+        <td>${qualBadges || '<small style="color: #94a3b8;">None</small>'}</td>
+        <td><small style="color: #334155;">${skillsStr || '<span style="color: #94a3b8;">None</span>'}</small></td>
+        <td>
+          <span class="badge ${p.status === 'submitted' ? 'badge-working' : 'badge-danger'}">
+            ${p.status === 'submitted' ? 'SUBMITTED' : 'DRAFT'}
+          </span>
+        </td>
+        <td style="text-align: center;">
+          <div style="display: flex; gap: 4px; justify-content: center;">
+            <button class="btn btn-outline btn-sm" onclick="openProfilePreviewModal(otProfilesStore.find(x => x.id === '${p.id}'))" title="Preview Profile">
+              <i class="fa-solid fa-eye"></i>
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="loadProfileForEditing('${p.id}')" title="Edit Profile">
+              <i class="fa-solid fa-pen"></i>
+            </button>
+            ${otHasPermission('edit_profile') ? `
+              <button class="btn btn-danger btn-sm" onclick="deleteOfficerProfile('${p.id}')" title="Delete Profile">
+                <i class="fa-solid fa-trash"></i>
+              </button>
+            ` : ''}
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function resetAdminDirectoryFilters() {
+  document.getElementById('otDirSearchInput').value = "";
+  document.getElementById('otDirOfficeFilter').value = "ALL";
+  document.getElementById('otDirDesignationFilter').value = "ALL";
+  document.getElementById('otDirTechQualFilter').value = "ALL";
+  document.getElementById('otDirAddQualFilter').value = "ALL";
+  document.getElementById('otDirStatusFilter').value = "ALL";
+  document.getElementById('otDirSkillFilter').value = "ALL";
+  document.getElementById('otDirTrainingYearFilter').value = "ALL";
+  renderAdminOfficersDirectory();
+}
+
+async function deleteOfficerProfile(profileId) {
+  let p = otProfilesStore.find(x => x.id === profileId || x.pen === profileId);
+  if (!p && typeof officersStore !== 'undefined') {
+    const off = officersStore.find(o => o.id === profileId || o.officer_pen === profileId);
+    if (off) {
+      p = otProfilesStore.find(x => x.pen === off.officer_pen) || {
+        id: off.id,
+        pen: off.officer_pen,
+        officerFullName: off.officer_name,
+        officeCode: (off.office_name || '').split(' ')[0] || '',
+        officeName: off.office_name || ''
+      };
+    }
+  }
+  if (!p) {
+    showToast("Officer profile not found", "error");
+    return;
+  }
+
+  // Permission check: Admin or Authorized User
+  const currentEmail = otGetLoggedInEmail();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const lockedEmail = getOfficeLockedEmail(p.officeCode);
+  const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
+
+  if (lockedEmail && !isAdmin && !isAuthorized) {
+    showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
+    return;
+  }
+
+  const confirmFn = window.showCustomConfirm || (typeof showCustomConfirm === 'function' ? showCustomConfirm : null);
+  let confirmed = false;
+  if (confirmFn) {
+    confirmed = await confirmFn({
+      title: 'Delete Officer Profile',
+      message: `Are you sure you want to permanently delete profile for "${p.officerFullName}" (PEN: ${p.pen})?`,
+      confirmText: 'Delete',
+      isDanger: true
+    });
+  } else {
+    confirmed = window.confirm(`Are you sure you want to permanently delete profile for "${p.officerFullName}" (PEN: ${p.pen})?`);
+  }
+  if (!confirmed) return;
+
+  const pen = p.pen;
+  const pId = p.id;
+  const officeCode = p.officeCode;
+  const officerName = p.officerFullName;
+
+  // 1. Remove from local stores
+  otProfilesStore = otProfilesStore.filter(x => x.id !== pId && x.pen !== pen);
+  localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+
+  if (typeof officersStore !== 'undefined') {
+    officersStore = officersStore.filter(x => x.id !== pId && x.officer_pen !== pen);
+    localStorage.setItem('mvd_officers_store', JSON.stringify(officersStore));
+  }
+
+  triggerReverificationCheck(officeCode);
+  otLogAudit('DELETE_PROFILE', pen, { officer: officerName, office: officeCode });
+
+  // 2. Delete from remote database in real time
+  showToast(`Deleting profile for "${officerName}"...`, "info");
+  const delRes = await deleteOfficerFromSupabase(pId, pen);
+
+  if (delRes && delRes.success) {
+    showToast(`Successfully deleted profile for "${officerName}" (PEN: ${pen}).`, "success");
+  } else {
+    showToast(`Deleted locally. Note: ${delRes?.error?.message || 'Remote sync completed'}`, "info");
+  }
+
+  // 3. Re-render directory and office tables
+  renderAdminOfficersDirectory();
+  renderOfficeSummaryReport();
+  if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+  if (officeCode) {
+    renderOfficeEditOptionList(officeCode);
+    checkOfficeAccessAndLock(officeCode);
+  }
+}
+window.deleteOfficerProfile = deleteOfficerProfile;
+
+// Multi-file CSV Export (Officer Profiles CSV and Linked Trainings CSV)
+function exportOfficersDirectoryDualCSV() {
+  if (otProfilesStore.length === 0) {
+    showToast("No officer profiles available to export.", "warning");
+    return;
+  }
+
+  // 1. Primary Profiles CSV
+  const profileHeaders = [
+    "PEN", "Full Name", "Designation", "Office Code", "Office Name",
+    "General Education", "Technical Qualification", "Institution", "Passing Year", "Grade",
+    "Completed Additional Quals", "Pursuing Additional Quals", "Specialized Skills",
+    "Total Trainings Count", "Status", "Entered By Name", "Entered By Designation", "Entered By Mobile", "Last Updated IST"
+  ];
+
+  const profileRows = otProfilesStore.map(p => {
+    const compQuals = (p.additionalQualifications || []).filter(q => q.status === 'Completed').map(q => q.qualification).join("; ");
+    const purQuals = (p.additionalQualifications || []).filter(q => q.status === 'Pursuing').map(q => q.qualification).join("; ");
+    const skills = (p.specializedSkills || []).join("; ");
+    const trCount = (p.trainingHistory || []).length;
+
+    return [
+      `"${p.pen}"`,
+      `"${p.officerFullName.replace(/"/g, '""')}"`,
+      `"${p.designation}"`,
+      `"${p.officeCode}"`,
+      `"${p.officeName.replace(/"/g, '""')}"`,
+      `"${p.generalEducation === 'Others' ? p.generalEducationOther : p.generalEducation}"`,
+      `"${p.technicalQualification === 'Others' ? p.technicalQualificationOther : p.technicalQualification}"`,
+      `"${(p.institution || '').replace(/"/g, '""')}"`,
+      p.passingYear || "",
+      `"${(p.grade || '').replace(/"/g, '""')}"`,
+      `"${compQuals.replace(/"/g, '""')}"`,
+      `"${purQuals.replace(/"/g, '""')}"`,
+      `"${skills.replace(/"/g, '""')}"`,
+      trCount,
+      p.status,
+      `"${(p.enteredBy?.fullName || '').replace(/"/g, '""')}"`,
+      `"${(p.enteredBy?.designation || '').replace(/"/g, '""')}"`,
+      `"${p.enteredBy?.mobile || ''}"`,
+      `"${otFormatIST(p.updatedAt || p.createdAt)}"`
+    ].join(',');
+  });
+
+  const profilesCsvContent = "data:text/csv;charset=utf-8," + [profileHeaders.join(','), ...profileRows].join('\n');
+  otDownloadCsvFile(profilesCsvContent, `MVD_Officers_Profiles_${Date.now()}.csv`);
+
+  // 2. Linked Trainings CSV (Linked by PEN)
+  const trainingHeaders = ["PEN", "Officer Name", "Designation", "Office Code", "Training Attended", "Conducted By", "Duration Value", "Duration Unit", "Month & Year"];
+  const trainingRows = [];
+
+  otProfilesStore.forEach(p => {
+    (p.trainingHistory || []).forEach(tr => {
+      trainingRows.push([
+        `"${p.pen}"`,
+        `"${p.officerFullName.replace(/"/g, '""')}"`,
+        `"${p.designation}"`,
+        `"${p.officeCode}"`,
+        `"${tr.attended.replace(/"/g, '""')}"`,
+        `"${tr.conductedBy.replace(/"/g, '""')}"`,
+        tr.durationValue,
+        `"${tr.durationUnit}"`,
+        `"${tr.monthYear}"`
+      ].join(','));
+    });
+  });
+
+  if (trainingRows.length > 0) {
+    const trainingsCsvContent = "data:text/csv;charset=utf-8," + [trainingHeaders.join(','), ...trainingRows].join('\n');
+    setTimeout(() => {
+      otDownloadCsvFile(trainingsCsvContent, `MVD_Officers_Linked_Trainings_${Date.now()}.csv`);
+    }, 500);
+  }
+
+  showToast("Exported Officers Profiles & Linked Trainings CSV files successfully!", "success");
+}
+
+function otDownloadCsvFile(encodedContent, filename) {
+  const link = document.createElement("a");
+  link.setAttribute("href", encodeURI(encodedContent));
+  link.setAttribute("download", filename);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+// --- 13. OFFICE-WISE SUMMARY REPORT & VERIFICATION WORKFLOW ---
+
+let otCurrentReportOfficeCode = "";
+
+function handleReportOfficeSelectChange(officeCode) {
+  otCurrentReportOfficeCode = officeCode;
+  renderOfficeSummaryReport();
+}
+
+function renderEmptyUserSummaryReport(userEmail) {
+  const reportSelect = document.getElementById('otReportOfficeSelect');
+  if (reportSelect) {
+    reportSelect.disabled = true;
+    reportSelect.value = "";
+    reportSelect.title = "No office is linked to your account yet";
+  }
+
+  const headerOfficeEl = document.getElementById('otReportHeaderOffice');
+  if (headerOfficeEl) headerOfficeEl.textContent = "No Linked Office Found";
+
+  const cutoffEl = document.getElementById('otReportCutoffTime');
+  if (cutoffEl) cutoffEl.textContent = otFormatIST(new Date().toISOString());
+
+  const genDateEl = document.getElementById('otReportGenDate');
+  if (genDateEl) genDateEl.textContent = otFormatIST(new Date().toISOString());
+
+  const statusBadge = document.getElementById('otReportVerificationStatusBadge');
+  if (statusBadge) {
+    statusBadge.className = 'badge badge-secondary';
+    statusBadge.innerHTML = `<i class="fa-solid fa-lock"></i> NO LINKED OFFICE`;
+  }
+
+  const draftAlert = document.getElementById('otReportExcludedDraftsAlert');
+  if (draftAlert) {
+    draftAlert.style.display = 'flex';
+    draftAlert.innerHTML = `
+      <i class="fa-solid fa-circle-exclamation" style="font-size: 1.1rem; color: #0284c7;"></i>
+      <span><strong>Account Notice:</strong> Logged in as <strong>${escapeHtml(userEmail)}</strong>. You have not submitted officer details for any office yet. Please select your office and enter officer details in the <strong>Officer Entry &amp; Qualification</strong> tab to generate the Summary Report for your office.</span>
+    `;
+  }
+
+  // Clear metric cards
+  if (document.getElementById('otSummTotalOfficers')) document.getElementById('otSummTotalOfficers').textContent = "0";
+  if (document.getElementById('otSummDesigCounts')) document.getElementById('otSummDesigCounts').innerHTML = "RTO: <strong>0</strong> • JRTO: <strong>0</strong> • MVI: <strong>0</strong> • AMVI: <strong>0</strong>";
+  if (document.getElementById('otSummCompAddQual')) document.getElementById('otSummCompAddQual').textContent = "0";
+  if (document.getElementById('otSummPursAddQual')) document.getElementById('otSummPursAddQual').textContent = "0";
+  if (document.getElementById('otSummSkills')) document.getElementById('otSummSkills').textContent = "0";
+  if (document.getElementById('otSummWithTrainings')) document.getElementById('otSummWithTrainings').textContent = "0";
+  if (document.getElementById('otSummTotalTrainings')) document.getElementById('otSummTotalTrainings').textContent = "0";
+  if (document.getElementById('otSummTechQualPills')) document.getElementById('otSummTechQualPills').innerHTML = '<span style="color: var(--text-muted); font-size: 0.85rem;">None</span>';
+
+  // Clear tables
+  const detailsTbody = document.getElementById('otReportDetailsTableBody');
+  if (detailsTbody) {
+    detailsTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No office linked to your Gmail ID (${escapeHtml(userEmail)}). Enter officer details first to view office data.</td></tr>`;
+  }
+  const annexTbody = document.getElementById('otReportAnnexureTableBody');
+  if (annexTbody) {
+    annexTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No training history records available.</td></tr>`;
+  }
+  const contribTbody = document.getElementById('otReportContributorsTableBody');
+  if (contribTbody) {
+    contribTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No contributors recorded.</td></tr>`;
+  }
+
+  const digiVerifBox = document.getElementById('otReportDigitalVerificationDisplay');
+  if (digiVerifBox) digiVerifBox.style.display = 'none';
+
+  const dispatchBox = document.getElementById('otReportForwardingDetailsDisplay');
+  if (dispatchBox) dispatchBox.style.display = 'none';
+}
+
+function renderOfficeSummaryReport() {
+  const userEmail = otGetLoggedInEmail();
+  const linkedOfficeCode = getOfficeLinkedToUser(userEmail);
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  const reportSelect = document.getElementById('otReportOfficeSelect');
+
+  let officeCode = otCurrentReportOfficeCode;
+
+  // Filter report to only show the office linked to the logged-in user
+  if (!isAdmin && userEmail) {
+    if (linkedOfficeCode) {
+      officeCode = linkedOfficeCode;
+      otCurrentReportOfficeCode = linkedOfficeCode;
+      if (reportSelect) {
+        reportSelect.value = linkedOfficeCode;
+        reportSelect.disabled = true;
+        reportSelect.title = "Summary Report is locked to your authorized office";
+      }
+    } else {
+      // User is logged in but hasn't entered data for any office yet
+      renderEmptyUserSummaryReport(userEmail);
+      return;
+    }
+  } else {
+    // Admin or no user session: default to selected office or first office
+    if (!officeCode) {
+      officeCode = reportSelect?.value || "KL01";
+      otCurrentReportOfficeCode = officeCode;
+    }
+    if (reportSelect) {
+      reportSelect.disabled = false;
+      reportSelect.value = officeCode;
+    }
+  }
+
+  const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode) || { code: officeCode, name: "Selected Office" };
+
+  // Fetch all profiles for this office
+  const allProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
+  const submittedProfiles = allProfiles.filter(p => p.status === 'submitted');
+  const draftProfiles = allProfiles.filter(p => p.status === 'draft');
+
+  // Check saved snapshot for this office
+  const savedSnapshot = otReportSnapshotsStore[officeCode];
+  const isVerified = savedSnapshot && savedSnapshot.isVerified;
+  const isReverificationRequired = savedSnapshot && savedSnapshot.reverificationRequired;
+  const isForwarded = savedSnapshot && savedSnapshot.isForwarded;
+
+  // Header Elements
+  const headerOfficeEl = document.getElementById('otReportHeaderOffice');
+  if (headerOfficeEl) headerOfficeEl.textContent = `${officeObj.name} (${officeObj.code})`;
+
+  const cutoffEl = document.getElementById('otReportCutoffTime');
+  if (cutoffEl) cutoffEl.textContent = savedSnapshot ? otFormatIST(savedSnapshot.cutoffTimestamp) : otFormatIST(new Date().toISOString());
+
+  const genDateEl = document.getElementById('otReportGenDate');
+  if (genDateEl) genDateEl.textContent = otFormatIST(new Date().toISOString());
+
+  // Report Status Badge
+  const statusBadge = document.getElementById('otReportVerificationStatusBadge');
+  if (statusBadge) {
+    if (isForwarded) {
+      statusBadge.className = 'badge badge-working';
+      statusBadge.innerHTML = `<i class="fa-solid fa-paper-plane"></i> SENT TO TRANSPORT COMMISSIONERATE`;
+    } else if (submittedProfiles.length > 0) {
+      statusBadge.className = 'badge badge-warning';
+      statusBadge.innerHTML = `<i class="fa-solid fa-clock"></i> PENDING SUBMISSION`;
+    } else {
+      statusBadge.className = 'badge badge-secondary';
+      statusBadge.innerHTML = `<i class="fa-solid fa-file-pen"></i> DRAFT — NO PROFILES`;
+    }
+  }
+
+  // Excluded Drafts Alert
+  const draftAlert = document.getElementById('otReportExcludedDraftsAlert');
+  if (draftAlert) {
+    if (draftProfiles.length > 0) {
+      draftAlert.style.display = 'flex';
+      draftAlert.innerHTML = `
+        <i class="fa-solid fa-circle-info" style="font-size: 1.1rem; color: #b45309;"></i>
+        <span><strong>Notice:</strong> <strong>${draftProfiles.length} draft profile(s)</strong> are currently excluded from this report snapshot. Only finalized, submitted officer profiles are forwarded to the Transport Commissionerate.</span>
+      `;
+    } else {
+      draftAlert.style.display = 'none';
+    }
+  }
+
+  // Summary Metrics Computation (each officer counted once per category)
+  const totalOfficers = submittedProfiles.length;
+  const desigCounts = { RTO: 0, "Joint RTO": 0, MVI: 0, AMVI: 0 };
+  const techQualCounts = {};
+  TECH_QUAL_OPTIONS.forEach(t => techQualCounts[t] = 0);
+
+  let officersWithCompletedAddQual = 0;
+  let officersWithPursuingAddQual = 0;
+  let officersWithSkills = 0;
+  let officersWithTrainings = 0;
+  let totalTrainingsCount = 0;
+
+  submittedProfiles.forEach(p => {
+    // Designation counts
+    if (desigCounts[p.designation] !== undefined) desigCounts[p.designation]++;
+
+    // Tech qual counts
+    const tq = p.technicalQualification || "Others";
+    techQualCounts[tq] = (techQualCounts[tq] || 0) + 1;
+
+    // Add quals
+    const hasCompleted = (p.additionalQualifications || []).some(q => q.status === 'Completed');
+    const hasPursuing = (p.additionalQualifications || []).some(q => q.status === 'Pursuing');
+    if (hasCompleted) officersWithCompletedAddQual++;
+    if (hasPursuing) officersWithPursuingAddQual++;
+
+    // Skills
+    if ((p.specializedSkills || []).length > 0) officersWithSkills++;
+
+    // Trainings
+    const trList = p.trainingHistory || [];
+    if (trList.length > 0) {
+      officersWithTrainings++;
+      totalTrainingsCount += trList.length;
+    }
+  });
+
+  // Render Metric Cards
+  document.getElementById('otSummTotalOfficers').textContent = totalOfficers;
+  document.getElementById('otSummDesigCounts').innerHTML = `
+    RTO: <strong>${desigCounts.RTO}</strong> • 
+    JRTO: <strong>${desigCounts['Joint RTO']}</strong> • 
+    MVI: <strong>${desigCounts.MVI}</strong> • 
+    AMVI: <strong>${desigCounts.AMVI}</strong>
+  `;
+  document.getElementById('otSummCompAddQual').textContent = officersWithCompletedAddQual;
+  document.getElementById('otSummPursAddQual').textContent = officersWithPursuingAddQual;
+  document.getElementById('otSummSkills').textContent = officersWithSkills;
+  document.getElementById('otSummWithTrainings').textContent = officersWithTrainings;
+  document.getElementById('otSummTotalTrainings').textContent = totalTrainingsCount;
+
+  // Tech Qual Pills
+  const techPillsEl = document.getElementById('otSummTechQualPills');
+  if (techPillsEl) {
+    techPillsEl.innerHTML = Object.entries(techQualCounts)
+      .filter(([k, v]) => v > 0)
+      .map(([k, v]) => `<span class="badge badge-info" style="margin: 2px;">${escapeHtml(k)}: <strong>${v}</strong></span>`)
+      .join(' ') || '<span style="color: var(--text-muted); font-size: 0.85rem;">None</span>';
+  }
+
+  // Section D: Officer-wise Details Table
+  const detailsTbody = document.getElementById('otReportDetailsTableBody');
+  if (detailsTbody) {
+    if (submittedProfiles.length === 0) {
+      detailsTbody.innerHTML = `<tr><td colspan="8" style="text-align: center; color: var(--text-muted); padding: 24px;">No submitted officer profiles found for this office.</td></tr>`;
+    } else {
+      detailsTbody.innerHTML = submittedProfiles.map((p, idx) => {
+        const addQualsList = (p.additionalQualifications || []).map(aq => `
+          <div>
+            • <strong>${escapeHtml(aq.qualification)}</strong>
+            <span class="badge ${aq.status === 'Completed' ? 'badge-working' : 'badge-warning'}" style="font-size: 0.7rem; padding: 1px 4px;">${aq.status}</span>
+            ${aq.year ? `(${aq.year})` : ''}
+          </div>
+        `).join('') || '<span style="color: #94a3b8;">None</span>';
+
+        const skillsList = (p.specializedSkills || []).map(s => `<div>• ${escapeHtml(s)}</div>`).join('') || '<span style="color: #94a3b8;">None</span>';
+
+        return `
+          <tr>
+            <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
+            <td><strong>${escapeHtml(p.officerFullName)}</strong></td>
+            <td><span class="badge badge-info">${escapeHtml(p.pen)}</span></td>
+            <td><strong>${escapeHtml(p.designation)}</strong></td>
+            <td>${escapeHtml(p.generalEducation === 'Others' ? p.generalEducationOther : p.generalEducation)}</td>
+            <td>
+              <strong>${escapeHtml(p.technicalQualification === 'Others' ? p.technicalQualificationOther : p.technicalQualification)}</strong><br>
+              <small style="color: #475569;">${escapeHtml(p.institution || 'N/A')}</small><br>
+              <small style="color: #047857;">Passing Year: ${p.passingYear || 'N/A'} • Grade: ${escapeHtml(p.grade || 'N/A')}</small>
+            </td>
+            <td><div style="font-size: 0.82rem; line-height: 1.4;">${addQualsList}</div></td>
+            <td><div style="font-size: 0.82rem; line-height: 1.4;">${skillsList}</div></td>
+          </tr>
+        `;
+      }).join('');
+    }
+  }
+
+  // Section E: Training History Annexure
+  const annexTbody = document.getElementById('otReportAnnexureTableBody');
+  if (annexTbody) {
+    const allTrainings = [];
+    submittedProfiles.forEach(p => {
+      (p.trainingHistory || []).forEach(tr => {
+        allTrainings.push({
+          officerName: p.officerFullName,
+          pen: p.pen,
+          ...tr
+        });
+      });
+    });
+
+    if (allTrainings.length === 0) {
+      annexTbody.innerHTML = `<tr><td colspan="6" style="text-align: center; color: var(--text-muted); padding: 20px;">No training records registered for submitted officers in this office.</td></tr>`;
+    } else {
+      annexTbody.innerHTML = allTrainings.map((tr, idx) => `
+        <tr>
+          <td style="text-align: center; font-weight: 700;">${idx + 1}</td>
+          <td><strong>${escapeHtml(tr.officerName)}</strong> (PEN: ${escapeHtml(tr.pen)})</td>
+          <td><strong>${escapeHtml(tr.attended)}</strong></td>
+          <td>${escapeHtml(tr.conductedBy)}</td>
+          <td><span class="badge badge-info">${tr.durationValue} ${escapeHtml(tr.durationUnit)}</span></td>
+          <td><strong>${escapeHtml(tr.monthYear)}</strong></td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  // Section F: Prepared / Entered By Contributors
+  const contribTbody = document.getElementById('otReportContributorsTableBody');
+  if (contribTbody) {
+    const contributors = {};
+    submittedProfiles.forEach(p => {
+      if (p.enteredBy && p.enteredBy.fullName) {
+        const key = p.enteredBy.fullName + "_" + p.enteredBy.mobile;
+        contributors[key] = p.enteredBy;
+      }
+    });
+
+    const contribList = Object.values(contributors);
+    if (contribList.length === 0) {
+      contribTbody.innerHTML = `<tr><td colspan="4" style="text-align: center; color: var(--text-muted);">No submitter details stored.</td></tr>`;
+    } else {
+      contribTbody.innerHTML = contribList.map((c, i) => `
+        <tr>
+          <td style="text-align: center;">${i + 1}</td>
+          <td><strong>${escapeHtml(c.fullName)}</strong></td>
+          <td>${escapeHtml(c.designation)}</td>
+          <td>📞 ${escapeHtml(c.mobile)}</td>
+        </tr>
+      `).join('');
+    }
+  }
+
+  // Digital Verification Box Display (Skipped in simplified workflow)
+  const digiVerifBox = document.getElementById('otReportDigitalVerificationDetails');
+  if (digiVerifBox) {
+    digiVerifBox.style.display = 'none';
+  }
+
+  // Dispatch / Forwarding Box Display
+  const dispatchBox = document.getElementById('otReportForwardingDetailsDisplay');
+  if (dispatchBox) {
+    if (savedSnapshot && savedSnapshot.isForwarded) {
+      dispatchBox.style.display = 'block';
+      dispatchBox.innerHTML = `
+        <div style="background: #eff6ff; border: 1.5px solid #bfdbfe; border-radius: 8px; padding: 14px 18px; margin-top: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+            <div style="color: #1d4ed8; font-weight: 800; font-size: 0.95rem;">
+              <i class="fa-solid fa-paper-plane"></i> SENT TO TRANSPORT COMMISSIONERATE
+            </div>
+            <span class="badge badge-working" style="font-size: 0.8rem; padding: 4px 8px;"><i class="fa-solid fa-circle-check"></i> Dispatched</span>
+          </div>
+          <div class="form-grid-4" style="font-size: 0.85rem; margin-top: 6px; gap: 12px;">
+            <div><strong>Head of Office:</strong><br>${escapeHtml(savedSnapshot.dispatchDetails?.headName || savedSnapshot.verifiedBy?.name || 'N/A')}</div>
+            <div><strong>Designation:</strong><br>${escapeHtml(savedSnapshot.dispatchDetails?.headDesignation || savedSnapshot.verifiedBy?.designation || 'N/A')}</div>
+            <div><strong>File No.:</strong><br><span class="badge badge-info" style="font-size: 0.88rem;">${escapeHtml(savedSnapshot.dispatchDetails?.fileNo || savedSnapshot.dispatchDetails?.outwardNo || 'N/A')}</span></div>
+            <div><strong>Date Sent:</strong><br><strong>${escapeHtml(savedSnapshot.dispatchDetails?.forwardDate || 'N/A')}</strong></div>
+          </div>
+          ${savedSnapshot.dispatchDetails?.remarks ? `<div style="font-size: 0.82rem; color: #1e40af; margin-top: 8px;"><strong>Forwarding Remarks:</strong> "${escapeHtml(savedSnapshot.dispatchDetails?.remarks)}"</div>` : ''}
+        </div>
+      `;
+    } else {
+      dispatchBox.style.display = 'none';
+    }
+  }
+
+  // Button Action States
+  const btnVerify = document.getElementById('otBtnTriggerVerify');
+  const btnForward = document.getElementById('otBtnTriggerForward');
+
+  if (btnVerify) {
+    btnVerify.style.display = 'none'; // Verification stage skipped
+  }
+
+  if (btnForward) {
+    btnForward.innerHTML = '<i class="fa-solid fa-paper-plane"></i> Send to Transport Commissionerate';
+    if (submittedProfiles.length === 0 || isForwarded) {
+      btnForward.style.display = 'none';
+    } else {
+      btnForward.style.display = 'inline-flex';
+    }
+  }
+}
+
+// Trigger automatic "Reverification Required" when source records change
+function triggerReverificationCheck(officeCode) {
+  const snapshot = otReportSnapshotsStore[officeCode];
+  if (snapshot && snapshot.isVerified) {
+    snapshot.reverificationRequired = true;
+    snapshot.isForwarded = false; // Reset forwarding on data modification
+    otReportSnapshotsStore[officeCode] = snapshot;
+    localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+    otLogAudit('REVERIFICATION_FLAGGED', officeCode, { reason: "Source officer profiles changed after verification" });
+  }
+}
+
+// Verification Modal & Handler
+function openVerificationModal() {
+  if (!otHasPermission('verify_report')) {
+    showToast("Access Denied: Only Head of Office or Officer holding charge can verify reports.", "error");
+    return;
+  }
+
+  const officeCode = otCurrentReportOfficeCode;
+  const user = otGetCurrentUser();
+
+  document.getElementById('otVerifOfficeCodeDisplay').textContent = officeCode;
+  document.getElementById('otVerifOfficerNameInput').value = user.name || "";
+  document.getElementById('otVerifOfficerDesigInput').value = "";
+  document.getElementById('otVerifRemarksInput').value = "";
+  document.getElementById('otVerifCertCheckbox').checked = false;
+
+  document.getElementById('otVerificationModal').style.display = 'flex';
+}
+
+function closeVerificationModal() {
+  document.getElementById('otVerificationModal').style.display = 'none';
+}
+
+function submitReportVerification(e) {
+  if (e) e.preventDefault();
+
+  const certCheck = document.getElementById('otVerifCertCheckbox');
+  if (!certCheck || !certCheck.checked) {
+    showToast("You must confirm the statutory certification statement before verifying.", "warning");
+    return;
+  }
+
+  const vName = document.getElementById('otVerifOfficerNameInput').value.trim();
+  const vDesig = document.getElementById('otVerifOfficerDesigInput').value.trim();
+  const vRemarks = document.getElementById('otVerifRemarksInput').value.trim();
+
+  if (!vName || !vDesig) {
+    showToast("Please enter Verifying Officer Name and Designation.", "warning");
+    return;
+  }
+
+  const officeCode = otCurrentReportOfficeCode;
+  const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode);
+  const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
+  const now = new Date().toISOString();
+
+  const prevSnapshot = otReportSnapshotsStore[officeCode];
+  const newVersion = prevSnapshot ? prevSnapshot.version + 1 : 1;
+  const refNum = `MVD/OTQ/${officeCode}/${new Date().getFullYear()}/V${newVersion}`;
+
+  const snapshot = {
+    officeCode,
+    officeName: officeObj ? officeObj.name : officeCode,
+    referenceNumber: refNum,
+    version: newVersion,
+    cutoffTimestamp: now,
+    verifiedAt: now,
+    isVerified: true,
+    reverificationRequired: false,
+    isForwarded: false,
+    verifiedBy: {
+      name: vName,
+      designation: vDesig
+    },
+    verifiedRemarks: vRemarks,
+    includedOfficerPenList: submittedProfiles.map(p => p.pen),
+    totalOfficersCount: submittedProfiles.length,
+    historicalCopies: prevSnapshot ? [...(prevSnapshot.historicalCopies || []), { ...prevSnapshot, historicalCopies: [] }] : []
+  };
+
+  otReportSnapshotsStore[officeCode] = snapshot;
+  localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+  if (typeof saveOfficerReportToSupabase === 'function') {
+    saveOfficerReportToSupabase(snapshot);
+  }
+
+  otLogAudit('VERIFY_REPORT', refNum, { office: officeCode, verifiedBy: vName, version: newVersion });
+  closeVerificationModal();
+  renderOfficeSummaryReport();
+  showToast(`Office Report verified successfully! Reference: ${refNum}`, "success");
+}
+
+// Forwarding Modal & Handler
+function openForwardingModal() {
+  const officeCode = otCurrentReportOfficeCode;
+  const user = otGetCurrentUser();
+  const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
+
+  if (submittedProfiles.length === 0) {
+    showToast("Please submit officer profiles before sending to the Transport Commissionerate.", "warning");
+    return;
+  }
+
+  const prevSnapshot = otReportSnapshotsStore[officeCode];
+  const newVersion = prevSnapshot ? prevSnapshot.version + 1 : 1;
+  const refNum = prevSnapshot ? prevSnapshot.referenceNumber : `MVD/OTQ/${officeCode}/${new Date().getFullYear()}/V${newVersion}`;
+
+  const refDisplay = document.getElementById('otFwdReportRefDisplay');
+  if (refDisplay) refDisplay.textContent = refNum;
+
+  const headNameInput = document.getElementById('otFwdHeadNameInput');
+  if (headNameInput) headNameInput.value = prevSnapshot?.dispatchDetails?.headName || user.name || "";
+
+  const headDesigInput = document.getElementById('otFwdHeadDesigInput');
+  if (headDesigInput) headDesigInput.value = prevSnapshot?.dispatchDetails?.headDesignation || "";
+
+  const fileNoInput = document.getElementById('otFwdOutwardNoInput');
+  if (fileNoInput) fileNoInput.value = prevSnapshot?.dispatchDetails?.fileNo || prevSnapshot?.dispatchDetails?.outwardNo || "";
+
+  const today = new Date().toISOString().substring(0, 10);
+  const fwdDateInput = document.getElementById('otFwdDateInput');
+  if (fwdDateInput) {
+    fwdDateInput.max = today;
+    fwdDateInput.value = today;
+  }
+  const remarksInput = document.getElementById('otFwdRemarksInput');
+  if (remarksInput) remarksInput.value = "";
+
+  document.getElementById('otForwardingModal').style.display = 'flex';
+}
+
+function closeForwardingModal() {
+  document.getElementById('otForwardingModal').style.display = 'none';
+}
+
+function submitReportForwarding(e) {
+  if (e) e.preventDefault();
+
+  const headName = document.getElementById('otFwdHeadNameInput').value.trim();
+  const headDesig = document.getElementById('otFwdHeadDesigInput').value.trim();
+  const fileNo = document.getElementById('otFwdOutwardNoInput').value.trim();
+  const fwdDate = document.getElementById('otFwdDateInput').value;
+  const remarks = document.getElementById('otFwdRemarksInput').value.trim();
+
+  if (!headName) {
+    showToast("Please enter Name of Head of Office Forwarding.", "warning");
+    return;
+  }
+  if (!headDesig) {
+    showToast("Please enter Designation of Head of Office.", "warning");
+    return;
+  }
+  if (!fileNo) {
+    showToast("Please enter File No.", "warning");
+    return;
+  }
+  if (!fwdDate) {
+    showToast("Please enter Date of Forwarding.", "warning");
+    return;
+  }
+
+  const today = new Date().toISOString().substring(0, 10);
+  if (fwdDate > today) {
+    showToast("Future dates are not allowed for forwarding.", "warning");
+    return;
+  }
+
+  const officeCode = otCurrentReportOfficeCode;
+  const officeObj = ALL_MVD_OFFICES.find(o => o.code === officeCode);
+  const submittedProfiles = otProfilesStore.filter(p => p.officeCode === officeCode && p.status === 'submitted');
+  const now = new Date().toISOString();
+
+  const prevSnapshot = otReportSnapshotsStore[officeCode];
+  const newVersion = prevSnapshot ? prevSnapshot.version + 1 : 1;
+  const refNum = `MVD/OTQ/${officeCode}/${new Date().getFullYear()}/V${newVersion}`;
+
+  const user = otGetCurrentUser();
+  const snapshot = {
+    officeCode,
+    officeName: officeObj ? officeObj.name : officeCode,
+    referenceNumber: refNum,
+    version: newVersion,
+    cutoffTimestamp: now,
+    verifiedAt: now,
+    isVerified: true,
+    reverificationRequired: false,
+    isForwarded: true,
+    verifiedBy: {
+      name: headName,
+      designation: headDesig
+    },
+    dispatchDetails: {
+      fileNo,
+      outwardNo: fileNo,
+      forwardDate: fwdDate,
+      remarks,
+      headName,
+      headDesignation: headDesig,
+      userName: user.name || headName,
+      userEmail: user.email,
+      timestamp: now
+    },
+    includedOfficerPenList: submittedProfiles.map(p => p.pen),
+    totalOfficersCount: submittedProfiles.length,
+    historicalCopies: prevSnapshot ? [...(prevSnapshot.historicalCopies || []), { ...prevSnapshot, historicalCopies: [] }] : []
+  };
+
+  otReportSnapshotsStore[officeCode] = snapshot;
+  localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+  if (typeof saveOfficerReportToSupabase === 'function') {
+    saveOfficerReportToSupabase(snapshot);
+  }
+
+  otLogAudit('FORWARD_REPORT', refNum, { office: officeCode, fileNo, headName, headDesignation: headDesig, forwardDate: fwdDate });
+  closeForwardingModal();
+  renderOfficeSummaryReport();
+  showToast(`Report successfully sent to Transport Commissionerate (File No: ${fileNo})`, "success");
+}
+
+function printOfficeSummaryReport() {
+  document.body.classList.remove('printing-modal');
+  document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('print-active'));
+  window.print();
+}
+
+// --- 14. ROLE SIMULATION & AUDIT LOG VIEWER ---
+
+function switchRoleSimulator(role) {
+  otCurrentRole = role;
+  localStorage.setItem('mvd_ot_current_role', role);
+  renderRoleSwitcherUI();
+  renderOfficeSummaryReport();
+  renderAdminOfficersDirectory();
+  showToast(`Switched active user role to: "${role.replace('_', ' ').toUpperCase()}"`, "info");
+}
+
+function renderRoleSwitcherUI() {
+  const container = document.getElementById('otRoleIndicatorPill');
+  if (container) {
+    const roleLabels = {
+      data_entry: "Data Entry User",
+      head_of_office: "Office Head Entry Page",
+      dispatch_user: "Office Dispatch User",
+      admin: "Commissionerate Administrator"
+    };
+    container.innerHTML = `
+      <i class="fa-solid fa-user-shield"></i> <strong>${roleLabels[otCurrentRole] || otCurrentRole}</strong>
+    `;
+  }
+
+  // Active button highlight in Role Switcher section
+  document.querySelectorAll('.ot-role-btn').forEach(btn => {
+    if (btn.dataset.role === otCurrentRole) {
+      btn.classList.add('active');
+    } else {
+      btn.classList.remove('active');
+    }
+  });
+
+  renderAuditLogTable();
+}
+
+function renderAuditLogTable() {
+  const tbody = document.getElementById('otAuditLogTableBody');
+  if (!tbody) return;
+
+  if (otAuditLogs.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No audit trail events logged yet.</td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = otAuditLogs.slice(0, 50).map((log, idx) => `
+    <tr>
+      <td style="text-align: center; color: var(--text-muted);">${idx + 1}</td>
+      <td><strong><i class="fa-solid fa-clock"></i> ${otFormatIST(log.timestamp)}</strong></td>
+      <td><span class="badge ${log.action.includes('DELETE') ? 'badge-danger' : (log.action.includes('VERIFY') ? 'badge-working' : 'badge-info')}">${log.action}</span></td>
+      <td><strong>${escapeHtml(log.reference || '')}</strong></td>
+      <td>${escapeHtml(log.userName || log.userEmail)} <small style="color: var(--text-muted);">(${escapeHtml(log.userRole)})</small></td>
+    </tr>
+  `).join('');
+}
+
+// Sub-Tab Switcher within Officer Training Module
+function switchOfficerSubTab(tabName) {
+  if (tabName === 'directory' || tabName === 'roles') {
+    if (typeof switchAdminSubView === 'function') {
+      switchAdminSubView(tabName);
+    }
+    return;
+  }
+
+  otActiveSubTab = tabName;
+  document.querySelectorAll('.ot-subtab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === tabName);
+  });
+
+  const formEl = document.getElementById('otTabContentForm');
+  const repEl = document.getElementById('otTabContentReport');
+  const dirEl = document.getElementById('otTabContentDirectory');
+  const rolesEl = document.getElementById('otTabContentRoles');
+
+  if (formEl) formEl.style.display = tabName === 'form' ? 'block' : 'none';
+  if (repEl) repEl.style.display = tabName === 'report' ? 'block' : 'none';
+  if (dirEl) dirEl.style.display = tabName === 'directory' ? 'block' : 'none';
+  if (rolesEl) rolesEl.style.display = tabName === 'roles' ? 'block' : 'none';
+
+  if (tabName === 'report') renderOfficeSummaryReport();
+}
+
+// --- 15. SUPABASE BACKEND PERSISTENCE & REALTIME SYNCHRONIZATION ---
+
+function getSupabaseClient() {
+  if (window.supabaseClient) return window.supabaseClient;
+  if (typeof supabaseClient !== 'undefined' && supabaseClient) {
+    window.supabaseClient = supabaseClient;
+    return supabaseClient;
+  }
+  if (window.supabase && typeof window.supabase.createClient === 'function') {
+    try {
+      window.supabaseClient = window.supabase.createClient(
+        'https://mghdekancxfqtnfoyfkj.supabase.co',
+        'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1naGRla2FuY3hmcXRuZm95ZmtqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ4NjY5MzksImV4cCI6MjEwMDQ0MjkzOX0.wb9ZdBEKQSgmbd-vUFsbnSh3iHFYmAPW4Ywgb8vf4V0'
+      );
+      return window.supabaseClient;
+    } catch (e) {
+      console.warn("Could not instantiate Supabase client:", e);
+    }
+  }
+  return null;
+}
+
+let otRealtimeSubscribed = false;
+function subscribeToRealtimeOfficerProfiles() {
+  if (otRealtimeSubscribed) return;
+  const client = getSupabaseClient();
+  if (!client || typeof client.channel !== 'function') return;
+
+  try {
+    const channel = client.channel('realtime_officer_profiles');
+    channel.on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'officer_profiles' },
+      (payload) => {
+        console.log("Supabase Realtime event for officer_profiles:", payload);
+        const { eventType, new: newRec, old: oldRec } = payload;
+        if (eventType === 'DELETE') {
+          const targetPen = oldRec?.pen;
+          const targetId = oldRec?.id;
+          if (targetPen || targetId) {
+            otProfilesStore = otProfilesStore.filter(p => (targetPen ? p.pen !== targetPen : true) && (targetId ? p.id !== targetId : true));
+            localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+            renderAdminOfficersDirectory();
+            renderOfficeSummaryReport();
+            if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+            const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+            if (currentSelectedOffice) renderOfficeEditOptionList(currentSelectedOffice);
+          }
+        } else if (newRec && newRec.pen) {
+          const mapped = {
+            id: newRec.id || ('off_' + newRec.pen),
+            officerFullName: newRec.officer_full_name,
+            pen: newRec.pen,
+            designation: newRec.current_designation,
+            officeCode: newRec.office_code,
+            officeName: newRec.office_name,
+            generalEducation: newRec.general_education || "Plus Two",
+            generalEducationOther: newRec.general_education_other || "",
+            technicalQualification: newRec.technical_qualification || "B.Tech",
+            technicalQualificationOther: newRec.technical_qualification_other || "",
+            institution: newRec.institution || "",
+            passingYear: newRec.passing_year || 2020,
+            grade: newRec.class_grade || "",
+            additionalQualifications: Array.isArray(newRec.additional_qualifications) ? newRec.additional_qualifications : [],
+            specializedSkills: Array.isArray(newRec.specialized_skills) ? newRec.specialized_skills : [],
+            customSkills: "",
+            trainingHistory: Array.isArray(newRec.training_history) ? newRec.training_history : [],
+            enteredBy: {
+              fullName: newRec.entered_by_name || "Reporting Officer",
+              designation: newRec.entered_by_designation || "Officer",
+              mobile: newRec.entered_by_mobile || "9447000000",
+              userId: newRec.entered_by_user_id || "",
+              timestamp: newRec.entered_by_timestamp || newRec.created_at || new Date().toISOString()
+            },
+            status: newRec.status || "submitted",
+            createdAt: newRec.created_at || new Date().toISOString(),
+            updatedAt: newRec.updated_at || new Date().toISOString(),
+            version: newRec.version || 1
+          };
+          const existingIdx = otProfilesStore.findIndex(p => p.pen === mapped.pen);
+          if (existingIdx >= 0) {
+            otProfilesStore[existingIdx] = mapped;
+          } else {
+            otProfilesStore.unshift(mapped);
+          }
+          localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+          renderAdminOfficersDirectory();
+          renderOfficeSummaryReport();
+          if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+          const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+          if (currentSelectedOffice) renderOfficeEditOptionList(currentSelectedOffice);
+        }
+      }
+    ).on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'mvd_app_settings' },
+      (payload) => {
+        const row = payload.new || payload.old;
+        if (row && row.id === 'office_locks' && row.menu_visibility) {
+          try {
+            const locks = typeof row.menu_visibility === 'object' ? row.menu_visibility : JSON.parse(row.menu_visibility);
+            localStorage.setItem('mvd_ot_office_locks', JSON.stringify(locks));
+            if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
+              for (const k in otOfficeLocks) {
+                if (!locks[k]) delete otOfficeLocks[k];
+              }
+              Object.assign(otOfficeLocks, locks);
+            }
+            if (window.otOfficeLocks) {
+              for (const k in window.otOfficeLocks) {
+                if (!locks[k]) delete window.otOfficeLocks[k];
+              }
+              Object.assign(window.otOfficeLocks, locks);
+            }
+            if (typeof window.renderAdminOfficeLocksTable === 'function') {
+              window.renderAdminOfficeLocksTable();
+            }
+            const officeCode = document.getElementById('otMainOfficeSelect')?.value;
+            if (officeCode && typeof checkOfficeAccessAndLock === 'function') {
+              checkOfficeAccessAndLock(officeCode);
+            }
+          } catch (e) {
+            console.warn("Could not process realtime office_locks update:", e);
+          }
+        }
+      }
+    ).subscribe((status) => {
+      console.log("Supabase Realtime Officer Profiles subscription status:", status);
+      if (status === 'SUBSCRIBED') otRealtimeSubscribed = true;
+    });
+  } catch (err) {
+    console.warn("Could not subscribe to officer profiles realtime:", err);
+  }
+}
+
+async function syncOfficerProfilesWithSupabase() {
+  const client = getSupabaseClient();
+  if (!client) return;
+
+  try {
+    // 1. Primary: sync from officer_profiles
+    let { data, error } = await client
+      .from('officer_profiles')
+      .select('*');
+
+    if (!error && data && data.length > 0) {
+      const mapped = data.map(row => ({
+        id: row.id || ('off_' + row.pen),
+        officerFullName: row.officer_full_name,
+        pen: row.pen,
+        designation: row.current_designation,
+        officeCode: row.office_code,
+        officeName: row.office_name,
+        generalEducation: row.general_education || "Plus Two",
+        generalEducationOther: row.general_education_other || "",
+        technicalQualification: row.technical_qualification || "B.Tech",
+        technicalQualificationOther: row.technical_qualification_other || "",
+        institution: row.institution || "",
+        passingYear: row.passing_year || 2020,
+        grade: row.class_grade || "",
+        additionalQualifications: Array.isArray(row.additional_qualifications) ? row.additional_qualifications : [],
+        specializedSkills: Array.isArray(row.specialized_skills) ? row.specialized_skills : [],
+        customSkills: "",
+        trainingHistory: Array.isArray(row.training_history) ? row.training_history : [],
+        enteredBy: {
+          fullName: row.entered_by_name || "Reporting Officer",
+          designation: row.entered_by_designation || "Officer",
+          mobile: row.entered_by_mobile || "9447000000",
+          userId: row.entered_by_user_id || "",
+          timestamp: row.entered_by_timestamp || row.created_at || new Date().toISOString()
+        },
+        status: row.status || "submitted",
+        createdAt: row.created_at || new Date().toISOString(),
+        updatedAt: row.updated_at || new Date().toISOString(),
+        version: row.version || 1
+      }));
+
+      // Merge into otProfilesStore by PEN
+      mapped.forEach(m => {
+        const existingIdx = otProfilesStore.findIndex(p => p.pen === m.pen);
+        if (existingIdx >= 0) {
+          otProfilesStore[existingIdx] = m;
+        } else {
+          otProfilesStore.push(m);
+        }
+      });
+      localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+      renderAdminOfficersDirectory();
+      const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+      if (currentSelectedOffice) checkOfficeAccessAndLock(currentSelectedOffice);
+    } else {
+      // Fallback: sync from legacy officer_qualifications
+      const legacyRes = await client
+        .from('officer_qualifications')
+        .select('*');
+      if (!legacyRes.error && legacyRes.data && legacyRes.data.length > 0) {
+        const mappedLegacy = legacyRes.data.map(row => ({
+          id: row.id,
+          officerFullName: row.officer_name,
+          pen: row.officer_pen,
+          designation: row.officer_designation,
+          officeCode: row.office_name ? (row.office_name.split(' ')[0] || "KL01") : "KL01",
+          officeName: row.office_name || "MVD Office",
+          generalEducation: "Plus Two",
+          generalEducationOther: "",
+          technicalQualification: row.educational_qualification || "B.Tech",
+          technicalQualificationOther: row.qualification_other || "",
+          institution: row.training_institutes || "",
+          passingYear: row.recent_training_year || 2018,
+          grade: "First Class",
+          additionalQualifications: [],
+          specializedSkills: row.specialization ? [row.specialization] : [],
+          customSkills: "",
+          trainingHistory: row.training_details ? [{
+            id: "tr_" + row.id,
+            attended: row.training_attended || "Departmental Course",
+            conductedBy: row.training_institutes || "MVD",
+            durationValue: 1,
+            durationUnit: "Weeks",
+            monthYear: "2024-01"
+          }] : [],
+          enteredBy: {
+            fullName: row.entry_officer_name || "Reporting Officer",
+            designation: row.entry_officer_designation || "Officer",
+            mobile: row.entry_officer_mobile || "9447000000",
+            userId: "cloud@mvd.keralam.gov.in",
+            timestamp: row.created_at || new Date().toISOString()
+          },
+          status: "submitted",
+          createdAt: row.created_at || new Date().toISOString(),
+          updatedAt: row.updated_at || new Date().toISOString(),
+          version: 1
+        }));
+        mappedLegacy.forEach(m => {
+          if (!otProfilesStore.some(p => p.pen === m.pen)) {
+            otProfilesStore.push(m);
+          }
+        });
+        localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
+        renderAdminOfficersDirectory();
+      }
+    }
+
+    // 2. Sync report versions
+    await syncOfficerReportsWithSupabase();
+
+    // 3. Sync audit logs
+    await syncOfficerAuditLogsWithSupabase();
+
+  } catch (err) {
+    console.warn("Officer Supabase sync error (using local storage fallback):", err);
+  }
+}
+
+async function syncOfficerReportsWithSupabase() {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    const { data, error } = await client
+      .from('office_report_versions')
+      .select('*');
+
+    if (!error && data && data.length > 0) {
+      data.forEach(r => {
+        otReportSnapshotsStore[r.office_code] = {
+          officeCode: r.office_code,
+          officeName: r.office_name,
+          referenceNumber: r.reference_number,
+          version: r.version,
+          cutoffTimestamp: r.cutoff_timestamp,
+          verifiedAt: r.verified_at,
+          isVerified: r.is_verified,
+          reverificationRequired: r.reverification_required,
+          isForwarded: r.is_forwarded,
+          verifiedBy: {
+            name: r.verified_by_name || "",
+            designation: r.verified_by_designation || ""
+          },
+          verifiedRemarks: r.verification_remarks || "",
+          dispatchDetails: r.is_forwarded ? {
+            outwardNo: r.outward_number || "",
+            forwardDate: r.forward_date || "",
+            remarks: r.forwarding_remarks || "",
+            userName: r.dispatched_by_name || ""
+          } : null,
+          includedOfficerPenList: r.included_officer_pens || [],
+          totalOfficersCount: (r.included_officer_pens || []).length,
+          historicalCopies: []
+        };
+      });
+      localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+    }
+  } catch (e) {
+    console.warn("Could not sync report versions:", e);
+  }
+}
+
+async function syncOfficerAuditLogsWithSupabase() {
+  const client = getSupabaseClient();
+  if (!client) return;
+  try {
+    const { data, error } = await client
+      .from('officer_audit_logs')
+      .select('*')
+      .order('timestamp', { ascending: false })
+      .limit(100);
+
+    if (!error && data && data.length > 0) {
+      data.forEach(log => {
+        if (!otAuditLogs.some(l => l.id === log.id)) {
+          otAuditLogs.push({
+            id: log.id,
+            action: log.action,
+            reference: log.reference,
+            userRole: log.user_role,
+            userName: log.user_name,
+            userEmail: log.user_email,
+            timestamp: log.timestamp,
+            details: log.changed_fields || {}
+          });
+        }
+      });
+      otAuditLogs.sort((a, b) => new Date(b.timestamp) - new Date(a.timestamp));
+      localStorage.setItem('mvd_ot_audit_logs', JSON.stringify(otAuditLogs));
+    }
+  } catch (e) {
+    console.warn("Could not sync audit logs:", e);
+  }
+}
+
+async function saveOfficerQualificationToSupabase(record) {
+  const client = getSupabaseClient();
+  if (!client) {
+    console.warn("Supabase client not initialized.");
+    return { success: false, error: new Error("Database client not available") };
+  }
+
+  try {
+    // 1. Save to officer_profiles
+    const profilePayload = {
+      id: record.id || ('off_' + record.pen),
+      officer_full_name: record.officerFullName,
+      pen: record.pen,
+      current_designation: record.designation,
+      office_code: record.officeCode,
+      office_name: record.officeName,
+      general_education: record.generalEducation || 'Plus Two',
+      general_education_other: record.generalEducationOther || null,
+      technical_qualification: record.technicalQualification || 'B.Tech',
+      technical_qualification_other: record.technicalQualificationOther || null,
+      institution: record.institution || null,
+      passing_year: record.passingYear ? parseInt(record.passingYear) : null,
+      class_grade: record.grade || null,
+      additional_qualifications: record.additionalQualifications || [],
+      specialized_skills: record.specializedSkills || [],
+      training_history: record.trainingHistory || [],
+      entered_by_name: record.enteredBy?.fullName || 'Reporting Officer',
+      entered_by_designation: record.enteredBy?.designation || 'Officer',
+      entered_by_mobile: record.enteredBy?.mobile || '9447000000',
+      entered_by_user_id: record.enteredBy?.userId || null,
+      entered_by_timestamp: record.enteredBy?.timestamp || new Date().toISOString(),
+      status: record.status || 'submitted',
+      version: record.version || 1,
+      updated_at: new Date().toISOString()
+    };
+
+    const { data: upsertData, error: profileError } = await client
+      .from('officer_profiles')
+      .upsert(profilePayload, { onConflict: 'pen' })
+      .select();
+
+    if (profileError) {
+      console.error("Could not upsert to officer_profiles:", profileError);
+      return { success: false, error: profileError };
+    }
+
+    // 2. Also save to legacy officer_qualifications for compatibility
+    try {
+      const legacyPayload = {
+        office_name: `${record.officeCode} ${record.officeName}`,
+        entry_officer_name: record.enteredBy?.fullName,
+        entry_officer_designation: record.enteredBy?.designation,
+        entry_officer_mobile: record.enteredBy?.mobile,
+        officer_name: record.officerFullName,
+        officer_pen: record.pen,
+        officer_designation: record.designation,
+        officer_mobile: record.enteredBy?.mobile,
+        officer_email: record.enteredBy?.userId,
+        educational_qualification: record.technicalQualification || record.generalEducation || 'Plus Two',
+        qualification_other: record.technicalQualificationOther,
+        specialization: (record.specializedSkills || []).join(', '),
+        technical_certifications: (record.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', '),
+        training_attended: (record.trainingHistory || []).map(t => t.attended).join('; '),
+        training_institutes: (record.trainingHistory || []).map(t => t.conductedBy).join('; '),
+        recent_training_year: record.passingYear || 2024,
+        training_details: JSON.stringify(record.trainingHistory || []),
+        updated_at: new Date().toISOString()
+      };
+
+      await client
+        .from('officer_qualifications')
+        .upsert(legacyPayload, { onConflict: 'officer_pen' });
+    } catch (legErr) {
+      console.warn("Legacy officer_qualifications sync warning (ignored):", legErr);
+    }
+
+    return { success: true, data: profilePayload };
+  } catch (e) {
+    console.error("Could not upsert officer to Supabase:", e);
+    return { success: false, error: e };
+  }
+}
+
+async function deleteOfficerFromSupabase(profileId, explicitPen) {
+  const client = getSupabaseClient();
+  if (!client) {
+    console.warn("Supabase client unavailable for deletion");
+    return { success: false, error: new Error("Database client not available") };
+  }
+
+  const pen = explicitPen || (typeof otProfilesStore !== 'undefined' ? otProfilesStore.find(x => x.id === profileId)?.pen : null) || (typeof officersStore !== 'undefined' ? officersStore.find(x => x.id === profileId)?.officer_pen : null) || profileId;
+  console.log(`[Supabase Delete] Deleting officer profileId: "${profileId}", pen: "${pen}"...`);
+
+  let pErr = null;
+  let qErr = null;
+
+  try {
+    // 1. Delete from officer_profiles table by pen and by id
+    if (pen) {
+      const { error } = await client
+        .from('officer_profiles')
+        .delete()
+        .eq('pen', pen);
+      if (error) pErr = error;
+    }
+    if (profileId) {
+      const { error } = await client
+        .from('officer_profiles')
+        .delete()
+        .eq('id', profileId);
+      if (error && !pErr) pErr = error;
+    }
+
+    // 2. Delete from legacy officer_qualifications table by officer_pen and by id
+    if (pen) {
+      const { error } = await client
+        .from('officer_qualifications')
+        .delete()
+        .eq('officer_pen', pen);
+      if (error) qErr = error;
+    }
+    if (profileId) {
+      const { error } = await client
+        .from('officer_qualifications')
+        .delete()
+        .eq('id', profileId);
+      if (error && !qErr) qErr = error;
+    }
+
+    if (pErr) console.warn("Supabase delete warning (officer_profiles):", pErr);
+    if (qErr) console.warn("Supabase delete warning (officer_qualifications):", qErr);
+
+    return { success: !pErr, error: pErr || qErr };
+  } catch (e) {
+    console.error("Supabase delete exception:", e);
+    return { success: false, error: e };
+  }
+}
+window.deleteOfficerFromSupabase = deleteOfficerFromSupabase;
+window.deleteOfficerQualificationFromSupabase = deleteOfficerFromSupabase;
+
+async function saveOfficerReportToSupabase(snapshot) {
+  const client = getSupabaseClient();
+  if (!client || !snapshot) return;
+  try {
+    const payload = {
+      id: "rep_" + snapshot.officeCode + "_v" + snapshot.version,
+      reference_number: snapshot.referenceNumber,
+      version: snapshot.version,
+      office_code: snapshot.officeCode,
+      office_name: snapshot.officeName,
+      cutoff_timestamp: snapshot.cutoffTimestamp,
+      is_verified: !!snapshot.isVerified,
+      reverification_required: !!snapshot.reverificationRequired,
+      verified_by_name: snapshot.verifiedBy?.name || null,
+      verified_by_designation: snapshot.verifiedBy?.designation || null,
+      verified_at: snapshot.verifiedAt || null,
+      verification_remarks: snapshot.verifiedRemarks || null,
+      is_forwarded: !!snapshot.isForwarded,
+      outward_number: snapshot.dispatchDetails?.outwardNo || null,
+      forward_date: snapshot.dispatchDetails?.forwardDate || null,
+      forwarding_remarks: snapshot.dispatchDetails?.remarks || null,
+      dispatched_by_name: snapshot.dispatchDetails?.userName || null,
+      dispatched_at: snapshot.dispatchDetails?.timestamp || null,
+      included_officer_pens: snapshot.includedOfficerPenList || [],
+      summary_counts: { totalOfficersCount: snapshot.totalOfficersCount || 0 },
+      updated_at: new Date().toISOString()
+    };
+
+    await client
+      .from('office_report_versions')
+      .upsert(payload, { onConflict: 'reference_number' });
+  } catch (e) {
+    console.warn("Could not save report version to Supabase:", e);
+  }
+}
+
+async function saveOfficerAuditLogToSupabase(entry) {
+  const client = getSupabaseClient();
+  if (!client || !entry) return;
+  try {
+    const payload = {
+      id: entry.id,
+      action: entry.action,
+      reference: entry.reference || '',
+      user_role: entry.userRole,
+      user_name: entry.userName || null,
+      user_email: entry.userEmail || null,
+      timestamp: entry.timestamp || new Date().toISOString(),
+      changed_fields: entry.details || {}
+    };
+
+    await client
+      .from('officer_audit_logs')
+      .insert(payload);
+  } catch (e) {
+    // Fails silently if table not yet created
+  }
+}
+
+// Automatically bind on DOM load
+document.addEventListener('DOMContentLoaded', () => {
+  initOfficerTrainingModule();
+});
+

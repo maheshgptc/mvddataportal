@@ -1,0 +1,124 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <base target="_top">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  <?!= include('Styles'); ?>
+</head>
+<body>
+  <div class="app">
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">V</div>
+        <div>
+          <div class="brand-title">Vahan</div>
+          <div class="brand-sub">Data Analysis</div>
+        </div>
+      </div>
+      <nav class="nav">
+        <button class="nav-item active" data-tab="dashboard">
+          <span class="dot"></span> Dashboard
+        </button>
+        <button class="nav-item" data-tab="entry-vahan">
+          <span class="dot"></span> Vahan Data Entry
+        </button>
+        <button class="nav-item" data-tab="entry-yearly">
+          <span class="dot"></span> Yearly Data Entry
+        </button>
+        <button class="nav-item" data-tab="records">
+          <span class="dot"></span> Records
+        </button>
+      </nav>
+      <div class="sidebar-foot">
+        <button class="btn-ghost" id="refreshBtn">↻ Refresh data</button>
+      </div>
+    </aside>
+
+    <main class="main">
+      <header class="topbar">
+        <div>
+          <h1 id="pageTitle">Dashboard</h1>
+          <p id="pageSub" class="muted">Live snapshot from Google Sheets</p>
+        </div>
+        <div class="status" id="status">Ready</div>
+      </header>
+
+      <!-- DASHBOARD -->
+      <section class="tab active" id="tab-dashboard">
+        <div class="kpi-grid" id="kpiGrid"></div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Yearly Registrations vs Total Vehicles</h3>
+            <span class="muted small">Stacked column — registrations during the year & cumulative total</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="chartYearly"></canvas></div>
+        </div>
+
+        <div class="card">
+          <div class="card-head">
+            <h3>Category Mix (Latest Snapshot)</h3>
+            <span class="muted small">From most recent Vahan Data row</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="chartMix"></canvas></div>
+        </div>
+      </section>
+
+      <!-- VAHAN ENTRY -->
+      <section class="tab" id="tab-entry-vahan">
+        <div class="card">
+          <div class="card-head">
+            <h3>Add Vahan Data Snapshot</h3>
+            <span class="muted small">Appends a new row to the "Vahan Data" sheet</span>
+          </div>
+          <form id="formVahan" class="form-grid"></form>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" id="vahanReset">Clear</button>
+            <button type="button" class="btn-primary" id="vahanSubmit">Save to Sheet</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- YEARLY ENTRY -->
+      <section class="tab" id="tab-entry-yearly">
+        <div class="card">
+          <div class="card-head">
+            <h3>Add Yearly Record</h3>
+            <span class="muted small">Appends a new row to the "Yearly Data" sheet</span>
+          </div>
+          <form id="formYearly" class="form-grid two"></form>
+          <div class="form-actions">
+            <button type="button" class="btn-secondary" id="yearlyReset">Clear</button>
+            <button type="button" class="btn-primary" id="yearlySubmit">Save to Sheet</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- RECORDS -->
+      <section class="tab" id="tab-records">
+        <div class="card">
+          <div class="card-head">
+            <h3>Yearly Data</h3>
+            <span class="muted small">All rows</span>
+          </div>
+          <div class="table-wrap"><table id="tblYearly"></table></div>
+        </div>
+        <div class="card">
+          <div class="card-head">
+            <h3>Vahan Data Snapshots</h3>
+            <span class="muted small">All rows</span>
+          </div>
+          <div class="table-wrap"><table id="tblVahan"></table></div>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <?!= include('JavaScript'); ?>
+</body>
+</html>
