@@ -570,6 +570,12 @@ body {
   border-left: 6px solid #0284c7;
 }
 
+.card-section.sec-contribution {
+  background: linear-gradient(135deg, #ffffff 0%, #f0fdfa 100%);
+  border: 1px solid #99f6e4;
+  border-left: 6px solid #0d9488;
+}
+
 .section-header {
   display: flex;
   justify-content: space-between;
