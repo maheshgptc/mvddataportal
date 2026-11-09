@@ -3359,8 +3359,13 @@ function renderAdminOfficeLocksTable() {
       if (!hay.includes(searchTerm)) return false;
     }
 
-    if (catFilter !== 'ALL' && off.category !== catFilter) {
-      return false;
+    if (catFilter !== 'ALL') {
+      const match = (off.category === catFilter) ||
+        (catFilter.includes('DTC') && (off.category || '').includes('DTC')) ||
+        (catFilter.includes('Sub') && (off.category || '').includes('Sub')) ||
+        (catFilter.includes('Enforcement') && (off.category || '').includes('Enforcement')) ||
+        (!catFilter.includes('Sub') && !catFilter.includes('Enforcement') && catFilter.includes('RTO') && (off.category || '').startsWith('RTO'));
+      if (!match) return false;
     }
 
     if (statusFilter === 'LOCKED' && !authEmail) return false;
