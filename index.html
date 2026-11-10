@@ -20,6 +20,13 @@
   <!-- Chart.js CDN for Admin Analytics -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
+  <!-- SheetJS (xlsx) for Structured Excel Exports -->
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+  <!-- jsPDF and jsPDF-AutoTable for Publication-Ready PDF Reports -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.8.2/jspdf.plugin.autotable.min.js"></script>
+
   <!-- Supabase JS Client CDN for Live Backend Synchronization -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 
@@ -956,12 +963,6 @@
                   <button type="button" class="btn btn-secondary" onclick="resetOfficerForm()">
                     <i class="fa-solid fa-xmark"></i> Cancel
                   </button>
-                  <button type="button" id="otBtnSaveDraft" class="btn btn-outline" onclick="handleSaveDraft()" style="font-weight: 700; border-color: #cbd5e1;">
-                    <i class="fa-solid fa-file-arrow-down"></i> Save Draft
-                  </button>
-                  <button type="button" class="btn btn-outline" onclick="handleProfilePreview()" style="font-weight: 700;">
-                    <i class="fa-solid fa-eye"></i> Preview Profile
-                  </button>
                   <button type="submit" id="otBtnSubmitProfile" class="btn btn-primary btn-lg" style="background: #0B3B24; border-color: #062C1A;">
                     <i class="fa-solid fa-check"></i> Submit Profile
                   </button>
@@ -1414,7 +1415,7 @@
                 <i class="fa-solid fa-table-list"></i> IT Summary Report
               </button>
               <button class="btn btn-outline" id="btnAdminNavOfficers" onclick="switchAdminSubView('officers')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                <i class="fa-solid fa-user-graduate"></i> Officer Qualifications
+                <i class="fa-solid fa-graduation-cap"></i> Officer Training Dashboard
               </button>
               <button class="btn btn-outline" id="btnAdminNavDirectory" onclick="switchAdminSubView('directory')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-address-book"></i> Officer Directory &amp; Search
@@ -1604,39 +1605,114 @@
           <!-- ADMIN OFFICER QUALIFICATIONS & TRAINING SUBVIEW -->
           <div id="adminOfficersSubView" style="display: none;">
             
-            <div class="summary-report-card">
-              <div class="summary-filter-bar">
+            <div class="summary-report-card" style="box-shadow: 0 4px 16px rgba(0,0,0,0.06); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color);">
+              <!-- Header Bar with Integrated Export Buttons -->
+              <div class="summary-filter-bar" style="background: linear-gradient(135deg, #0B3B24 0%, #15803d 100%); color: white; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
                 <div>
-                  <h3 style="font-size: 1.18rem; font-weight: 800; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 8px;">
-                    <i class="fa-solid fa-user-graduate" style="color: #059669;"></i>
-                    Statewide Officer Training & Qualifications Console
+                  <h3 style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin: 0; display: flex; align-items: center; gap: 10px;">
+                    <i class="fa-solid fa-graduation-cap" style="color: #6ee7b7;"></i>
+                    Officer Training &amp; Qualification — Executive Admin Dashboard
                   </h3>
-                  <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
-                    Central repository of academic degrees, technical qualifications, specializations, and departmental training history across all MVD cadres.
+                  <p style="font-size: 0.82rem; color: #d1fae5; margin: 4px 0 0 0;">
+                    Centralized executive analytics, qualification distributions, specialized skills capacity, and office-wise profile submission tracking.
                   </p>
                 </div>
 
                 <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-primary btn-sm" onclick="exportOfficersReportCSV()" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-file-csv"></i> Download Officers CSV
+                  <button class="btn btn-sm" onclick="exportOfficerDashboardToExcel()" style="background: #16a34a; color: white; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 7px 14px; border-radius: 6px; cursor: pointer;">
+                    <i class="fa-solid fa-file-excel"></i> Export Excel (XLSX)
                   </button>
-                  <button class="btn btn-outline btn-sm" onclick="printOfficerTrainingReport()" style="border-color: #cbd5e1; color: #1e293b; background: white; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
-                    <i class="fa-solid fa-download"></i> Download / Print Officer Report
+                  <button class="btn btn-sm" onclick="exportOfficerDashboardToPDF()" style="background: #dc2626; color: white; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 7px 14px; border-radius: 6px; cursor: pointer;">
+                    <i class="fa-solid fa-file-pdf"></i> Download PDF
+                  </button>
+                  <button class="btn btn-sm" onclick="exportOfficersReportCSV()" style="background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.4); font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 6px; cursor: pointer;">
+                    <i class="fa-solid fa-file-csv"></i> CSV
+                  </button>
+                  <button class="btn btn-sm" onclick="renderOfficerAdminDashboard()" style="background: rgba(255,255,255,0.18); color: white; border: 1px solid rgba(255,255,255,0.4); font-weight: 700; display: inline-flex; align-items: center; gap: 6px; padding: 7px 12px; border-radius: 6px; cursor: pointer;" title="Refresh Dashboard Data">
+                    <i class="fa-solid fa-rotate"></i>
                   </button>
                 </div>
               </div>
 
-              <!-- Quick Filters Bar -->
-              <div style="padding: 12px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
-                <div style="flex: 1; min-width: 200px;">
-                  <div style="position: relative;">
-                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
-                    <input type="text" id="adminOfficerSearchInput" class="form-control" placeholder="Search officer name, PEN, office, specialization..." oninput="renderAdminOfficersTable()" style="padding-left: 36px;">
+              <!-- Top-Level Summary Cards: 4 Prominent KPIs -->
+              <div class="dashboard-grid-4" style="padding: 16px 20px; margin: 0; background: #ffffff; border-bottom: 1px solid var(--border-color); gap: 14px;">
+                <!-- Card 1: Total Officers Entered -->
+                <div class="ot-kpi-card" id="kpiCardTotalOfficers" onclick="applyQuickKpiFilter('all')" style="cursor: pointer; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to view all registered officers">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                      <div style="font-size: 0.72rem; font-weight: 800; color: #166534; text-transform: uppercase; letter-spacing: 0.5px;">TOTAL OFFICERS ENTERED</div>
+                      <div id="kpiOtTotalOfficers" style="font-size: 1.85rem; font-weight: 800; color: #14532d; margin-top: 4px; line-height: 1;">0</div>
+                      <div style="font-size: 0.74rem; color: #15803d; margin-top: 6px; font-weight: 600;">Registered officer profiles</div>
+                    </div>
+                    <div style="background: #bbf7d0; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #166534; font-size: 1.15rem;">
+                      <i class="fa-solid fa-users"></i>
+                    </div>
                   </div>
                 </div>
 
-                <div style="min-width: 170px;">
-                  <select id="adminOfficerDesignationFilter" class="form-control" onchange="renderAdminOfficersTable()">
+                <!-- Card 2: Officers with Additional Qualifications -->
+                <div class="ot-kpi-card" id="kpiCardAddQual" onclick="applyQuickKpiFilter('add_qual')" style="cursor: pointer; background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #93c5fd; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to filter officers with Additional Qualifications">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                      <div style="font-size: 0.72rem; font-weight: 800; color: #1e40af; text-transform: uppercase; letter-spacing: 0.5px;">ADDITIONAL QUALIFICATIONS</div>
+                      <div id="kpiOtAddQualOfficers" style="font-size: 1.85rem; font-weight: 800; color: #1e3a8a; margin-top: 4px; line-height: 1;">0</div>
+                      <div id="kpiOtAddQualPct" style="font-size: 0.74rem; color: #2563eb; margin-top: 6px; font-weight: 600;">0% of total officers</div>
+                    </div>
+                    <div style="background: #bfdbfe; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #1e40af; font-size: 1.15rem;">
+                      <i class="fa-solid fa-user-graduate"></i>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 3: Officers with Specialized Skills & In-Service Trainings -->
+                <div class="ot-kpi-card" id="kpiCardSkillsTrainings" onclick="applyQuickKpiFilter('skills_trainings')" style="cursor: pointer; background: linear-gradient(135deg, #faf5ff 0%, #f3e8ff 100%); border: 1px solid #d8b4fe; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to filter officers with Specialized Skills or In-Service Trainings">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                      <div style="font-size: 0.72rem; font-weight: 800; color: #6b21a8; text-transform: uppercase; letter-spacing: 0.5px;">SKILLS &amp; TRAININGS</div>
+                      <div id="kpiOtSkillsTrainingOfficers" style="font-size: 1.85rem; font-weight: 800; color: #581c87; margin-top: 4px; line-height: 1;">0</div>
+                      <div id="kpiOtSkillsTrainingPct" style="font-size: 0.74rem; color: #7e22ce; margin-top: 6px; font-weight: 600;">0% specialized personnel</div>
+                    </div>
+                    <div style="background: #e9d5ff; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #6b21a8; font-size: 1.15rem;">
+                      <i class="fa-solid fa-award"></i>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 4: Willing to contribute more -->
+                <div class="ot-kpi-card" id="kpiCardWilling" onclick="applyQuickKpiFilter('willing')" style="cursor: pointer; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%); border: 1px solid #fde68a; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to filter officers willing to contribute more">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                      <div style="font-size: 0.72rem; font-weight: 800; color: #92400e; text-transform: uppercase; letter-spacing: 0.5px;">WILLING TO CONTRIBUTE MORE</div>
+                      <div id="kpiOtWillingOfficers" style="font-size: 1.85rem; font-weight: 800; color: #78350f; margin-top: 4px; line-height: 1;">0</div>
+                      <div id="kpiOtWillingPct" style="font-size: 0.74rem; color: #b45309; margin-top: 6px; font-weight: 600;">0% ready for special duties</div>
+                    </div>
+                    <div style="background: #fde68a; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #92400e; font-size: 1.15rem;">
+                      <i class="fa-solid fa-handshake-angle"></i>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Multi-Dimension Filtering Bar -->
+              <div style="padding: 14px 20px; background: #f8fafc; border-bottom: 1px solid var(--border-color); display: flex; gap: 10px; align-items: center; flex-wrap: wrap;">
+                <!-- Search text -->
+                <div style="flex: 2; min-width: 220px;">
+                  <div style="position: relative;">
+                    <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 12px; top: 50%; transform: translateY(-50%); color: var(--text-muted);"></i>
+                    <input type="text" id="adminOfficerSearchInput" class="form-control" placeholder="Search officer name, PEN, office, specialization, willingness..." oninput="handleOfficerDashboardFilterChange()" style="padding-left: 36px; font-size: 0.88rem;">
+                  </div>
+                </div>
+
+                <!-- Office Filter -->
+                <div style="flex: 1; min-width: 170px;">
+                  <select id="adminOfficerOfficeFilter" class="form-control" onchange="handleOfficerDashboardFilterChange()" style="font-size: 0.88rem;">
+                    <option value="ALL">-- All Offices (Statewide) --</option>
+                  </select>
+                </div>
+
+                <!-- Designation Filter -->
+                <div style="flex: 1; min-width: 160px;">
+                  <select id="adminOfficerDesignationFilter" class="form-control" onchange="handleOfficerDashboardFilterChange()" style="font-size: 0.88rem;">
                     <option value="ALL">-- All Designations --</option>
                     <option value="Regional Transport Officer">Regional Transport Officer (RTO)</option>
                     <option value="Joint Regional Transport Officer">Joint RTO (JRTO)</option>
@@ -1649,81 +1725,155 @@
                   </select>
                 </div>
 
-                <div style="min-width: 170px;">
-                  <select id="adminOfficerQualificationFilter" class="form-control" onchange="renderAdminOfficersTable()">
+                <!-- Qualification Filter -->
+                <div style="flex: 1; min-width: 160px;">
+                  <select id="adminOfficerQualificationFilter" class="form-control" onchange="handleOfficerDashboardFilterChange()" style="font-size: 0.88rem;">
                     <option value="ALL">-- All Qualifications --</option>
-                    <option value="PHD">PhD / Doctorate</option>
-                    <option value="M.Tech">M.Tech / M.E</option>
-                    <option value="B.Tech">B.Tech / B.E</option>
-                    <option value="Diploma">Diploma</option>
-                    <option value="MCA / M.Sc / MBA">Master's Degree</option>
-                    <option value="BCA / B.Sc / B.Com / BA">Bachelor's Degree</option>
-                    <option value="LLB / LLM">Law Degree</option>
+                    <optgroup label="Basic Technical Qualifications">
+                      <option value="B.Tech">B.Tech / B.E</option>
+                      <option value="Diploma">Diploma</option>
+                      <option value="ITI">ITI</option>
+                      <option value="Automobile Engineering">Automobile Engineering</option>
+                      <option value="Mechanical Engineering">Mechanical Engineering</option>
+                    </optgroup>
+                    <optgroup label="Additional Qualifications">
+                      <option value="PHD">PhD / Post Doctoral</option>
+                      <option value="M.Tech">M.Tech / ME</option>
+                      <option value="LLB">LLB / Law</option>
+                      <option value="LLM">LLM</option>
+                      <option value="MBA">MBA</option>
+                      <option value="MCA">MCA / M.Sc Computer</option>
+                      <option value="PGDeG">PGDeG (e-Governance)</option>
+                    </optgroup>
                   </select>
                 </div>
 
-                <button class="btn btn-secondary btn-sm" onclick="resetAdminOfficerFilters()">
-                  <i class="fa-solid fa-rotate-left"></i> Reset Filters
+                <!-- Specialized Skills Filter -->
+                <div style="flex: 1; min-width: 160px;">
+                  <select id="adminOfficerSkillFilter" class="form-control" onchange="handleOfficerDashboardFilterChange()" style="font-size: 0.88rem;">
+                    <option value="ALL">-- All Specialized Skills --</option>
+                    <option value="IIT Trained">IIT Trained</option>
+                    <option value="ARAI">ARAI</option>
+                    <option value="CIRT">CIRT</option>
+                    <option value="IMG">IMG</option>
+                    <option value="IDTR">IDTR</option>
+                    <option value="Legal & Prosecution">Legal &amp; Prosecution</option>
+                    <option value="Accident Investigation">Accident Investigation</option>
+                    <option value="AIS Standards & Homologation">AIS Standards &amp; Homologation</option>
+                    <option value="EV Architecture">EV Architecture</option>
+                    <option value="IT & Software">IT &amp; Software</option>
+                    <option value="Radar & Speed Enforcement">Radar &amp; Speed Enforcement</option>
+                    <option value="Vehicle Fitness Inspection">Vehicle Fitness Inspection</option>
+                    <option value="Heavy Equipment Inspection">Heavy Equipment Inspection</option>
+                  </select>
+                </div>
+
+                <!-- Willingness to Contribute Filter -->
+                <div style="flex: 1; min-width: 150px;">
+                  <select id="adminOfficerWillingnessFilter" class="form-control" onchange="handleOfficerDashboardFilterChange()" style="font-size: 0.88rem;">
+                    <option value="ALL">-- Willingness (All) --</option>
+                    <option value="WILLING">Willing to Contribute More</option>
+                    <option value="NOT_SPECIFIED">Not Specified</option>
+                  </select>
+                </div>
+
+                <!-- Reset Button -->
+                <button class="btn btn-secondary btn-sm" id="btnResetOfficerFilters" onclick="resetAdminOfficerDashboardFilters()" style="font-weight: 700; white-space: nowrap;">
+                  <i class="fa-solid fa-rotate-left"></i> Reset
                 </button>
               </div>
 
-              <!-- Officer KPI Metrics Strip -->
-              <div class="dashboard-grid-4" style="padding: 16px 20px; margin: 0; background: #ffffff; border-bottom: 1px solid var(--border-color); grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));">
-                <div style="background: #f0fdf4; border: 1px solid #a7f3d0; border-radius: 8px; padding: 12px; text-align: center;">
-                  <div style="font-size: 0.74rem; font-weight: 700; color: #047857;">TOTAL OFFICERS PROFILED</div>
-                  <div id="kpiTotalOfficers" style="font-size: 1.4rem; font-weight: 800; color: #064e3b; margin-top: 2px;">0</div>
+              <!-- Active Drill-Down Banner (Revealed when a chart slice, bar, or card is clicked) -->
+              <div id="otAdminDrillDownBanner" style="display: none; padding: 10px 20px; background: #e0f2fe; border-bottom: 2px solid #38bdf8; align-items: center; justify-content: space-between;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <span class="badge" style="background: #0284c7; color: white; font-weight: 700; font-size: 0.75rem;"><i class="fa-solid fa-filter"></i> DRILL-DOWN ACTIVE</span>
+                  <span id="otDrillDownLabel" style="font-size: 0.88rem; font-weight: 700; color: #0369a1;">Showing data for: ...</span>
                 </div>
-
-                <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; text-align: center;">
-                  <div style="font-size: 0.74rem; font-weight: 700; color: #1d4ed8;">ENGINEERING DEGREES (B.Tech/M.Tech)</div>
-                  <div id="kpiEnggOfficers" style="font-size: 1.4rem; font-weight: 800; color: #1e40af; margin-top: 2px;">0</div>
-                </div>
-
-                <div style="background: #fffbe6; border: 1px solid #ffe58f; border-radius: 8px; padding: 12px; text-align: center;">
-                  <div style="font-size: 0.74rem; font-weight: 700; color: #b45309;">TECHNICAL DIPLOMA HOLDERS</div>
-                  <div id="kpiDiplomaOfficers" style="font-size: 1.4rem; font-weight: 800; color: #78350f; margin-top: 2px;">0</div>
-                </div>
-
-                <div style="background: #faf5ff; border: 1px solid #e9d5ff; border-radius: 8px; padding: 12px; text-align: center;">
-                  <div style="font-size: 0.74rem; font-weight: 700; color: #7c3aed;">VAHAN / E-CHALLAN TRAINED</div>
-                  <div id="kpiVahanTrained" style="font-size: 1.4rem; font-weight: 800; color: #5b21b6; margin-top: 2px;">0</div>
-                </div>
+                <button class="btn btn-outline btn-sm" onclick="clearDrillDown()" style="background: white; border-color: #0284c7; color: #0284c7; font-weight: 700; padding: 3px 10px; font-size: 0.78rem;">
+                  <i class="fa-solid fa-xmark"></i> Clear Drill-Down
+                </button>
               </div>
 
-              <!-- Officer Charts Grid -->
-              <div class="charts-grid-2" style="padding: 16px 20px; margin: 0; background: #ffffff; border-bottom: 1px solid var(--border-color);">
-                <div class="chart-card" style="margin-bottom: 0;">
-                  <div class="section-header" style="margin-bottom: 8px; padding-bottom: 6px;">
-                    <h4 style="font-size: 0.95rem; font-weight: 700; color: #0f172a;"><i class="fa-solid fa-chart-pie" style="color: #7c3aed;"></i> Qualification Distribution</h4>
+              <!-- Charts Grid: 2 Comprehensive Visualizations -->
+              <div class="charts-grid-2" style="padding: 18px 20px; margin: 0; background: #ffffff; border-bottom: 1px solid var(--border-color); gap: 18px;">
+                
+                <!-- Chart 1: Breakdown (Pie / Doughnut) with dimension switcher -->
+                <div class="chart-card" style="margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px;">
+                  <div class="section-header" style="margin-bottom: 10px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <h4 style="font-size: 0.95rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-chart-pie" style="color: #7c3aed;"></i>
+                        <span id="otPieChartHeading">Qualification &amp; Skill Breakdown</span>
+                      </h4>
+                      <small style="color: #64748b; font-size: 0.75rem;">Click any chart slice to drill-down into officer records</small>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                      <select id="otPieDimensionSelect" class="form-control" onchange="renderOfficerBreakdownPieChart()" style="font-size: 0.78rem; padding: 4px 8px; height: auto;">
+                        <option value="qualifications">Qualifications (All)</option>
+                        <option value="basic_qualifications">Basic Qualifications</option>
+                        <option value="additional_qualifications">Additional Qualifications</option>
+                        <option value="specialized_skills">Specialized Skills &amp; Trainings</option>
+                      </select>
+                    </div>
                   </div>
-                  <div class="chart-container" style="height: 220px;">
+                  <div class="chart-container" style="height: 250px; position: relative;">
                     <canvas id="chartOfficerQualDistribution"></canvas>
                   </div>
                 </div>
 
-                <div class="chart-card" style="margin-bottom: 0;">
-                  <div class="section-header" style="margin-bottom: 8px; padding-bottom: 6px;">
-                    <h4 style="font-size: 0.95rem; font-weight: 700; color: #0f172a;"><i class="fa-solid fa-chart-column" style="color: #0284c7;"></i> Cadre Designation Breakdown</h4>
+                <!-- Chart 2: Office-Wise Completion Rate (Bar Graph) -->
+                <div class="chart-card" style="margin-bottom: 0; box-shadow: 0 2px 8px rgba(0,0,0,0.04); border: 1px solid #e2e8f0; border-radius: 10px; padding: 14px 16px;">
+                  <div class="section-header" style="margin-bottom: 10px; padding-bottom: 8px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                    <div>
+                      <h4 style="font-size: 0.95rem; font-weight: 800; color: #0f172a; margin: 0; display: flex; align-items: center; gap: 6px;">
+                        <i class="fa-solid fa-chart-column" style="color: #0284c7;"></i>
+                        <span>Office-Wise Completion &amp; Submission Rate</span>
+                      </h4>
+                      <small style="color: #64748b; font-size: 0.75rem;">Click any bar to drill-down and filter by office</small>
+                    </div>
+                    <div style="display: flex; gap: 6px;">
+                      <select id="otBarScopeSelect" class="form-control" onchange="renderOfficeCompletionBarChart()" style="font-size: 0.78rem; padding: 4px 8px; height: auto;">
+                        <option value="active">Active Offices with Entries</option>
+                        <option value="top15">Top 15 Offices by Count</option>
+                        <option value="dtc_rto">DTC &amp; RTO Offices</option>
+                      </select>
+                    </div>
                   </div>
-                  <div class="chart-container" style="height: 220px;">
-                    <canvas id="chartOfficerDesigDistribution"></canvas>
+                  <div class="chart-container" style="height: 250px; position: relative;">
+                    <canvas id="chartOfficeCompletionRate"></canvas>
                   </div>
+                </div>
+
+              </div>
+
+              <!-- Officer Data Table Header & Counter -->
+              <div style="padding: 12px 20px; background: #ffffff; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                  <h4 style="font-size: 0.96rem; font-weight: 800; color: #0B3B24; margin: 0;">
+                    <i class="fa-solid fa-table-list"></i> Underlying Officer Profile Data
+                  </h4>
+                  <span id="otDashboardRecordCount" class="badge badge-info" style="font-size: 0.76rem; font-weight: 700;">Showing 0 officers</span>
+                </div>
+                <div style="font-size: 0.78rem; color: #64748b;">
+                  <span>Tip: Click any chart segment, bar, or KPI card to filter and sort records instantly.</span>
                 </div>
               </div>
 
               <!-- Officer Table -->
-              <div class="summary-table-wrapper">
+              <div class="summary-table-wrapper" id="otDashboardTableWrapper">
                 <table class="summary-report-table" id="adminOfficersReportTable">
                   <thead>
                     <tr>
-                      <th style="width: 40px; text-align: center;">#</th>
-                      <th style="min-width: 170px;">Office Name</th>
-                      <th style="min-width: 160px;">Officer Name &amp; PEN</th>
-                      <th style="min-width: 150px;">Designation</th>
-                      <th style="min-width: 140px;">Highest Qualification</th>
-                      <th style="min-width: 150px;">Branch / Specialization</th>
-                      <th style="min-width: 220px;">Trainings Attended</th>
-                      <th style="min-width: 90px; text-align: center;">Actions</th>
+                      <th style="width: 38px; text-align: center;">#</th>
+                      <th style="min-width: 150px;">Office</th>
+                      <th style="min-width: 170px;">Officer Name &amp; PEN</th>
+                      <th style="min-width: 120px;">Designation</th>
+                      <th style="min-width: 140px;">Basic Qualification</th>
+                      <th style="min-width: 160px;">Additional Qualifications</th>
+                      <th style="min-width: 160px;">Specialized Skills</th>
+                      <th style="min-width: 140px;">Trainings</th>
+                      <th style="min-width: 170px;">Willing to Contribute?</th>
+                      <th style="min-width: 80px; text-align: center;">Actions</th>
                     </tr>
                   </thead>
                   <tbody id="adminOfficersTableBody">
@@ -1731,6 +1881,7 @@
                   </tbody>
                 </table>
               </div>
+
             </div>
 
           </div>
@@ -1850,7 +2001,7 @@
                       <option value="MV Act & Statutory Rules">MV Act &amp; Statutory Rules</option>
                       <option value="Vehicle Fitness Inspection">Vehicle Fitness Inspection</option>
                       <option value="Policy Drafting">Policy Drafting</option>
-                      <option value="IIT">IIT</option>
+                      <option value="IIT Trained">IIT Trained</option>
                       <option value="ARAI">ARAI</option>
                       <option value="CIRT">CIRT</option>
                       <option value="IMG">IMG</option>

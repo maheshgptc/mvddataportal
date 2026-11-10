@@ -2596,7 +2596,10 @@ function switchAdminSubView(view) {
   if (view === 'dashboard') renderAdminDashboard();
   if (view === 'officelocks') renderAdminOfficeLocksTable();
   if (view === 'summary') renderAdminSummaryReport();
-  if (view === 'officers') renderAdminOfficersTable();
+  if (view === 'officers') {
+    if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+    else if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+  }
   if (view === 'directory') {
     if (typeof initOfficerTrainingModule === 'function') initOfficerTrainingModule();
     if (typeof renderAdminOfficersDirectory === 'function') renderAdminOfficersDirectory();

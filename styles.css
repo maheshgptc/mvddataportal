@@ -2154,3 +2154,24 @@ input:checked+.slider:before {
     padding: 6px !important;
   }
 }
+
+/* --- OFFICER TRAINING & QUALIFICATION ADMIN DASHBOARD STYLES --- */
+.ot-kpi-card {
+  transition: transform 0.18s ease, box-shadow 0.18s ease, border-color 0.18s ease;
+  user-select: none;
+}
+.ot-kpi-card:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.08);
+}
+.ot-kpi-card.active {
+  outline: 2px solid #0284c7;
+  box-shadow: 0 0 0 4px rgba(2, 132, 199, 0.25) !important;
+}
+#otAdminDrillDownBanner {
+  animation: otFadeInDown 0.2s ease-out;
+}
+@keyframes otFadeInDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}

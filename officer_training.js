@@ -217,20 +217,58 @@ const SPECIALIZED_SKILL_OPTIONS = [
   "Transport Administration",
   "Vehicle Homologation",
   "Heavy Equipment Inspection",
-  "IIT",
+  "IIT Trained",
   "ARAI",
   "CIRT",
   "IMG",
   "IDTR",
   "Others — Specify"
 ];
+window.SPECIALIZED_SKILL_OPTIONS = SPECIALIZED_SKILL_OPTIONS;
 
 // --- 2. SAMPLE SEED DATA (Cleaned - No hardcoded or dummy officers) ---
 const SEED_OFFICER_PROFILES = [];
 
+// --- DATA CLEANUP: Purge locally stored form drafts/caches to prevent caching issues upon load ---
+try {
+  const formCacheKeys = [
+    'mvd_ot_form_draft',
+    'mvd_ot_draft',
+    'ot_form_cache',
+    'otOfficerFormDraft',
+    'mvd_officer_draft',
+    'mvd_form_backup',
+    'mvd_ot_cached_form',
+    'mvd_ot_form_state'
+  ];
+  formCacheKeys.forEach(k => {
+    try { localStorage.removeItem(k); } catch (e) {}
+  });
+
+  if (typeof sessionStorage !== 'undefined') {
+    try {
+      Object.keys(sessionStorage).forEach(k => {
+        if (k.toLowerCase().includes('form') || k.toLowerCase().includes('draft') || k.startsWith('ot_')) {
+          sessionStorage.removeItem(k);
+        }
+      });
+    } catch (e) {}
+  }
+} catch (e) {
+  console.warn("Storage cleanup notice:", e);
+}
+
 // --- 3. STATE CONTROLLER ---
 let otProfilesStore = (JSON.parse(localStorage.getItem('mvd_ot_profiles_store')) || [])
-  .filter(p => p && p.id && !p.id.startsWith('prof_kl01_') && !p.id.startsWith('prof_kl07_') && !p.id.startsWith('off_seed_'));
+  .filter(p => p && p.id && p.status !== 'draft' && !p.id.startsWith('prof_kl01_') && !p.id.startsWith('prof_kl07_') && !p.id.startsWith('off_seed_'));
+
+// Normalize any existing "IIT" skill entries to "IIT Trained"
+otProfilesStore.forEach(p => {
+  if (Array.isArray(p.specializedSkills)) {
+    p.specializedSkills = p.specializedSkills.map(s => s === 'IIT' ? 'IIT Trained' : s);
+  }
+});
+
 localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
 window.otProfilesStore = otProfilesStore;
 
@@ -2014,6 +2052,7 @@ function loadProfileForEditing(profileId) {
     try { normSkills = JSON.parse(normSkills); } catch (e) { normSkills = normSkills.split(',').map(s => s.trim()); }
   }
   if (!Array.isArray(normSkills)) normSkills = [];
+  normSkills = normSkills.map(s => (s === 'IIT' ? 'IIT Trained' : s));
   const normCustomSkills = profile.customSkills || profile.custom_skills || "";
 
   // Normalize training history
@@ -3681,6 +3720,7 @@ async function syncOfficerProfilesWithSupabase() {
       });
       localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
       renderAdminOfficersDirectory();
+      if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
       const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
       if (currentSelectedOffice) checkOfficeAccessAndLock(currentSelectedOffice);
     } else {
@@ -3734,6 +3774,7 @@ async function syncOfficerProfilesWithSupabase() {
         });
         localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
         renderAdminOfficersDirectory();
+        if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
       }
     }
 
@@ -4025,6 +4066,1040 @@ async function saveOfficerAuditLogToSupabase(entry) {
     // Fails silently if table not yet created
   }
 }
+
+// --- 16. ADMIN PORTAL OFFICER TRAINING & QUALIFICATION DASHBOARD ---
+
+let otDashboardFilter = {
+  search: '',
+  office: 'ALL',
+  designation: 'ALL',
+  qualification: 'ALL',
+  skill: 'ALL',
+  willingness: 'ALL', // 'ALL' | 'WILLING' | 'NOT_SPECIFIED'
+  drillDownType: null, // null | 'office' | 'qualification' | 'skill' | 'kpi'
+  drillDownValue: null,
+  pieDimension: 'qualifications', // 'qualifications' | 'basic_qualifications' | 'additional_qualifications' | 'specialized_skills'
+  barScope: 'active' // 'active' | 'top15' | 'dtc_rto'
+};
+
+let otChartOfficerQualInstance = null;
+let otChartOfficeCompletionInstance = null;
+
+function getAdminOfficerDashboardData() {
+  const map = new Map();
+
+  // 1. Primary: Rich profiles from otProfilesStore
+  const store = (typeof window !== 'undefined' && Array.isArray(window.otProfilesStore))
+    ? window.otProfilesStore
+    : otProfilesStore;
+  if (Array.isArray(store)) {
+    store.forEach(p => {
+      if (!p || p.status === 'draft') return;
+      const key = p.pen || p.id;
+      if (!key) return;
+
+      let addl = p.additionalQualifications || p.additional_qualifications || [];
+      if (typeof addl === 'string') {
+        try { addl = JSON.parse(addl); } catch (e) { addl = []; }
+      }
+      if (!Array.isArray(addl)) addl = [];
+      addl = addl.filter(a => {
+        const q = (typeof a === 'string' ? a : (a.qualification || a.name || '')).trim();
+        return q && q !== 'No additional Qualifications' && q !== 'No additional Qualification';
+      });
+
+      let skills = p.specializedSkills || p.specialized_skills || [];
+      if (typeof skills === 'string') {
+        try { skills = JSON.parse(skills); } catch (e) { skills = skills.split(',').map(s => s.trim()).filter(Boolean); }
+      }
+      if (!Array.isArray(skills)) skills = [];
+      skills = skills.map(s => s === 'IIT' ? 'IIT Trained' : s);
+
+      let trainings = p.trainingHistory || p.training_history || [];
+      if (typeof trainings === 'string') {
+        try { trainings = JSON.parse(trainings); } catch (e) { trainings = []; }
+      }
+      if (!Array.isArray(trainings)) trainings = [];
+
+      const item = {
+        id: p.id,
+        officeCode: p.officeCode || (p.officeName || '').split(' ')[0] || 'KL01',
+        officeName: p.officeName || p.officeCode || 'MVD Office',
+        officerFullName: p.officerFullName || p.officer_full_name || 'Officer',
+        pen: p.pen || p.officer_pen || '',
+        designation: p.designation || p.current_designation || p.officer_designation || 'AMVI',
+        basicQualification: p.technicalQualification || p.technical_qualification || p.educational_qualification || p.generalEducation || 'Diploma',
+        institution: p.institution || '',
+        passingYear: p.passingYear || p.passing_year || '',
+        grade: p.grade || p.class_grade || '',
+        additionalQualifications: addl,
+        specializedSkills: skills,
+        customSkills: p.customSkills || p.custom_skills || '',
+        willingnessToContribute: p.willingnessToContribute || p.willingness_to_contribute || '',
+        trainingHistory: trainings,
+        enteredBy: p.enteredBy || {
+          fullName: p.entered_by_name || p.entry_officer_name || '',
+          designation: p.entered_by_designation || p.entry_officer_designation || '',
+          mobile: p.entered_by_mobile || p.entry_officer_mobile || ''
+        },
+        status: p.status || 'submitted',
+        updatedAt: p.updatedAt || p.created_at || new Date().toISOString()
+      };
+      map.set(key, item);
+    });
+  }
+
+  // 2. Secondary: Complementary profiles from officersStore in app.js
+  if (typeof officersStore !== 'undefined' && Array.isArray(officersStore)) {
+    officersStore.forEach(o => {
+      if (!o) return;
+      const key = o.officer_pen || o.id;
+      if (!key || map.has(key)) return;
+
+      const offCode = (o.office_name || '').split(' ')[0] || 'KL01';
+      const skills = o.specialization ? o.specialization.split(',').map(s => s.trim() === 'IIT' ? 'IIT Trained' : s.trim()).filter(Boolean) : [];
+
+      let trainings = [];
+      if (o.training_details) {
+        try { trainings = JSON.parse(o.training_details); } catch (e) { trainings = []; }
+      } else if (o.training_attended && o.training_attended !== 'None') {
+        trainings = [{ attended: o.training_attended, conductedBy: o.training_institutes || 'MVD', monthYear: o.recent_training_year ? String(o.recent_training_year) : '' }];
+      }
+
+      map.set(key, {
+        id: o.id,
+        officeCode: offCode,
+        officeName: o.office_name || offCode,
+        officerFullName: o.officer_name || '',
+        pen: o.officer_pen || '',
+        designation: o.officer_designation || 'AMVI',
+        basicQualification: o.educational_qualification || 'Diploma',
+        institution: '',
+        passingYear: o.recent_training_year || '',
+        grade: '',
+        additionalQualifications: [],
+        specializedSkills: skills,
+        customSkills: o.qualification_other || '',
+        willingnessToContribute: o.willingness_to_contribute || '',
+        trainingHistory: trainings,
+        enteredBy: {
+          fullName: o.entry_officer_name || '',
+          designation: o.entry_officer_designation || '',
+          mobile: o.entry_officer_mobile || ''
+        },
+        status: 'submitted',
+        updatedAt: o.created_at || new Date().toISOString()
+      });
+    });
+  }
+
+  return Array.from(map.values());
+}
+
+function getFilteredDashboardOfficers() {
+  const all = getAdminOfficerDashboardData();
+  return all.filter(o => {
+    // 1. Text Search
+    if (otDashboardFilter.search) {
+      const q = otDashboardFilter.search.toLowerCase().trim();
+      const hay = [
+        o.officerFullName,
+        o.pen,
+        o.officeCode,
+        o.officeName,
+        o.designation,
+        o.basicQualification,
+        o.institution,
+        (o.specializedSkills || []).join(' '),
+        (o.additionalQualifications || []).map(a => a.qualification).join(' '),
+        o.willingnessToContribute,
+        (o.trainingHistory || []).map(t => t.attended).join(' ')
+      ].join(' ').toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+
+    // 2. Office Filter
+    if (otDashboardFilter.office !== 'ALL') {
+      if (o.officeCode !== otDashboardFilter.office) return false;
+    }
+
+    // 3. Designation Filter
+    if (otDashboardFilter.designation !== 'ALL') {
+      if ((o.designation || '').toLowerCase() !== otDashboardFilter.designation.toLowerCase()) return false;
+    }
+
+    // 4. Qualification Filter
+    if (otDashboardFilter.qualification !== 'ALL') {
+      const targetQual = otDashboardFilter.qualification.toLowerCase();
+      const basic = (o.basicQualification || '').toLowerCase();
+      const addl = (o.additionalQualifications || []).map(a => (a.qualification || '').toLowerCase());
+      const matchBasic = basic.includes(targetQual);
+      const matchAddl = addl.some(a => a.includes(targetQual));
+      if (!matchBasic && !matchAddl) return false;
+    }
+
+    // 5. Skill Filter
+    if (otDashboardFilter.skill !== 'ALL') {
+      const targetSkill = otDashboardFilter.skill.toLowerCase();
+      const skills = (o.specializedSkills || []).map(s => s.toLowerCase());
+      const custom = (o.customSkills || '').toLowerCase();
+      if (!skills.includes(targetSkill) && !custom.includes(targetSkill)) return false;
+    }
+
+    // 6. Willingness Filter
+    if (otDashboardFilter.willingness !== 'ALL') {
+      const isWilling = !!(o.willingnessToContribute && o.willingnessToContribute.trim().length > 0);
+      if (otDashboardFilter.willingness === 'WILLING' && !isWilling) return false;
+      if (otDashboardFilter.willingness === 'NOT_SPECIFIED' && isWilling) return false;
+    }
+
+    // 7. Active Drill-Down Filter
+    if (otDashboardFilter.drillDownType && otDashboardFilter.drillDownValue) {
+      const val = String(otDashboardFilter.drillDownValue).toLowerCase().trim();
+      if (otDashboardFilter.drillDownType === 'office') {
+        if (o.officeCode.toLowerCase() !== val && !o.officeName.toLowerCase().includes(val)) return false;
+      } else if (otDashboardFilter.drillDownType === 'skill') {
+        const skills = (o.specializedSkills || []).map(s => s.toLowerCase());
+        const custom = (o.customSkills || '').toLowerCase();
+        if (!skills.includes(val) && !custom.includes(val)) return false;
+      } else if (otDashboardFilter.drillDownType === 'qualification') {
+        const basic = (o.basicQualification || '').toLowerCase();
+        const addl = (o.additionalQualifications || []).map(a => (a.qualification || '').toLowerCase());
+        if (!basic.includes(val) && !addl.some(a => a.includes(val))) return false;
+      } else if (otDashboardFilter.drillDownType === 'kpi') {
+        if (val === 'add_qual' && !(o.additionalQualifications && o.additionalQualifications.length > 0)) return false;
+        if (val === 'skills_trainings' && !((o.specializedSkills && o.specializedSkills.length > 0) || (o.trainingHistory && o.trainingHistory.length > 0))) return false;
+        if (val === 'willing' && !(o.willingnessToContribute && o.willingnessToContribute.trim().length > 0)) return false;
+      }
+    }
+
+    return true;
+  });
+}
+
+function updateOfficerDashboardKpis(allOfficers, filteredOfficers) {
+  const total = allOfficers.length;
+  const withAddl = allOfficers.filter(o => o.additionalQualifications && o.additionalQualifications.length > 0).length;
+  const withSkillsTrainings = allOfficers.filter(o => 
+    (o.specializedSkills && o.specializedSkills.length > 0) ||
+    (o.customSkills && o.customSkills.trim().length > 0) ||
+    (o.trainingHistory && o.trainingHistory.length > 0)
+  ).length;
+  const willing = allOfficers.filter(o => o.willingnessToContribute && o.willingnessToContribute.trim().length > 0).length;
+
+  const elTotal = document.getElementById('kpiOtTotalOfficers');
+  const elAddl = document.getElementById('kpiOtAddQualOfficers');
+  const elAddlPct = document.getElementById('kpiOtAddQualPct');
+  const elSkills = document.getElementById('kpiOtSkillsTrainingOfficers');
+  const elSkillsPct = document.getElementById('kpiOtSkillsTrainingPct');
+  const elWilling = document.getElementById('kpiOtWillingOfficers');
+  const elWillingPct = document.getElementById('kpiOtWillingPct');
+
+  if (elTotal) elTotal.textContent = total;
+  if (elAddl) elAddl.textContent = withAddl;
+  if (elAddlPct) elAddlPct.textContent = total > 0 ? `${Math.round((withAddl / total) * 100)}% of total officers` : '0% of total officers';
+  if (elSkills) elSkills.textContent = withSkillsTrainings;
+  if (elSkillsPct) elSkillsPct.textContent = total > 0 ? `${Math.round((withSkillsTrainings / total) * 100)}% specialized personnel` : '0% specialized personnel';
+  if (elWilling) elWilling.textContent = willing;
+  if (elWillingPct) elWillingPct.textContent = total > 0 ? `${Math.round((willing / total) * 100)}% ready for special duties` : '0% ready for special duties';
+
+  // Highlight active KPI card
+  document.querySelectorAll('.ot-kpi-card').forEach(c => c.classList.remove('active'));
+  if (otDashboardFilter.drillDownType === 'kpi') {
+    if (otDashboardFilter.drillDownValue === 'all') document.getElementById('kpiCardTotalOfficers')?.classList.add('active');
+    else if (otDashboardFilter.drillDownValue === 'add_qual') document.getElementById('kpiCardAddQual')?.classList.add('active');
+    else if (otDashboardFilter.drillDownValue === 'skills_trainings') document.getElementById('kpiCardSkillsTrainings')?.classList.add('active');
+    else if (otDashboardFilter.drillDownValue === 'willing') document.getElementById('kpiCardWilling')?.classList.add('active');
+  }
+
+  // Update table record count
+  const countEl = document.getElementById('otDashboardRecordCount');
+  if (countEl) countEl.textContent = `Showing ${filteredOfficers.length} of ${total} officers`;
+}
+
+function renderOfficerBreakdownPieChart(filteredOfficers) {
+  const canvas = document.getElementById('chartOfficerQualDistribution');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const dim = document.getElementById('otPieDimensionSelect')?.value || otDashboardFilter.pieDimension || 'qualifications';
+  otDashboardFilter.pieDimension = dim;
+
+  const officers = filteredOfficers || getFilteredDashboardOfficers();
+  let counts = {};
+  let title = "Qualification Breakdown";
+
+  if (dim === 'qualifications') {
+    title = "Qualifications Distribution (Basic & Additional)";
+    counts = {
+      'B.Tech / B.E': 0,
+      'Diploma': 0,
+      'ITI': 0,
+      'LLB / Law': 0,
+      'MBA': 0,
+      'M.Tech': 0,
+      'PhD': 0,
+      'MCA / M.Sc': 0,
+      'Other Qualifications': 0
+    };
+    officers.forEach(o => {
+      const b = (o.basicQualification || '').toUpperCase();
+      let categorized = false;
+      if (b.includes('B.TECH') || b.includes('B.E')) { counts['B.Tech / B.E']++; categorized = true; }
+      else if (b.includes('DIPLOMA')) { counts['Diploma']++; categorized = true; }
+      else if (b.includes('ITI')) { counts['ITI']++; categorized = true; }
+
+      (o.additionalQualifications || []).forEach(a => {
+        const aq = (a.qualification || '').toUpperCase();
+        if (aq.includes('LLB') || aq.includes('LAW') || aq.includes('LLM')) { counts['LLB / Law']++; categorized = true; }
+        else if (aq.includes('MBA')) { counts['MBA']++; categorized = true; }
+        else if (aq.includes('M.TECH')) { counts['M.Tech']++; categorized = true; }
+        else if (aq.includes('PHD')) { counts['PhD']++; categorized = true; }
+        else if (aq.includes('MCA') || aq.includes('M.SC')) { counts['MCA / M.Sc']++; categorized = true; }
+      });
+      if (!categorized) counts['Other Qualifications']++;
+    });
+  } else if (dim === 'basic_qualifications') {
+    title = "Basic Technical Qualifications";
+    counts = {};
+    officers.forEach(o => {
+      const q = o.basicQualification || 'Not Specified';
+      counts[q] = (counts[q] || 0) + 1;
+    });
+  } else if (dim === 'additional_qualifications') {
+    title = "Additional Qualifications Breakdown";
+    counts = {};
+    officers.forEach(o => {
+      (o.additionalQualifications || []).forEach(a => {
+        const q = a.qualification || 'Other';
+        counts[q] = (counts[q] || 0) + 1;
+      });
+    });
+    if (Object.keys(counts).length === 0) counts['No Additional Qualifications'] = 0;
+  } else if (dim === 'specialized_skills') {
+    title = "Specialized Skills & Trainings Distribution";
+    counts = {};
+    officers.forEach(o => {
+      (o.specializedSkills || []).forEach(s => {
+        const skillName = s === 'IIT' ? 'IIT Trained' : s;
+        counts[skillName] = (counts[skillName] || 0) + 1;
+      });
+      if (o.customSkills) {
+        counts['Custom / Other Skills'] = (counts['Custom / Other Skills'] || 0) + 1;
+      }
+    });
+    if (Object.keys(counts).length === 0) counts['No Specialized Skills'] = 0;
+  }
+
+  const labels = [];
+  const data = [];
+  Object.entries(counts).forEach(([k, v]) => {
+    if (v > 0) {
+      labels.push(k);
+      data.push(v);
+    }
+  });
+
+  const headingEl = document.getElementById('otPieChartHeading');
+  if (headingEl) headingEl.textContent = title;
+
+  const palette = [
+    '#059669', '#0284c7', '#7c3aed', '#f59e0b', '#dc2626',
+    '#10b981', '#38bdf8', '#c084fc', '#fbbf24', '#f87171',
+    '#065f46', '#0369a1', '#6b21a8', '#b45309', '#991b1b',
+    '#64748b'
+  ];
+
+  if (otChartOfficerQualInstance) {
+    try { otChartOfficerQualInstance.destroy(); } catch (e) {}
+    otChartOfficerQualInstance = null;
+  }
+
+  if (labels.length === 0) {
+    labels.push("No data");
+    data.push(1);
+  }
+
+  otChartOfficerQualInstance = new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels,
+      datasets: [{
+        data,
+        backgroundColor: palette.slice(0, labels.length),
+        borderWidth: 2,
+        borderColor: '#ffffff'
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: {
+          position: 'right',
+          labels: { boxWidth: 12, font: { size: 10, family: "'Plus Jakarta Sans', sans-serif" } }
+        },
+        tooltip: {
+          callbacks: {
+            label: (item) => {
+              const val = item.raw;
+              const total = data.reduce((a, b) => a + b, 0);
+              const pct = total > 0 ? Math.round((val / total) * 100) : 0;
+              return ` ${item.label}: ${val} officers (${pct}%)`;
+            }
+          }
+        }
+      },
+      onClick: (evt, activeEls) => {
+        if (activeEls && activeEls.length > 0) {
+          const idx = activeEls[0].index;
+          const clickedLabel = labels[idx];
+          if (clickedLabel === 'No data') return;
+          if (dim === 'specialized_skills') {
+            applyDrillDown('skill', clickedLabel);
+          } else {
+            applyDrillDown('qualification', clickedLabel);
+          }
+        }
+      }
+    }
+  });
+}
+
+function renderOfficeCompletionBarChart(allOfficers) {
+  const canvas = document.getElementById('chartOfficeCompletionRate');
+  if (!canvas || typeof Chart === 'undefined') return;
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return;
+
+  const officers = allOfficers || getAdminOfficerDashboardData();
+  const scope = document.getElementById('otBarScopeSelect')?.value || otDashboardFilter.barScope || 'active';
+  otDashboardFilter.barScope = scope;
+
+  const officeCounts = {};
+  officers.forEach(o => {
+    const code = o.officeCode || 'Unknown';
+    officeCounts[code] = (officeCounts[code] || 0) + 1;
+  });
+
+  let sortedOffices = [];
+  if (scope === 'active') {
+    sortedOffices = Object.keys(officeCounts)
+      .map(code => {
+        const off = (typeof ALL_MVD_OFFICES !== 'undefined' ? ALL_MVD_OFFICES.find(m => m.code === code) : null);
+        return { code, label: `${code} ${off ? off.name.replace(/^(RTO|SRTO|DTC),?\s*/i, '') : ''}`.trim(), count: officeCounts[code] };
+      })
+      .sort((a, b) => b.count - a.count);
+  } else if (scope === 'top15') {
+    sortedOffices = Object.keys(officeCounts)
+      .map(code => {
+        const off = (typeof ALL_MVD_OFFICES !== 'undefined' ? ALL_MVD_OFFICES.find(m => m.code === code) : null);
+        return { code, label: `${code} ${off ? off.name.replace(/^(RTO|SRTO|DTC),?\s*/i, '') : ''}`.trim(), count: officeCounts[code] };
+      })
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 15);
+  } else if (scope === 'dtc_rto' && typeof ALL_MVD_OFFICES !== 'undefined') {
+    sortedOffices = ALL_MVD_OFFICES
+      .filter(m => m.category === 'Commissionerate & DTC Offices' || m.category === 'RTO Offices')
+      .map(m => ({
+        code: m.code,
+        label: `${m.code} ${m.name.replace(/^(RTO|DTC),?\s*/i, '')}`.trim(),
+        count: officeCounts[m.code] || 0
+      }))
+      .sort((a, b) => (b.count || 0) - (a.count || 0));
+  }
+
+  if (sortedOffices.length === 0) {
+    sortedOffices = [{ code: "KL01", label: "KL01 Thiruvananthapuram", count: 0 }];
+  }
+
+  const labels = sortedOffices.map(o => o.label);
+  const data = sortedOffices.map(o => o.count);
+  const officeCodes = sortedOffices.map(o => o.code);
+
+  if (otChartOfficeCompletionInstance) {
+    try { otChartOfficeCompletionInstance.destroy(); } catch (e) {}
+    otChartOfficeCompletionInstance = null;
+  }
+
+  otChartOfficeCompletionInstance = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Officers Profiled',
+        data,
+        backgroundColor: data.map(c => c > 0 ? '#0284c7' : '#e2e8f0'),
+        borderRadius: 4,
+        maxBarThickness: 32
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: (item) => ` ${item.raw} profile(s) entered`
+          }
+        }
+      },
+      scales: {
+        y: {
+          beginAtZero: true,
+          ticks: { precision: 0 },
+          title: { display: true, text: 'Number of Officers', font: { size: 10 } }
+        },
+        x: {
+          ticks: {
+            font: { size: 9 },
+            maxRotation: 45,
+            minRotation: 30
+          }
+        }
+      },
+      onClick: (evt, activeEls) => {
+        if (activeEls && activeEls.length > 0) {
+          const idx = activeEls[0].index;
+          const clickedCode = officeCodes[idx];
+          applyDrillDown('office', clickedCode);
+        }
+      }
+    }
+  });
+}
+
+function applyDrillDown(type, value) {
+  otDashboardFilter.drillDownType = type;
+  otDashboardFilter.drillDownValue = value;
+
+  const banner = document.getElementById('otAdminDrillDownBanner');
+  const label = document.getElementById('otDrillDownLabel');
+  if (banner && label) {
+    banner.style.display = 'flex';
+    const typeLabel = type === 'office' ? 'Office' : (type === 'skill' ? 'Specialized Skill' : (type === 'qualification' ? 'Qualification' : 'Filter'));
+    label.textContent = `${typeLabel}: ${value}`;
+  }
+
+  if (type === 'office') {
+    const sel = document.getElementById('adminOfficerOfficeFilter');
+    if (sel) sel.value = value;
+  } else if (type === 'skill') {
+    const sel = document.getElementById('adminOfficerSkillFilter');
+    if (sel) sel.value = value;
+  } else if (type === 'qualification') {
+    const sel = document.getElementById('adminOfficerQualificationFilter');
+    if (sel) {
+      const opt = Array.from(sel.options).find(o => o.value.toLowerCase().includes(value.toLowerCase()) || value.toLowerCase().includes(o.value.toLowerCase()));
+      if (opt) sel.value = opt.value;
+    }
+  }
+
+  renderOfficerDashboardTable();
+
+  const tableEl = document.getElementById('otDashboardTableWrapper');
+  if (tableEl) {
+    tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  if (typeof showToast === 'function') showToast(`Drill-Down applied for: ${value}`, 'info');
+}
+
+function clearDrillDown() {
+  otDashboardFilter.drillDownType = null;
+  otDashboardFilter.drillDownValue = null;
+  const banner = document.getElementById('otAdminDrillDownBanner');
+  if (banner) banner.style.display = 'none';
+
+  document.querySelectorAll('.ot-kpi-card').forEach(c => c.classList.remove('active'));
+  renderOfficerAdminDashboard();
+  if (typeof showToast === 'function') showToast('Drill-down cleared', 'info');
+}
+
+function applyQuickKpiFilter(kpiType) {
+  if (otDashboardFilter.drillDownType === 'kpi' && otDashboardFilter.drillDownValue === kpiType) {
+    clearDrillDown();
+    return;
+  }
+  otDashboardFilter.drillDownType = 'kpi';
+  otDashboardFilter.drillDownValue = kpiType;
+
+  const banner = document.getElementById('otAdminDrillDownBanner');
+  const label = document.getElementById('otDrillDownLabel');
+  if (banner && label) {
+    banner.style.display = 'flex';
+    const names = {
+      all: 'All Registered Officers',
+      add_qual: 'Officers with Additional Qualifications',
+      skills_trainings: 'Officers with Specialized Skills / In-Service Trainings',
+      willing: 'Officers Willing to Contribute More'
+    };
+    label.textContent = `KPI Metric: ${names[kpiType] || kpiType}`;
+  }
+
+  renderOfficerDashboardTable();
+  const tableEl = document.getElementById('otDashboardTableWrapper');
+  if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function populateDashboardOfficeFilter() {
+  const sel = document.getElementById('adminOfficerOfficeFilter');
+  if (!sel || sel.options.length > 1) return;
+
+  sel.innerHTML = '<option value="ALL">-- All Offices (Statewide) --</option>';
+  if (typeof OT_OFFICE_GROUPS !== 'undefined') {
+    Object.entries(OT_OFFICE_GROUPS).forEach(([groupName, offices]) => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupName;
+      offices.forEach(off => {
+        const opt = document.createElement('option');
+        opt.value = off.code;
+        opt.textContent = `${off.code} — ${off.name}`;
+        optgroup.appendChild(opt);
+      });
+      sel.appendChild(optgroup);
+    });
+  }
+}
+
+function handleOfficerDashboardFilterChange() {
+  otDashboardFilter.search = document.getElementById('adminOfficerSearchInput')?.value || '';
+  otDashboardFilter.office = document.getElementById('adminOfficerOfficeFilter')?.value || 'ALL';
+  otDashboardFilter.designation = document.getElementById('adminOfficerDesignationFilter')?.value || 'ALL';
+  otDashboardFilter.qualification = document.getElementById('adminOfficerQualificationFilter')?.value || 'ALL';
+  otDashboardFilter.skill = document.getElementById('adminOfficerSkillFilter')?.value || 'ALL';
+  otDashboardFilter.willingness = document.getElementById('adminOfficerWillingnessFilter')?.value || 'ALL';
+
+  const filtered = getFilteredDashboardOfficers();
+  const all = getAdminOfficerDashboardData();
+
+  updateOfficerDashboardKpis(all, filtered);
+  renderOfficerBreakdownPieChart(filtered);
+  renderOfficerDashboardTable();
+}
+
+function resetAdminOfficerDashboardFilters() {
+  otDashboardFilter = {
+    search: '',
+    office: 'ALL',
+    designation: 'ALL',
+    qualification: 'ALL',
+    skill: 'ALL',
+    willingness: 'ALL',
+    drillDownType: null,
+    drillDownValue: null,
+    pieDimension: 'qualifications',
+    barScope: 'active'
+  };
+
+  if (document.getElementById('adminOfficerSearchInput')) document.getElementById('adminOfficerSearchInput').value = '';
+  if (document.getElementById('adminOfficerOfficeFilter')) document.getElementById('adminOfficerOfficeFilter').value = 'ALL';
+  if (document.getElementById('adminOfficerDesignationFilter')) document.getElementById('adminOfficerDesignationFilter').value = 'ALL';
+  if (document.getElementById('adminOfficerQualificationFilter')) document.getElementById('adminOfficerQualificationFilter').value = 'ALL';
+  if (document.getElementById('adminOfficerSkillFilter')) document.getElementById('adminOfficerSkillFilter').value = 'ALL';
+  if (document.getElementById('adminOfficerWillingnessFilter')) document.getElementById('adminOfficerWillingnessFilter').value = 'ALL';
+
+  const banner = document.getElementById('otAdminDrillDownBanner');
+  if (banner) banner.style.display = 'none';
+
+  renderOfficerAdminDashboard();
+  if (typeof showToast === 'function') showToast("All dashboard filters reset", "info");
+}
+
+function renderOfficerDashboardTable() {
+  const tbody = document.getElementById('adminOfficersTableBody');
+  if (!tbody) return;
+
+  const allOfficers = getAdminOfficerDashboardData();
+  const filtered = getFilteredDashboardOfficers();
+
+  updateOfficerDashboardKpis(allOfficers, filtered);
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `
+      <tr>
+        <td colspan="10" style="text-align: center; color: var(--text-muted); padding: 36px 20px;">
+          <i class="fa-solid fa-user-slash" style="font-size: 2rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i>
+          <span style="font-size: 0.95rem; font-weight: 700; color: #475569;">No officer records found matching the selected criteria.</span>
+          <br>
+          <small style="color: #94a3b8;">Try clearing the search term or resetting the filters.</small>
+          <div style="margin-top: 12px;">
+            <button class="btn btn-outline btn-sm" onclick="resetAdminOfficerDashboardFilters()" style="font-weight: 700;">
+              <i class="fa-solid fa-rotate-left"></i> Reset All Filters
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  tbody.innerHTML = filtered.map((o, idx) => {
+    const qualClass = typeof getQualificationBadgeClass === 'function' ? getQualificationBadgeClass(o.basicQualification) : 'badge-info';
+    const basicBadge = `<span class="badge ${qualClass}" style="font-size: 0.76rem;">${escapeHtml(o.basicQualification)}</span>${o.passingYear ? `<br><small style="color: #64748b;">Year: ${escapeHtml(o.passingYear)}</small>` : ''}`;
+
+    const addlBadges = (o.additionalQualifications && o.additionalQualifications.length > 0)
+      ? o.additionalQualifications.map(a => `<span class="badge badge-info" style="font-size: 0.72rem; margin: 1px 2px;" title="${escapeHtml(a.institution || '')}">${escapeHtml(a.qualification)} <small>(${escapeHtml(a.status || 'Completed')})</small></span>`).join('')
+      : '<span style="color: #94a3b8; font-size: 0.8rem;">None</span>';
+
+    const skillBadges = (o.specializedSkills && o.specializedSkills.length > 0)
+      ? o.specializedSkills.map(s => {
+          const isIit = s === 'IIT Trained';
+          return `<span class="badge" style="background: ${isIit ? '#047857' : '#f3e8ff'}; color: ${isIit ? '#ffffff' : '#6b21a8'}; font-size: 0.72rem; margin: 1px 2px;">${escapeHtml(s)}</span>`;
+        }).join('')
+      : (o.customSkills ? `<span class="badge badge-warning" style="font-size: 0.72rem;">${escapeHtml(o.customSkills)}</span>` : '<span style="color: #94a3b8; font-size: 0.8rem;">None</span>');
+
+    const trCount = (o.trainingHistory || []).length;
+    const trBadge = trCount > 0
+      ? `<span class="badge badge-working" style="font-size: 0.74rem; font-weight: 700;">${trCount} course(s)</span><br><small style="color: #475569;" title="${escapeHtml(o.trainingHistory.map(t => t.attended).join('; '))}">Latest: ${escapeHtml(o.trainingHistory[0]?.attended?.slice(0, 20) || '')}...</small>`
+      : '<span style="color: #94a3b8; font-size: 0.8rem;">0 courses</span>';
+
+    const willText = (o.willingnessToContribute || '').trim();
+    const willBadge = willText
+      ? `<span class="badge" style="background: #fef3c7; color: #92400e; font-size: 0.74rem; font-weight: 700;" title="${escapeHtml(willText)}"><i class="fa-solid fa-handshake-angle"></i> Willing</span><br><small style="color: #78350f; font-style: italic;">"${escapeHtml(willText.length > 32 ? willText.substring(0, 30) + '...' : willText)}"</small>`
+      : '<span style="color: #94a3b8; font-size: 0.8rem;">Not Specified</span>';
+
+    return `
+      <tr>
+        <td style="text-align: center; font-weight: 700; color: var(--text-muted);">${idx + 1}</td>
+        <td>
+          <span class="badge badge-info" style="font-size: 0.74rem; font-weight: 800;">${escapeHtml(o.officeCode)}</span>
+          <br><small style="color: #475569; font-weight: 600;">${escapeHtml(o.officeName || o.officeCode)}</small>
+        </td>
+        <td>
+          <span style="font-weight: 800; color: #0B3B24;">${escapeHtml(o.officerFullName)}</span>
+          <br><small style="color: #64748b; font-weight: 700;"><i class="fa-solid fa-hashtag"></i> PEN: ${escapeHtml(o.pen)}</small>
+        </td>
+        <td><span class="badge badge-info" style="font-weight: 700;">${escapeHtml(o.designation)}</span></td>
+        <td>${basicBadge}</td>
+        <td><div style="max-width: 190px; line-height: 1.4;">${addlBadges}</div></td>
+        <td><div style="max-width: 190px; line-height: 1.4;">${skillBadges}</div></td>
+        <td>${trBadge}</td>
+        <td><div style="max-width: 180px;">${willBadge}</div></td>
+        <td style="text-align: center;">
+          <div style="display: flex; gap: 4px; justify-content: center;">
+            <button class="btn btn-outline btn-sm" onclick="editOfficerInAdmin('${escapeHtml(o.id || o.pen)}')" title="Edit Profile in Entry Form" style="padding: 4px 8px;">
+              <i class="fa-solid fa-pen-to-square"></i>
+            </button>
+            <button class="btn btn-danger btn-sm" onclick="deleteOfficerRecord('${escapeHtml(o.id || o.pen)}')" title="Delete Profile" style="padding: 4px 8px;">
+              <i class="fa-solid fa-trash"></i>
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+  }).join('');
+}
+
+function renderOfficerAdminDashboard() {
+  populateDashboardOfficeFilter();
+  const allOfficers = getAdminOfficerDashboardData();
+  const filtered = getFilteredDashboardOfficers();
+
+  updateOfficerDashboardKpis(allOfficers, filtered);
+  renderOfficerBreakdownPieChart(filtered);
+  renderOfficeCompletionBarChart(allOfficers);
+  renderOfficerDashboardTable();
+}
+
+function exportOfficerDashboardToExcel() {
+  const officers = getFilteredDashboardOfficers();
+  if (officers.length === 0) {
+    if (typeof showToast === 'function') showToast("No officer records match current filter criteria.", "warning");
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    if (typeof showToast === 'function') showToast("SheetJS library loading... falling back to CSV export.", "info");
+    exportOfficersReportCSV();
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN');
+  const fileDate = now.toISOString().slice(0, 10);
+
+  const total = officers.length;
+  const withAddl = officers.filter(o => o.additionalQualifications && o.additionalQualifications.length > 0).length;
+  const withSkills = officers.filter(o => (o.specializedSkills && o.specializedSkills.length > 0) || (o.trainingHistory && o.trainingHistory.length > 0)).length;
+  const willing = officers.filter(o => o.willingnessToContribute && o.willingnessToContribute.trim().length > 0).length;
+
+  const headerRows = [
+    ["KERALAM MOTOR VEHICLES DEPARTMENT"],
+    ["OFFICER TRAINING & QUALIFICATIONS — EXECUTIVE ADMIN DASHBOARD REPORT"],
+    [`Generated On: ${dateStr}`, `Applied Filters: Office: ${otDashboardFilter.office} | Designation: ${otDashboardFilter.designation} | Qual: ${otDashboardFilter.qualification} | Skill: ${otDashboardFilter.skill}`],
+    [`Summary KPIs: Total Officers: ${total}`, `With Addl Qual: ${withAddl}`, `With Skills/Trainings: ${withSkills}`, `Willing to Contribute: ${willing}`],
+    []
+  ];
+
+  const columnHeaders = [
+    "Sl No", "Office Code", "Office Name", "Officer Full Name", "PEN", "Designation",
+    "Basic Technical Qualification", "Institution", "Passing Year", "Class / Grade",
+    "Additional Qualifications", "Specialized Skills", "In-Service Trainings Count",
+    "Training Courses Attended", "Willingness to Contribute More",
+    "Entered By Name", "Entered By Designation", "Entered By Mobile", "Status"
+  ];
+
+  const dataRows = officers.map((o, idx) => {
+    const addlStr = (o.additionalQualifications || []).map(a => `${a.qualification} (${a.status || 'Completed'}${a.year ? ' ' + a.year : ''})`).join('; ') || 'None';
+    const skillsStr = (o.specializedSkills || []).join(', ') || (o.customSkills || 'None');
+    const trainCount = (o.trainingHistory || []).length;
+    const trainCourses = (o.trainingHistory || []).map(t => `${t.attended} (${t.conductedBy || 'MVD'})`).join('; ') || 'None';
+
+    return [
+      idx + 1,
+      o.officeCode || '',
+      o.officeName || '',
+      o.officerFullName || '',
+      o.pen || '',
+      o.designation || '',
+      o.basicQualification || '',
+      o.institution || '',
+      o.passingYear || '',
+      o.grade || '',
+      addlStr,
+      skillsStr,
+      trainCount,
+      trainCourses,
+      o.willingnessToContribute || 'Not Specified',
+      o.enteredBy?.fullName || '',
+      o.enteredBy?.designation || '',
+      o.enteredBy?.mobile || '',
+      o.status || 'submitted'
+    ];
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet([...headerRows, columnHeaders, ...dataRows]);
+
+  ws['!cols'] = [
+    { wch: 6 },  { wch: 12 }, { wch: 26 }, { wch: 24 }, { wch: 12 }, { wch: 18 },
+    { wch: 22 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 34 }, { wch: 32 },
+    { wch: 12 }, { wch: 38 }, { wch: 35 }, { wch: 20 }, { wch: 20 }, { wch: 14 },
+    { wch: 12 }
+  ];
+
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Officer Training Dashboard");
+  XLSX.writeFile(wb, `MVD_Officer_Training_Dashboard_${fileDate}.xlsx`);
+  if (typeof showToast === 'function') showToast(`Exported ${total} officer record(s) to Excel successfully!`, "success");
+}
+
+function exportOfficerDashboardToPDF() {
+  const officers = getFilteredDashboardOfficers();
+  if (officers.length === 0) {
+    if (typeof showToast === 'function') showToast("No officer records match current filter criteria.", "warning");
+    return;
+  }
+
+  const jsPDF = window.jspdf ? window.jspdf.jsPDF : (typeof jspdf !== 'undefined' ? jspdf.jsPDF : null);
+  if (!jsPDF) {
+    if (typeof showToast === 'function') showToast("jsPDF library not available; opening browser print view...", "info");
+    window.print();
+    return;
+  }
+
+  const doc = new jsPDF({
+    orientation: 'landscape',
+    unit: 'pt',
+    format: 'a4'
+  });
+
+  const total = officers.length;
+  const withAddl = officers.filter(o => o.additionalQualifications && o.additionalQualifications.length > 0).length;
+  const withSkills = officers.filter(o => (o.specializedSkills && o.specializedSkills.length > 0) || (o.trainingHistory && o.trainingHistory.length > 0)).length;
+  const willing = officers.filter(o => o.willingnessToContribute && o.willingnessToContribute.trim().length > 0).length;
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  // 1. Header Banner
+  doc.setFillColor(11, 59, 36);
+  doc.rect(0, 0, 842, 54, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text("GOVERNMENT OF KERALAM • MOTOR VEHICLES DEPARTMENT", 40, 24);
+
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'normal');
+  doc.text("OFFICER TRAINING & QUALIFICATIONS — EXECUTIVE ADMIN DASHBOARD REPORT", 40, 42);
+
+  doc.setFontSize(8);
+  doc.text(`Generated: ${dateStr}`, 680, 24);
+  doc.text(`Total Records: ${total}`, 680, 42);
+
+  // 2. Summary KPI Cards Strip
+  const kpiY = 64;
+  const kpiW = 180;
+  const kpiH = 34;
+
+  const kpis = [
+    { label: "TOTAL ENTERED", val: String(total), color: [240, 253, 244], stroke: [134, 239, 172], text: [20, 83, 45] },
+    { label: "ADDITIONAL QUAL", val: `${withAddl} (${total > 0 ? Math.round((withAddl/total)*100) : 0}%)`, color: [239, 246, 255], stroke: [147, 197, 253], text: [30, 58, 138] },
+    { label: "SKILLS & TRAININGS", val: `${withSkills} (${total > 0 ? Math.round((withSkills/total)*100) : 0}%)`, color: [250, 245, 255], stroke: [216, 180, 254], text: [88, 28, 135] },
+    { label: "WILLING TO CONTRIBUTE", val: `${willing} (${total > 0 ? Math.round((willing/total)*100) : 0}%)`, color: [255, 251, 235], stroke: [253, 230, 138], text: [120, 53, 15] }
+  ];
+
+  kpis.forEach((kpi, idx) => {
+    const x = 40 + idx * (kpiW + 14);
+    doc.setFillColor(kpi.color[0], kpi.color[1], kpi.color[2]);
+    doc.setDrawColor(kpi.stroke[0], kpi.stroke[1], kpi.stroke[2]);
+    doc.roundedRect(x, kpiY, kpiW, kpiH, 4, 4, 'FD');
+
+    doc.setTextColor(100, 116, 139);
+    doc.setFontSize(6.5);
+    doc.setFont('helvetica', 'bold');
+    doc.text(kpi.label, x + 8, kpiY + 12);
+
+    doc.setTextColor(kpi.text[0], kpi.text[1], kpi.text[2]);
+    doc.setFontSize(11);
+    doc.setFont('helvetica', 'bold');
+    doc.text(kpi.val, x + 8, kpiY + 28);
+  });
+
+  // 3. AutoTable
+  const tableData = officers.map((o, idx) => {
+    const addl = (o.additionalQualifications || []).map(a => `${a.qualification} (${a.status})`).join(', ') || '-';
+    const skills = (o.specializedSkills || []).join(', ') || (o.customSkills || '-');
+    const trCount = (o.trainingHistory || []).length;
+    const trStr = trCount > 0 ? `${trCount} course(s)` : '-';
+    const willStr = (o.willingnessToContribute || '').trim();
+
+    return [
+      idx + 1,
+      `${o.officeCode}\n${(o.officeName || '').replace(/^(RTO|SRTO|DTC),?\s*/i, '')}`,
+      `${o.officerFullName}\nPEN: ${o.pen}`,
+      o.designation,
+      `${o.basicQualification}${o.passingYear ? ' (' + o.passingYear + ')' : ''}`,
+      addl,
+      skills,
+      trStr,
+      willStr ? (willStr.length > 45 ? willStr.substring(0, 42) + '...' : willStr) : 'Not Specified'
+    ];
+  });
+
+  doc.autoTable({
+    startY: kpiY + kpiH + 12,
+    head: [[
+      "#", "Office", "Officer & PEN", "Designation",
+      "Basic Qual", "Additional Qual", "Specialized Skills", "Trainings", "Willing to Contribute"
+    ]],
+    body: tableData,
+    theme: 'grid',
+    styles: {
+      fontSize: 7.5,
+      cellPadding: 4,
+      font: 'helvetica',
+      overflow: 'linebreak',
+      textColor: [30, 41, 59]
+    },
+    headStyles: {
+      fillColor: [11, 59, 36],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 8,
+      halign: 'left'
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252]
+    },
+    columnStyles: {
+      0: { cellWidth: 24, halign: 'center' },
+      1: { cellWidth: 70 },
+      2: { cellWidth: 105 },
+      3: { cellWidth: 75 },
+      4: { cellWidth: 85 },
+      5: { cellWidth: 110 },
+      6: { cellWidth: 110 },
+      7: { cellWidth: 55, halign: 'center' },
+      8: { cellWidth: 128 }
+    },
+    margin: { left: 40, right: 40 },
+    didDrawPage: (data) => {
+      const pageCount = doc.internal.getNumberOfPages();
+      doc.setFontSize(7);
+      doc.setTextColor(148, 163, 184);
+      doc.text(
+        `Page ${data.pageNumber} of ${pageCount} • Motor Vehicles Department, Government of Keralam • Confidential Official Document`,
+        40,
+        575
+      );
+    }
+  });
+
+  const fileDate = now.toISOString().slice(0, 10);
+  doc.save(`MVD_Officer_Training_Dashboard_${fileDate}.pdf`);
+  if (typeof showToast === 'function') showToast(`PDF report generated and downloaded successfully!`, "success");
+}
+
+function exportOfficersReportCSV() {
+  const officers = getFilteredDashboardOfficers();
+
+  if (!officers || officers.length === 0) {
+    if (typeof showToast === 'function') showToast('No officer records available to export', 'warning');
+    return;
+  }
+
+  const headers = [
+    "Sl No", "Office Code", "Office Name", "Officer Full Name", "PEN", "Designation",
+    "Basic Qualification", "Institution", "Passing Year", "Grade",
+    "Additional Qualifications", "Specialized Skills", "In-Service Trainings",
+    "Willingness to Contribute More", "Entered By Name", "Entered By Designation", "Entered By Mobile"
+  ];
+
+  const rows = officers.map((o, idx) => {
+    const addlStr = (o.additionalQualifications || []).map(a => `${a.qualification} (${a.status || 'Completed'})`).join('; ') || 'None';
+    const skillsStr = (o.specializedSkills || []).join(', ') || (o.customSkills || 'None');
+    const trainStr = (o.trainingHistory || []).map(t => `${t.attended} (${t.conductedBy || 'MVD'})`).join('; ') || 'None';
+
+    return [
+      idx + 1,
+      `"${(o.officeCode || '').replace(/"/g, '""')}"`,
+      `"${(o.officeName || '').replace(/"/g, '""')}"`,
+      `"${(o.officerFullName || '').replace(/"/g, '""')}"`,
+      `"${(o.pen || '').replace(/"/g, '""')}"`,
+      `"${(o.designation || '').replace(/"/g, '""')}"`,
+      `"${(o.basicQualification || '').replace(/"/g, '""')}"`,
+      `"${(o.institution || '').replace(/"/g, '""')}"`,
+      `"${(o.passingYear || '').replace(/"/g, '""')}"`,
+      `"${(o.grade || '').replace(/"/g, '""')}"`,
+      `"${addlStr.replace(/"/g, '""')}"`,
+      `"${skillsStr.replace(/"/g, '""')}"`,
+      `"${trainStr.replace(/"/g, '""')}"`,
+      `"${(o.willingnessToContribute || 'Not Specified').replace(/"/g, '""')}"`,
+      `"${(o.enteredBy?.fullName || '').replace(/"/g, '""')}"`,
+      `"${(o.enteredBy?.designation || '').replace(/"/g, '""')}"`,
+      `"${(o.enteredBy?.mobile || '').replace(/"/g, '""')}"`
+    ];
+  });
+
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `MVD_Officer_Training_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  if (typeof showToast === 'function') showToast(`Exported ${officers.length} officer record(s) to CSV`, 'success');
+}
+
+// Global Exports
+window.renderOfficerAdminDashboard = renderOfficerAdminDashboard;
+window.renderAdminOfficersTable = renderOfficerAdminDashboard;
+window.exportOfficerDashboardToExcel = exportOfficerDashboardToExcel;
+window.exportOfficerDashboardToPDF = exportOfficerDashboardToPDF;
+window.exportOfficersReportCSV = exportOfficersReportCSV;
+window.clearDrillDown = clearDrillDown;
+window.applyQuickKpiFilter = applyQuickKpiFilter;
+window.applyDrillDown = applyDrillDown;
+window.handleOfficerDashboardFilterChange = handleOfficerDashboardFilterChange;
+window.resetAdminOfficerDashboardFilters = resetAdminOfficerDashboardFilters;
+window.renderOfficerBreakdownPieChart = renderOfficerBreakdownPieChart;
+window.renderOfficeCompletionBarChart = renderOfficeCompletionBarChart;
 
 // Automatically bind on DOM load
 document.addEventListener('DOMContentLoaded', () => {
