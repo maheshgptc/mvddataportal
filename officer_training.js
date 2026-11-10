@@ -226,6 +226,60 @@ const SPECIALIZED_SKILL_OPTIONS = [
 ];
 window.SPECIALIZED_SKILL_OPTIONS = SPECIALIZED_SKILL_OPTIONS;
 
+// --- OFFICE LOCATION & DIGITAL SIGNATURE FORMATTING UTILITIES ---
+function otGetOfficeLocation(officeObj, officeCode) {
+  if (!officeObj && officeCode) {
+    officeObj = (typeof ALL_MVD_OFFICES !== 'undefined' ? ALL_MVD_OFFICES.find(o => o.code === officeCode) : null);
+  }
+  if (!officeObj) return officeCode || "";
+  if (officeObj.code === 'TCO') return "Thiruvananthapuram";
+  if (officeObj.name && officeObj.name.includes(',')) {
+    const parts = officeObj.name.split(',');
+    return parts.slice(1).join(',').trim();
+  }
+  return officeObj.name || officeCode || "";
+}
+window.otGetOfficeLocation = otGetOfficeLocation;
+
+function otFormatDigitalSignatureTimestamp(isoString) {
+  const d = isoString ? new Date(isoString) : new Date();
+  if (isNaN(d.getTime())) return '';
+  try {
+    const parts = new Intl.DateTimeFormat('en-IN', {
+      timeZone: 'Asia/Kolkata',
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    }).formatToParts(d);
+
+    let day = '', month = '', year = '', hour = '', minute = '', dayPeriod = '';
+    parts.forEach(p => {
+      if (p.type === 'day') day = p.value.padStart(2, '0');
+      if (p.type === 'month') month = p.value.padStart(2, '0');
+      if (p.type === 'year') year = p.value;
+      if (p.type === 'hour') hour = p.value.padStart(2, '0');
+      if (p.type === 'minute') minute = p.value.padStart(2, '0');
+      if (p.type === 'dayPeriod') dayPeriod = p.value.toUpperCase();
+    });
+    return `${day}-${month}-${year} ${hour}:${minute} ${dayPeriod}`;
+  } catch (e) {
+    const day = String(d.getDate()).padStart(2, '0');
+    const month = String(d.getMonth() + 1).padStart(2, '0');
+    const year = d.getFullYear();
+    let hours = d.getHours();
+    const minutes = String(d.getMinutes()).padStart(2, '0');
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    hours = hours % 12;
+    hours = hours ? hours : 12;
+    const strHours = String(hours).padStart(2, '0');
+    return `${day}-${month}-${year} ${strHours}:${minutes} ${ampm}`;
+  }
+}
+window.otFormatDigitalSignatureTimestamp = otFormatDigitalSignatureTimestamp;
+
 // --- 2. SAMPLE SEED DATA (Cleaned - No hardcoded or dummy officers) ---
 const SEED_OFFICER_PROFILES = [];
 
@@ -273,6 +327,7 @@ localStorage.setItem('mvd_ot_profiles_store', JSON.stringify(otProfilesStore));
 window.otProfilesStore = otProfilesStore;
 
 let otReportSnapshotsStore = JSON.parse(localStorage.getItem('mvd_ot_report_snapshots')) || {};
+window.otReportSnapshotsStore = otReportSnapshotsStore;
 let otAuditLogs = JSON.parse(localStorage.getItem('mvd_ot_audit_logs')) || [];
 
 // Office Lock Registry: Maps officeCode => authorized Gmail ID
@@ -282,6 +337,7 @@ window.otOfficeLocks = otOfficeLocks;
 // Active Session Roles:
 // 'data_entry' | 'head_of_office' | 'dispatch_user' | 'admin'
 let otCurrentRole = localStorage.getItem('mvd_ot_current_role') || 'head_of_office';
+window.otCurrentRole = otCurrentRole;
 let otActiveSubTab = 'form'; // 'form' | 'directory' | 'report' | 'roles'
 let otFormDirty = false;
 let otEditingProfileId = null;
@@ -646,7 +702,7 @@ function checkOfficeAccessAndLock(officeCode) {
 
   const currentEmail = otGetLoggedInEmail();
   const lockedEmail = getOfficeLockedEmail(officeCode);
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
 
   if (isAdmin) {
     toggleOfficerFormDisabled(false);
@@ -670,6 +726,27 @@ function checkOfficeAccessAndLock(officeCode) {
   if (lockedEmail) {
     if (currentEmail && lockedEmail.toLowerCase() === currentEmail.toLowerCase()) {
       // Authorized User
+      // Check if office report has been sent to Transport Commissionerate
+      const snap = otReportSnapshotsStore && otReportSnapshotsStore[officeCode];
+      if (snap && snap.isForwarded) {
+        toggleOfficerFormDisabled(true);
+        if (alertBox) {
+          alertBox.className = 'reflection-alert alert-authorized';
+          alertBox.style.display = 'flex';
+          alertBox.style.background = '#eff6ff';
+          alertBox.style.borderColor = '#93c5fd';
+          alertBox.style.color = '#1e40af';
+          alertBox.innerHTML = `
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <i class="fa-solid fa-lock" style="color:#2563eb; font-size: 1.15rem;"></i>
+              <span>This office report has been <strong>Sent to Transport Commissionerate</strong>. Form is locked. If edits are required, an administrator can revert the forwarding status from the Admin Portal.</span>
+            </div>
+          `;
+        }
+        renderOfficeEditOptionList(officeCode);
+        return;
+      }
+
       toggleOfficerFormDisabled(false);
       if (alertBox) {
         alertBox.className = 'reflection-alert alert-authorized';
@@ -2069,7 +2146,7 @@ function loadProfileForEditing(profileId) {
 
   // Permission check: Admin or Authorized User or role permission
   const currentEmail = otGetLoggedInEmail();
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
   const lockedEmail = getOfficeLockedEmail(normOfficeCode);
   const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
 
@@ -2616,7 +2693,7 @@ async function deleteOfficerProfile(profileId) {
 
   // Permission check: Admin or Authorized User
   const currentEmail = otGetLoggedInEmail();
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
   const lockedEmail = getOfficeLockedEmail(p.officeCode);
   const isAuthorized = (currentEmail && lockedEmail && currentEmail.toLowerCase() === lockedEmail.toLowerCase());
 
@@ -2864,7 +2941,7 @@ function renderEmptyUserSummaryReport(userEmail) {
 
 function renderOfficeSummaryReport() {
   const userEmail = otGetLoggedInEmail();
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
   const reportSelect = document.getElementById('otReportOfficeSelect');
 
   let officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
@@ -2931,7 +3008,8 @@ function renderOfficeSummaryReport() {
   const draftProfiles = allProfiles.filter(p => p.status === 'draft');
 
   // Check saved snapshot for this office
-  const savedSnapshot = otReportSnapshotsStore[officeCode];
+  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+  const savedSnapshot = snapStore[officeCode];
   const isVerified = savedSnapshot && savedSnapshot.isVerified;
   const isReverificationRequired = savedSnapshot && savedSnapshot.reverificationRequired;
   const isForwarded = savedSnapshot && savedSnapshot.isForwarded;
@@ -3155,6 +3233,16 @@ function renderOfficeSummaryReport() {
             <div><strong>Date Sent:</strong><br><strong>${escapeHtml(savedSnapshot.dispatchDetails?.forwardDate || 'N/A')}</strong></div>
           </div>
           ${savedSnapshot.dispatchDetails?.remarks ? `<div style="font-size: 0.82rem; color: #1e40af; margin-top: 8px;"><strong>Forwarding Remarks:</strong> "${escapeHtml(savedSnapshot.dispatchDetails?.remarks)}"</div>` : ''}
+          ${isAdmin ? `
+            <div style="margin-top: 12px; padding-top: 10px; border-top: 1px dashed #bfdbfe; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+              <span style="font-size: 0.82rem; color: #1e40af; font-weight: 600;">
+                <i class="fa-solid fa-shield-halved"></i> Admin Control: Mistakenly forwarded? Revert status to unlock office for user edits.
+              </span>
+              <button type="button" class="btn btn-danger btn-sm" onclick="revertOfficeForwardingStatus('${escapeHtml(officeCode)}')" style="font-weight: 700; padding: 4px 12px; display: inline-flex; align-items: center; gap: 6px;">
+                <i class="fa-solid fa-rotate-left"></i> Revert Forwarding Status (Unlock Office)
+              </button>
+            </div>
+          ` : ''}
         </div>
       `;
     } else {
@@ -3176,6 +3264,80 @@ function renderOfficeSummaryReport() {
       btnForward.style.display = 'none';
     } else {
       btnForward.style.display = 'inline-flex';
+    }
+  }
+
+  // Header Revert Button for Admin
+  let btnRevert = document.getElementById('otBtnRevertForward');
+  if (!btnRevert && btnForward && btnForward.parentNode) {
+    btnRevert = document.createElement('button');
+    btnRevert.type = 'button';
+    btnRevert.id = 'otBtnRevertForward';
+    btnRevert.className = 'btn btn-danger btn-sm';
+    btnRevert.style.fontWeight = '700';
+    btnRevert.style.display = 'none';
+    btnRevert.innerHTML = '<i class="fa-solid fa-rotate-left"></i> Revert Status';
+    btnForward.parentNode.appendChild(btnRevert);
+  }
+  if (btnRevert) {
+    if (isAdmin && isForwarded) {
+      btnRevert.style.display = 'inline-flex';
+      btnRevert.onclick = () => revertOfficeForwardingStatus(officeCode);
+    } else {
+      btnRevert.style.display = 'none';
+    }
+  }
+
+  // PDF / Print Template Footer Formatting (Post-Forwarding vs Draft)
+  const sigGrid = document.getElementById('otReportSigLineGrid');
+  if (sigGrid) {
+    if (isForwarded) {
+      const dDetails = (savedSnapshot && savedSnapshot.dispatchDetails) || {};
+      const headName = dDetails.headName || savedSnapshot?.verifiedBy?.name || "Head of Office";
+      const headDesig = dDetails.headDesignation || savedSnapshot?.verifiedBy?.designation || "Head of Office";
+
+      // 1. Place: Auto-fill with respective office location
+      const officeLocation = otGetOfficeLocation(officeObj, officeCode);
+
+      // 2. Date: Auto-fill with date of forwarding
+      const rawFwdDate = dDetails.forwardDate || (savedSnapshot?.verifiedAt ? savedSnapshot.verifiedAt.substring(0, 10) : "");
+      let formattedDate = rawFwdDate;
+      if (/^\d{4}-\d{2}-\d{2}$/.test(rawFwdDate)) {
+        const dp = rawFwdDate.split('-');
+        formattedDate = `${dp[2]}-${dp[1]}-${dp[0]}`;
+      }
+
+      // 3. Digital signature strictly formatted as DD-MM-YYYY HH:MM AM/PM
+      const rawTs = dDetails.timestamp || savedSnapshot?.verifiedAt || new Date().toISOString();
+      const formattedTs = otFormatDigitalSignatureTimestamp(rawTs);
+
+      // 4. Exact text string: (Digitally signed by [Name of Head of Office] at [Timestamp])
+      const digitalSigText = `(Digitally signed by ${headName} at ${formattedTs})`;
+
+      sigGrid.innerHTML = `
+        <div id="otReportSigLeftCol">
+          <div id="otSigPlaceLine" style="margin-bottom: 16px;"><strong>Place:</strong> ${escapeHtml(officeLocation)}</div>
+          <div id="otSigDateLine" style="margin-bottom: 16px;"><strong>Date:</strong> ${escapeHtml(formattedDate)}</div>
+        </div>
+        <div id="otReportSigRightCol">
+          <div id="otSigHeadLine" style="margin-bottom: 16px;"><strong>Signature of the Head of Office:</strong> ${escapeHtml(digitalSigText)}</div>
+          <div id="otSigNameLine" style="margin-bottom: 16px;"><strong>Name:</strong> ${escapeHtml(headName)}</div>
+          <div id="otSigDesigLine"><strong>Designation:</strong> ${escapeHtml(headDesig)}</div>
+        </div>
+      `;
+    } else {
+      sigGrid.innerHTML = `
+        <div id="otReportSigLeftCol">
+          <div id="otSigPlaceLine" style="margin-bottom: 16px;"><strong>Place:</strong> ______________________________</div>
+          <div id="otSigDateLine" style="margin-bottom: 16px;"><strong>Date:</strong> _______________________________</div>
+          <div id="otSigSealLine" style="margin-top: 28px;"><strong>Office Seal:</strong> _________________________</div>
+        </div>
+        <div id="otReportSigRightCol">
+          <div id="otSigHeadLine" style="margin-bottom: 16px;"><strong>Signature of the Head of Office:</strong> ______________________________</div>
+          <div id="otSigNameLine" style="margin-bottom: 16px;"><strong>Name:</strong> ______________________________</div>
+          <div id="otSigDesigLine"><strong>Designation:</strong> _________________________</div>
+        </div>
+      `;
     }
   }
 }
@@ -3279,7 +3441,7 @@ function submitReportVerification(e) {
 function openForwardingModal() {
   const officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
   const userEmail = otGetLoggedInEmail();
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
   if (!isAdmin && userEmail) {
     const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
     if (!authorizedOffices.includes(officeCode)) {
@@ -3332,7 +3494,7 @@ function submitReportForwarding(e) {
 
   const officeCode = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
   const userEmail = otGetLoggedInEmail();
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
   if (!isAdmin && userEmail) {
     const authorizedOffices = getAllOfficesLinkedToUser(userEmail);
     if (!authorizedOffices.includes(officeCode)) {
@@ -3421,9 +3583,207 @@ function submitReportForwarding(e) {
   showToast(`Report successfully sent to Transport Commissionerate (File No: ${fileNo})`, "success");
 }
 
+// --- ADMIN STATUS REVERSAL (UNDO FORWARDING FEATURE) ---
+async function revertOfficeForwardingStatus(officeCode) {
+  if (!officeCode) {
+    if (typeof showToast === 'function') showToast("Please select a valid office to revert.", "warning");
+    return;
+  }
+
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  if (!isAdmin) {
+    if (typeof showToast === 'function') showToast("Access Denied: Only administrators can revert forwarding status.", "error");
+    return;
+  }
+
+  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+  const snapshot = snapStore[officeCode];
+  if (!snapshot || !snapshot.isForwarded) {
+    if (typeof showToast === 'function') showToast(`Office ${officeCode} is not marked as forwarded to Transport Commissionerate.`, "info");
+    return;
+  }
+
+  const confirmFn = window.showCustomConfirm || (typeof showCustomConfirm === 'function' ? showCustomConfirm : null);
+  let confirmed = false;
+  if (confirmFn) {
+    confirmed = await confirmFn({
+      title: 'Revert Forwarding Status',
+      message: `Are you sure you want to revert the status for office "${officeCode}"? This will unlock the office and allow further edits by the authorized user.`,
+      confirmText: 'Yes, Revert & Unlock',
+      cancelText: 'Cancel',
+      isDanger: true
+    });
+  } else if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
+    confirmed = window.confirm(`Are you sure you want to revert forwarding status for office "${officeCode}"? This will allow further edits by the authorized user.`);
+  } else {
+    confirmed = true;
+  }
+
+  if (!confirmed) return;
+
+  // Reset forwarding state
+  snapshot.isForwarded = false;
+  snapshot.reverificationRequired = false;
+  if (snapshot.dispatchDetails) {
+    snapshot.dispatchDetails.revertedAt = new Date().toISOString();
+    snapshot.dispatchDetails.revertedBy = "Admin";
+  }
+
+  otReportSnapshotsStore[officeCode] = snapshot;
+  if (typeof window !== 'undefined' && window.otReportSnapshotsStore) {
+    window.otReportSnapshotsStore[officeCode] = snapshot;
+  }
+  try {
+    localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+  } catch (e) {
+    console.warn("Could not save to localStorage:", e);
+  }
+
+  // Persist reversal to Supabase
+  const client = getSupabaseClient();
+  if (client) {
+    try {
+      const { error } = await client
+        .from('office_report_versions')
+        .upsert({
+          office_code: officeCode,
+          office_name: snapshot.officeName || officeCode,
+          reference_number: snapshot.referenceNumber,
+          version: snapshot.version,
+          cutoff_timestamp: snapshot.cutoffTimestamp || new Date().toISOString(),
+          verified_at: snapshot.verifiedAt || new Date().toISOString(),
+          is_verified: true,
+          reverification_required: false,
+          is_forwarded: false,
+          verified_by_name: snapshot.verifiedBy?.name || null,
+          verified_by_designation: snapshot.verifiedBy?.designation || null,
+          outward_number: snapshot.dispatchDetails?.outwardNo || null,
+          forward_date: snapshot.dispatchDetails?.forwardDate || null,
+          forwarding_remarks: snapshot.dispatchDetails?.remarks || null,
+          dispatched_by_name: null,
+          dispatched_at: null,
+          officer_pen_list: snapshot.includedOfficerPenList || [],
+          total_officers_count: snapshot.totalOfficersCount || 0,
+          historical_copies: snapshot.historicalCopies || []
+        }, { onConflict: 'office_code' });
+      if (error) console.error("Error reverting status in Supabase:", error);
+    } catch (err) {
+      console.warn("Supabase revert call failed:", err);
+    }
+  }
+
+  otLogAudit('REVERT_FORWARDING_STATUS', officeCode, {
+    office: officeCode,
+    action: "Reverted forwarding status to allow further edits"
+  });
+
+  closeAdminRevertForwardModal();
+
+  // Re-check office access and unlock form if this office is currently selected
+  const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value || (typeof otCurrentOfficeCode !== 'undefined' && otCurrentOfficeCode);
+  if (currentSelectedOffice === officeCode && typeof checkOfficeAccessAndLock === 'function') {
+    checkOfficeAccessAndLock(officeCode);
+  }
+
+  // Refresh Views
+  renderOfficeSummaryReport();
+  if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+
+  if (typeof showToast === 'function') {
+    showToast(`Forwarding status for ${officeCode} reverted successfully. Office is now unlocked for edits.`, "success");
+  }
+}
+window.revertOfficeForwardingStatus = revertOfficeForwardingStatus;
+
+function openAdminRevertForwardingModal() {
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  if (!isAdmin) {
+    if (typeof showToast === 'function') showToast("Access Denied: Admin authorization required.", "error");
+    return;
+  }
+
+  const modal = document.getElementById('adminRevertForwardModal');
+  if (!modal) return;
+
+  const select = document.getElementById('adminRevertOfficeSelect');
+  const detailsBox = document.getElementById('adminRevertOfficeDetails');
+  const btnSubmit = document.getElementById('btnSubmitRevertOffice');
+
+  if (select) {
+    const forwardedCodes = Object.keys(otReportSnapshotsStore || {}).filter(code => otReportSnapshotsStore[code]?.isForwarded === true);
+
+    if (forwardedCodes.length === 0) {
+      select.innerHTML = '<option value="">-- No Forwarded Offices Found --</option>';
+      select.disabled = true;
+      if (btnSubmit) btnSubmit.disabled = true;
+      if (detailsBox) {
+        detailsBox.style.display = 'block';
+        detailsBox.innerHTML = '<div style="color: #64748b; font-size: 0.88rem; text-align: center; padding: 12px;">No offices have completed "Send to Transport Commissionerate" yet.</div>';
+      }
+    } else {
+      select.disabled = false;
+      if (btnSubmit) btnSubmit.disabled = false;
+      select.innerHTML = '<option value="">-- Select Forwarded Office to Revert --</option>' +
+        forwardedCodes.map(code => {
+          const off = (typeof ALL_MVD_OFFICES !== 'undefined' ? ALL_MVD_OFFICES.find(o => o.code === code) : null);
+          return `<option value="${escapeHtml(code)}">${escapeHtml(code)} — ${escapeHtml(off ? off.name : code)}</option>`;
+        }).join('');
+      if (detailsBox) detailsBox.style.display = 'none';
+    }
+  }
+
+  modal.style.display = 'flex';
+}
+window.openAdminRevertForwardingModal = openAdminRevertForwardingModal;
+
+function closeAdminRevertForwardModal() {
+  const modal = document.getElementById('adminRevertForwardModal');
+  if (modal) modal.style.display = 'none';
+}
+window.closeAdminRevertForwardModal = closeAdminRevertForwardModal;
+
+function handleAdminRevertOfficeSelectChange() {
+  const code = document.getElementById('adminRevertOfficeSelect')?.value;
+  const detailsBox = document.getElementById('adminRevertOfficeDetails');
+  if (!detailsBox) return;
+
+  if (!code || !otReportSnapshotsStore[code]) {
+    detailsBox.style.display = 'none';
+    return;
+  }
+
+  const snap = otReportSnapshotsStore[code];
+  const d = snap.dispatchDetails || {};
+  const off = (typeof ALL_MVD_OFFICES !== 'undefined' ? ALL_MVD_OFFICES.find(o => o.code === code) : null);
+
+  detailsBox.style.display = 'block';
+  detailsBox.innerHTML = `
+    <div style="background: #eff6ff; border: 1px solid #bfdbfe; border-radius: 8px; padding: 12px; font-size: 0.85rem;">
+      <div style="font-weight: 700; color: #1e40af; margin-bottom: 6px;">
+        <i class="fa-solid fa-building"></i> ${escapeHtml(off ? off.name : code)} (${escapeHtml(code)})
+      </div>
+      <div><strong>File / Outward No:</strong> ${escapeHtml(d.fileNo || d.outwardNo || 'N/A')}</div>
+      <div><strong>Date Sent:</strong> ${escapeHtml(d.forwardDate || 'N/A')}</div>
+      <div><strong>Head of Office:</strong> ${escapeHtml(d.headName || snap.verifiedBy?.name || 'N/A')} (${escapeHtml(d.headDesignation || snap.verifiedBy?.designation || 'N/A')})</div>
+      <div><strong>Total Officers:</strong> ${snap.totalOfficersCount || snap.includedOfficerPenList?.length || 0}</div>
+    </div>
+  `;
+}
+window.handleAdminRevertOfficeSelectChange = handleAdminRevertOfficeSelectChange;
+
+function submitAdminRevertOfficeModal() {
+  const code = document.getElementById('adminRevertOfficeSelect')?.value;
+  if (!code) {
+    if (typeof showToast === 'function') showToast("Please select an office to revert.", "warning");
+    return;
+  }
+  revertOfficeForwardingStatus(code);
+}
+window.submitAdminRevertOfficeModal = submitAdminRevertOfficeModal;
+
 function printOfficeSummaryReport() {
   const userEmail = otGetLoggedInEmail();
-  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
+  const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
   if (!isAdmin) {
     if (!userEmail) {
       if (typeof showToast === 'function') showToast("Please log in to print summary reports.", "warning");
@@ -3655,6 +4015,53 @@ function subscribeToRealtimeOfficerProfiles() {
           } catch (e) {
             console.warn("Could not process realtime office_locks update:", e);
           }
+        }
+      }
+    ).on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'office_report_versions' },
+      (payload) => {
+        console.log("Supabase Realtime event for office_report_versions:", payload);
+        const { eventType, new: newRec, old: oldRec } = payload;
+        const targetCode = newRec?.office_code || oldRec?.office_code;
+        if (eventType === 'DELETE' && targetCode) {
+          delete otReportSnapshotsStore[targetCode];
+        } else if (newRec && newRec.office_code) {
+          otReportSnapshotsStore[newRec.office_code] = {
+            officeCode: newRec.office_code,
+            officeName: newRec.office_name,
+            referenceNumber: newRec.reference_number,
+            version: newRec.version,
+            cutoffTimestamp: newRec.cutoff_timestamp,
+            verifiedAt: newRec.verified_at,
+            isVerified: newRec.is_verified,
+            reverificationRequired: newRec.reverification_required,
+            isForwarded: newRec.is_forwarded,
+            verifiedBy: {
+              name: newRec.verified_by_name || "",
+              designation: newRec.verified_by_designation || ""
+            },
+            verifiedRemarks: newRec.verification_remarks || "",
+            dispatchDetails: newRec.is_forwarded ? {
+              fileNo: newRec.outward_number || "",
+              outwardNo: newRec.outward_number || "",
+              forwardDate: newRec.forward_date || "",
+              remarks: newRec.forwarding_remarks || "",
+              headName: newRec.verified_by_name || "",
+              headDesignation: newRec.verified_by_designation || "",
+              userName: newRec.dispatched_by_name || ""
+            } : null,
+            includedOfficerPenList: newRec.included_officer_pens || [],
+            totalOfficersCount: (newRec.included_officer_pens || []).length,
+            historicalCopies: []
+          };
+        }
+        localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
+        renderOfficeSummaryReport();
+        if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+        const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+        if (targetCode && currentSelectedOffice === targetCode && typeof checkOfficeAccessAndLock === 'function') {
+          checkOfficeAccessAndLock(targetCode);
         }
       }
     ).subscribe((status) => {
@@ -4270,6 +4677,16 @@ function getFilteredDashboardOfficers() {
         if (val === 'add_qual' && !(o.additionalQualifications && o.additionalQualifications.length > 0)) return false;
         if (val === 'skills_trainings' && !((o.specializedSkills && o.specializedSkills.length > 0) || (o.trainingHistory && o.trainingHistory.length > 0))) return false;
         if (val === 'willing' && !(o.willingnessToContribute && o.willingnessToContribute.trim().length > 0)) return false;
+        if (val === 'offices_completed') {
+          const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+          const snap = snapStore[o.officeCode];
+          if (!snap || !snap.isForwarded) return false;
+        }
+        if (val === 'offices_pending') {
+          const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+          const snap = snapStore[o.officeCode];
+          if (snap && snap.isForwarded) return false;
+        }
       }
     }
 
@@ -4303,6 +4720,34 @@ function updateOfficerDashboardKpis(allOfficers, filteredOfficers) {
   if (elWilling) elWilling.textContent = willing;
   if (elWillingPct) elWillingPct.textContent = total > 0 ? `${Math.round((willing / total) * 100)}% ready for special duties` : '0% ready for special duties';
 
+  // Calculate completed & pending offices for "Send to Transport Commissionerate" action
+  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+  const knownOffices = new Set();
+  (allOfficers || []).forEach(o => { if (o && o.officeCode) knownOffices.add(o.officeCode); });
+  Object.keys(snapStore).forEach(c => { if (c) knownOffices.add(c); });
+
+  let officesCompleted = 0;
+  let officesPending = 0;
+
+  knownOffices.forEach(code => {
+    const snap = snapStore[code];
+    if (snap && snap.isForwarded) {
+      officesCompleted++;
+    } else {
+      officesPending++;
+    }
+  });
+
+  const elCompleted = document.getElementById('kpiOtOfficesCompleted');
+  const elCompletedSub = document.getElementById('kpiOtOfficesCompletedSub');
+  const elPending = document.getElementById('kpiOtOfficesPending');
+  const elPendingSub = document.getElementById('kpiOtOfficesPendingSub');
+
+  if (elCompleted) elCompleted.textContent = officesCompleted;
+  if (elCompletedSub) elCompletedSub.textContent = `${officesCompleted} office(s) sent`;
+  if (elPending) elPending.textContent = officesPending;
+  if (elPendingSub) elPendingSub.textContent = `${officesPending} office(s) pending action`;
+
   // Highlight active KPI card
   document.querySelectorAll('.ot-kpi-card').forEach(c => c.classList.remove('active'));
   if (otDashboardFilter.drillDownType === 'kpi') {
@@ -4310,6 +4755,8 @@ function updateOfficerDashboardKpis(allOfficers, filteredOfficers) {
     else if (otDashboardFilter.drillDownValue === 'add_qual') document.getElementById('kpiCardAddQual')?.classList.add('active');
     else if (otDashboardFilter.drillDownValue === 'skills_trainings') document.getElementById('kpiCardSkillsTrainings')?.classList.add('active');
     else if (otDashboardFilter.drillDownValue === 'willing') document.getElementById('kpiCardWilling')?.classList.add('active');
+    else if (otDashboardFilter.drillDownValue === 'offices_completed') document.getElementById('kpiCardOfficesCompleted')?.classList.add('active');
+    else if (otDashboardFilter.drillDownValue === 'offices_pending') document.getElementById('kpiCardOfficesPending')?.classList.add('active');
   }
 
   // Update table record count
@@ -4634,7 +5081,9 @@ function applyQuickKpiFilter(kpiType) {
       all: 'All Registered Officers',
       add_qual: 'Officers with Additional Qualifications',
       skills_trainings: 'Officers with Specialized Skills / In-Service Trainings',
-      willing: 'Officers Willing to Contribute More'
+      willing: 'Officers Willing to Contribute More',
+      offices_completed: 'Offices Sent to Transport Commissionerate (Completed)',
+      offices_pending: 'Offices Pending "Send to Transport Commissionerate"'
     };
     label.textContent = `KPI Metric: ${names[kpiType] || kpiType}`;
   }
@@ -4826,11 +5275,20 @@ function exportOfficerDashboardToExcel() {
   const withSkills = officers.filter(o => (o.specializedSkills && o.specializedSkills.length > 0) || (o.trainingHistory && o.trainingHistory.length > 0)).length;
   const willing = officers.filter(o => o.willingnessToContribute && o.willingnessToContribute.trim().length > 0).length;
 
+  const knownOffices = new Set();
+  officers.forEach(o => { if (o && o.officeCode) knownOffices.add(o.officeCode); });
+  Object.keys(otReportSnapshotsStore || {}).forEach(c => { if (c) knownOffices.add(c); });
+  let offCompleted = 0, offPending = 0;
+  knownOffices.forEach(code => {
+    if (otReportSnapshotsStore && otReportSnapshotsStore[code]?.isForwarded) offCompleted++;
+    else offPending++;
+  });
+
   const headerRows = [
     ["KERALAM MOTOR VEHICLES DEPARTMENT"],
     ["OFFICER TRAINING & QUALIFICATIONS — EXECUTIVE ADMIN DASHBOARD REPORT"],
     [`Generated On: ${dateStr}`, `Applied Filters: Office: ${otDashboardFilter.office} | Designation: ${otDashboardFilter.designation} | Qual: ${otDashboardFilter.qualification} | Skill: ${otDashboardFilter.skill}`],
-    [`Summary KPIs: Total Officers: ${total}`, `With Addl Qual: ${withAddl}`, `With Skills/Trainings: ${withSkills}`, `Willing to Contribute: ${willing}`],
+    [`Summary KPIs: Total Officers: ${total}`, `With Addl Qual: ${withAddl}`, `With Skills/Trainings: ${withSkills}`, `Willing to Contribute: ${willing}`, `Offices Sent to TC: ${offCompleted}`, `Offices Pending: ${offPending}`],
     []
   ];
 
@@ -4931,33 +5389,44 @@ function exportOfficerDashboardToPDF() {
   doc.text(`Generated: ${dateStr}`, 680, 24);
   doc.text(`Total Records: ${total}`, 680, 42);
 
-  // 2. Summary KPI Cards Strip
+  // 2. Summary KPI Cards Strip (All 6 metrics)
+  const knownOffices = new Set();
+  officers.forEach(o => { if (o && o.officeCode) knownOffices.add(o.officeCode); });
+  Object.keys(otReportSnapshotsStore || {}).forEach(c => { if (c) knownOffices.add(c); });
+  let offCompleted = 0, offPending = 0;
+  knownOffices.forEach(code => {
+    if (otReportSnapshotsStore && otReportSnapshotsStore[code]?.isForwarded) offCompleted++;
+    else offPending++;
+  });
+
   const kpiY = 64;
-  const kpiW = 180;
+  const kpiW = 118;
   const kpiH = 34;
 
   const kpis = [
     { label: "TOTAL ENTERED", val: String(total), color: [240, 253, 244], stroke: [134, 239, 172], text: [20, 83, 45] },
     { label: "ADDITIONAL QUAL", val: `${withAddl} (${total > 0 ? Math.round((withAddl/total)*100) : 0}%)`, color: [239, 246, 255], stroke: [147, 197, 253], text: [30, 58, 138] },
     { label: "SKILLS & TRAININGS", val: `${withSkills} (${total > 0 ? Math.round((withSkills/total)*100) : 0}%)`, color: [250, 245, 255], stroke: [216, 180, 254], text: [88, 28, 135] },
-    { label: "WILLING TO CONTRIBUTE", val: `${willing} (${total > 0 ? Math.round((willing/total)*100) : 0}%)`, color: [255, 251, 235], stroke: [253, 230, 138], text: [120, 53, 15] }
+    { label: "WILLING TO CONTRIBUTE", val: `${willing} (${total > 0 ? Math.round((willing/total)*100) : 0}%)`, color: [255, 251, 235], stroke: [253, 230, 138], text: [120, 53, 15] },
+    { label: "OFFICES SENT TO TC", val: `${offCompleted} (${knownOffices.size > 0 ? Math.round((offCompleted/knownOffices.size)*100) : 0}%)`, color: [236, 253, 245], stroke: [110, 231, 183], text: [6, 95, 70] },
+    { label: "OFFICES PENDING TC", val: `${offPending} (${knownOffices.size > 0 ? Math.round((offPending/knownOffices.size)*100) : 0}%)`, color: [255, 247, 237], stroke: [253, 186, 116], text: [154, 52, 18] }
   ];
 
   kpis.forEach((kpi, idx) => {
-    const x = 40 + idx * (kpiW + 14);
+    const x = 40 + idx * (kpiW + 8);
     doc.setFillColor(kpi.color[0], kpi.color[1], kpi.color[2]);
     doc.setDrawColor(kpi.stroke[0], kpi.stroke[1], kpi.stroke[2]);
     doc.roundedRect(x, kpiY, kpiW, kpiH, 4, 4, 'FD');
 
     doc.setTextColor(100, 116, 139);
-    doc.setFontSize(6.5);
+    doc.setFontSize(6);
     doc.setFont('helvetica', 'bold');
-    doc.text(kpi.label, x + 8, kpiY + 12);
+    doc.text(kpi.label, x + 6, kpiY + 12);
 
     doc.setTextColor(kpi.text[0], kpi.text[1], kpi.text[2]);
-    doc.setFontSize(11);
+    doc.setFontSize(10.5);
     doc.setFont('helvetica', 'bold');
-    doc.text(kpi.val, x + 8, kpiY + 28);
+    doc.text(kpi.val, x + 6, kpiY + 27);
   });
 
   // 3. AutoTable
