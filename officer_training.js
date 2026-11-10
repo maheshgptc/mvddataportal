@@ -334,6 +334,52 @@ let otAuditLogs = JSON.parse(localStorage.getItem('mvd_ot_audit_logs')) || [];
 let otOfficeLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks')) || {};
 window.otOfficeLocks = otOfficeLocks;
 
+// Cross-tab Synchronization Listener for instant multi-window unlock & status updates
+if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+  window.addEventListener('storage', (e) => {
+    if (e.key === 'mvd_ot_report_snapshots' && e.newValue) {
+      try {
+        const updated = JSON.parse(e.newValue);
+        Object.assign(otReportSnapshotsStore, updated);
+        if (window.otReportSnapshotsStore) Object.assign(window.otReportSnapshotsStore, updated);
+        renderOfficeSummaryReport();
+        if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+        const curOffice = document.getElementById('otMainOfficeSelect')?.value;
+        if (curOffice && typeof checkOfficeAccessAndLock === 'function') {
+          checkOfficeAccessAndLock(curOffice);
+          renderOfficeEditOptionList(curOffice);
+        }
+      } catch (err) {}
+    }
+  });
+
+  if (typeof BroadcastChannel !== 'undefined') {
+    try {
+      const bc = new BroadcastChannel('mvd_office_status_channel');
+      bc.onmessage = (event) => {
+        if (event.data && event.data.type === 'OFFICE_REVERTED') {
+          const revCode = event.data.officeCode;
+          const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+          const snap = snapStore[revCode];
+          if (snap) {
+            snap.isForwarded = false;
+            snap.dispatchDetails = null;
+          }
+          renderOfficeSummaryReport();
+          if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+          const curOffice = document.getElementById('otMainOfficeSelect')?.value;
+          const curCanon = (typeof getCanonicalOfficeCode === 'function') ? (getCanonicalOfficeCode(curOffice) || curOffice) : curOffice;
+          if (curOffice && (curOffice === revCode || curCanon === revCode)) {
+            if (typeof toggleOfficerFormDisabled === 'function') toggleOfficerFormDisabled(false);
+            if (typeof checkOfficeAccessAndLock === 'function') checkOfficeAccessAndLock(curOffice);
+            if (typeof renderOfficeEditOptionList === 'function') renderOfficeEditOptionList(curOffice);
+          }
+        }
+      };
+    } catch (err) {}
+  }
+}
+
 // Active Session Roles:
 // 'data_entry' | 'head_of_office' | 'dispatch_user' | 'admin'
 let otCurrentRole = localStorage.getItem('mvd_ot_current_role') || 'head_of_office';
@@ -701,7 +747,8 @@ function checkOfficeAccessAndLock(officeCode) {
   }
 
   const currentEmail = otGetLoggedInEmail();
-  const lockedEmail = getOfficeLockedEmail(officeCode);
+  const canonCode = getCanonicalOfficeCode(officeCode) || officeCode;
+  const lockedEmail = getOfficeLockedEmail(canonCode) || getOfficeLockedEmail(officeCode);
   const isAdmin = ((typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') || (typeof window !== 'undefined' && window.otCurrentRole === 'admin') || (typeof activeSession !== 'undefined' && activeSession === 'admin') || (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated));
 
   if (isAdmin) {
@@ -727,8 +774,9 @@ function checkOfficeAccessAndLock(officeCode) {
     if (currentEmail && lockedEmail.toLowerCase() === currentEmail.toLowerCase()) {
       // Authorized User
       // Check if office report has been sent to Transport Commissionerate
-      const snap = otReportSnapshotsStore && otReportSnapshotsStore[officeCode];
-      if (snap && snap.isForwarded) {
+      const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+      const snap = snapStore[canonCode] || snapStore[officeCode];
+      if (snap && snap.isForwarded === true) {
         toggleOfficerFormDisabled(true);
         if (alertBox) {
           alertBox.className = 'reflection-alert alert-authorized';
@@ -3009,10 +3057,11 @@ function renderOfficeSummaryReport() {
 
   // Check saved snapshot for this office
   const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
-  const savedSnapshot = snapStore[officeCode];
+  const canonCode = getCanonicalOfficeCode(officeCode) || officeCode;
+  const savedSnapshot = snapStore[canonCode] || snapStore[officeCode];
   const isVerified = savedSnapshot && savedSnapshot.isVerified;
   const isReverificationRequired = savedSnapshot && savedSnapshot.reverificationRequired;
-  const isForwarded = savedSnapshot && savedSnapshot.isForwarded;
+  const isForwarded = savedSnapshot && savedSnapshot.isForwarded === true;
 
   // Header Elements
   const headerOfficeEl = document.getElementById('otReportHeaderOffice');
@@ -3024,18 +3073,15 @@ function renderOfficeSummaryReport() {
   const genDateEl = document.getElementById('otReportGenDate');
   if (genDateEl) genDateEl.textContent = otFormatIST(new Date().toISOString());
 
-  // Report Status Badge
+  // Report Status Badge: SENT TO TRANSPORT COMMISSIONERATE when forwarded, explicitly ASSIGNED when reverted/open
   const statusBadge = document.getElementById('otReportVerificationStatusBadge');
   if (statusBadge) {
     if (isForwarded) {
       statusBadge.className = 'badge badge-working';
       statusBadge.innerHTML = `<i class="fa-solid fa-paper-plane"></i> SENT TO TRANSPORT COMMISSIONERATE`;
-    } else if (submittedProfiles.length > 0) {
-      statusBadge.className = 'badge badge-warning';
-      statusBadge.innerHTML = `<i class="fa-solid fa-clock"></i> PENDING SUBMISSION`;
     } else {
-      statusBadge.className = 'badge badge-secondary';
-      statusBadge.innerHTML = `<i class="fa-solid fa-file-pen"></i> DRAFT — NO PROFILES`;
+      statusBadge.className = 'badge badge-info';
+      statusBadge.innerHTML = `<i class="fa-solid fa-folder-open"></i> ASSIGNED`;
     }
   }
 
@@ -3247,6 +3293,7 @@ function renderOfficeSummaryReport() {
       `;
     } else {
       dispatchBox.style.display = 'none';
+      dispatchBox.innerHTML = '';
     }
   }
 
@@ -3596,10 +3643,50 @@ async function revertOfficeForwardingStatus(officeCode) {
     return;
   }
 
+  const canonCode = getCanonicalOfficeCode(officeCode) || officeCode;
   const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
-  const snapshot = snapStore[officeCode];
+  let snapshot = snapStore[canonCode] || snapStore[officeCode];
+
+  if (!snapshot) {
+    try {
+      const raw = localStorage.getItem('mvd_ot_report_snapshots');
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        snapshot = parsed[canonCode] || parsed[officeCode];
+      }
+    } catch (e) {}
+  }
+
   if (!snapshot || !snapshot.isForwarded) {
-    if (typeof showToast === 'function') showToast(`Office ${officeCode} is not marked as forwarded to Transport Commissionerate.`, "info");
+    const client = getSupabaseClient();
+    if (client) {
+      try {
+        const { data: dbData } = await client
+          .from('office_report_versions')
+          .select('*')
+          .or(`office_code.eq.${canonCode},office_code.eq.${officeCode}`)
+          .eq('is_forwarded', true)
+          .limit(1);
+        if (dbData && dbData.length > 0) {
+          const r = dbData[0];
+          snapshot = {
+            officeCode: r.office_code,
+            officeName: r.office_name,
+            referenceNumber: r.reference_number,
+            version: r.version,
+            cutoffTimestamp: r.cutoff_timestamp,
+            verifiedAt: r.verified_at,
+            isVerified: r.is_verified,
+            reverificationRequired: r.reverification_required,
+            isForwarded: true
+          };
+        }
+      } catch (e) {}
+    }
+  }
+
+  if (!snapshot || !snapshot.isForwarded) {
+    if (typeof showToast === 'function') showToast(`Office ${canonCode} is not marked as forwarded to Transport Commissionerate.`, "info");
     return;
   }
 
@@ -3608,29 +3695,36 @@ async function revertOfficeForwardingStatus(officeCode) {
   if (confirmFn) {
     confirmed = await confirmFn({
       title: 'Revert Forwarding Status',
-      message: `Are you sure you want to revert the status for office "${officeCode}"? This will unlock the office and allow further edits by the authorized user.`,
+      message: `Are you sure you want to revert the status for office "${canonCode}"? This will unlock the office and allow further edits by the authorized user.`,
       confirmText: 'Yes, Revert & Unlock',
       cancelText: 'Cancel',
       isDanger: true
     });
   } else if (typeof window !== 'undefined' && typeof window.confirm === 'function') {
-    confirmed = window.confirm(`Are you sure you want to revert forwarding status for office "${officeCode}"? This will allow further edits by the authorized user.`);
+    confirmed = window.confirm(`Are you sure you want to revert forwarding status for office "${canonCode}"? This will allow further edits by the authorized user.`);
   } else {
     confirmed = true;
   }
 
   if (!confirmed) return;
 
-  // Reset forwarding state
+  // 1. Reset in-memory snapshot state
   snapshot.isForwarded = false;
   snapshot.reverificationRequired = false;
-  if (snapshot.dispatchDetails) {
-    snapshot.dispatchDetails.revertedAt = new Date().toISOString();
-    snapshot.dispatchDetails.revertedBy = "Admin";
-  }
+  snapshot.isReverted = true;
+  snapshot.dispatchDetails = null;
+  snapshot.dispatchedByName = null;
+  snapshot.dispatchedAt = null;
+  snapshot.outwardNumber = null;
+  snapshot.forwardDate = null;
+  snapshot.forwardingRemarks = null;
 
+  // Store in both canonical and raw keys
+  otReportSnapshotsStore[canonCode] = snapshot;
   otReportSnapshotsStore[officeCode] = snapshot;
-  if (typeof window !== 'undefined' && window.otReportSnapshotsStore) {
+  if (typeof window !== 'undefined') {
+    if (!window.otReportSnapshotsStore) window.otReportSnapshotsStore = {};
+    window.otReportSnapshotsStore[canonCode] = snapshot;
     window.otReportSnapshotsStore[officeCode] = snapshot;
   }
   try {
@@ -3639,58 +3733,108 @@ async function revertOfficeForwardingStatus(officeCode) {
     console.warn("Could not save to localStorage:", e);
   }
 
-  // Persist reversal to Supabase
+  // 2. Persist status reversal to Supabase backend
   const client = getSupabaseClient();
   if (client) {
     try {
-      const { error } = await client
+      const { error: updateErr } = await client
         .from('office_report_versions')
-        .upsert({
-          office_code: officeCode,
-          office_name: snapshot.officeName || officeCode,
-          reference_number: snapshot.referenceNumber,
-          version: snapshot.version,
-          cutoff_timestamp: snapshot.cutoffTimestamp || new Date().toISOString(),
-          verified_at: snapshot.verifiedAt || new Date().toISOString(),
-          is_verified: true,
-          reverification_required: false,
+        .update({
           is_forwarded: false,
-          verified_by_name: snapshot.verifiedBy?.name || null,
-          verified_by_designation: snapshot.verifiedBy?.designation || null,
-          outward_number: snapshot.dispatchDetails?.outwardNo || null,
-          forward_date: snapshot.dispatchDetails?.forwardDate || null,
-          forwarding_remarks: snapshot.dispatchDetails?.remarks || null,
+          reverification_required: false,
+          outward_number: null,
+          forward_date: null,
+          forwarding_remarks: null,
           dispatched_by_name: null,
           dispatched_at: null,
-          officer_pen_list: snapshot.includedOfficerPenList || [],
-          total_officers_count: snapshot.totalOfficersCount || 0,
-          historical_copies: snapshot.historicalCopies || []
-        }, { onConflict: 'office_code' });
-      if (error) console.error("Error reverting status in Supabase:", error);
+          updated_at: new Date().toISOString()
+        })
+        .or(`office_code.eq.${canonCode},office_code.eq.${officeCode}`);
+
+      if (updateErr) {
+        console.warn("Supabase .or() update failed, trying direct .eq():", updateErr);
+        await client
+          .from('office_report_versions')
+          .update({
+            is_forwarded: false,
+            reverification_required: false,
+            outward_number: null,
+            forward_date: null,
+            forwarding_remarks: null,
+            dispatched_by_name: null,
+            dispatched_at: null,
+            updated_at: new Date().toISOString()
+          })
+          .eq('office_code', canonCode);
+        if (officeCode !== canonCode) {
+          await client
+            .from('office_report_versions')
+            .update({
+              is_forwarded: false,
+              reverification_required: false,
+              outward_number: null,
+              forward_date: null,
+              forwarding_remarks: null,
+              dispatched_by_name: null,
+              dispatched_at: null,
+              updated_at: new Date().toISOString()
+            })
+            .eq('office_code', officeCode);
+        }
+      }
+
+      if (snapshot.referenceNumber && typeof saveOfficerReportToSupabase === 'function') {
+        await saveOfficerReportToSupabase(snapshot);
+      }
     } catch (err) {
       console.warn("Supabase revert call failed:", err);
     }
   }
 
-  otLogAudit('REVERT_FORWARDING_STATUS', officeCode, {
-    office: officeCode,
+  otLogAudit('REVERT_FORWARDING_STATUS', canonCode, {
+    office: canonCode,
     action: "Reverted forwarding status to allow further edits"
   });
 
   closeAdminRevertForwardModal();
 
-  // Re-check office access and unlock form if this office is currently selected
+  // 3. Unlock Form & Instant UI State Sync
+  toggleOfficerFormDisabled(false);
+
   const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value || (typeof otCurrentOfficeCode !== 'undefined' && otCurrentOfficeCode);
-  if (currentSelectedOffice === officeCode && typeof checkOfficeAccessAndLock === 'function') {
-    checkOfficeAccessAndLock(officeCode);
+  const curCanon = getCanonicalOfficeCode(currentSelectedOffice) || currentSelectedOffice;
+
+  if (currentSelectedOffice && (currentSelectedOffice === officeCode || curCanon === canonCode || currentSelectedOffice === canonCode)) {
+    checkOfficeAccessAndLock(currentSelectedOffice);
+    renderOfficeEditOptionList(currentSelectedOffice);
+  } else {
+    checkOfficeAccessAndLock(canonCode);
+    renderOfficeEditOptionList(canonCode);
   }
 
-  // Refresh Views
+  // Update Summary Report view immediately
+  if (typeof otCurrentReportOfficeCode !== 'undefined') otCurrentReportOfficeCode = canonCode;
+  if (typeof window !== 'undefined') window.otCurrentReportOfficeCode = canonCode;
+  const repSel = document.getElementById('otReportOfficeSelect');
+  if (repSel) repSel.value = canonCode;
   renderOfficeSummaryReport();
-  if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+
+  // Refresh Admin Dashboard & Charts
+  if (typeof renderOfficerAdminDashboard === 'function') {
+    renderOfficerAdminDashboard();
+  }
+
+  // Cross-tab broadcast
+  try {
+    if (typeof BroadcastChannel !== 'undefined') {
+      const bc = new BroadcastChannel('mvd_office_status_channel');
+      bc.postMessage({ type: 'OFFICE_REVERTED', officeCode: canonCode });
+      bc.close();
+    }
+  } catch (e) {}
 
   if (typeof showToast === 'function') {
-    showToast(`Forwarding status for ${officeCode} reverted successfully. Office is now unlocked for edits.`, "success");
+    showToast(`Forwarding status for ${canonCode} reverted successfully. Office is now unlocked and status set to ASSIGNED.`, "success");
   }
 }
 window.revertOfficeForwardingStatus = revertOfficeForwardingStatus;
@@ -3710,7 +3854,12 @@ function openAdminRevertForwardingModal() {
   const btnSubmit = document.getElementById('btnSubmitRevertOffice');
 
   if (select) {
-    const forwardedCodes = Object.keys(otReportSnapshotsStore || {}).filter(code => otReportSnapshotsStore[code]?.isForwarded === true);
+    const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+    const forwardedCodes = Array.from(new Set(
+      Object.keys(snapStore)
+        .filter(code => snapStore[code]?.isForwarded === true)
+        .map(code => getCanonicalOfficeCode(code) || code)
+    ));
 
     if (forwardedCodes.length === 0) {
       select.innerHTML = '<option value="">-- No Forwarded Offices Found --</option>';
@@ -4024,10 +4173,13 @@ function subscribeToRealtimeOfficerProfiles() {
         console.log("Supabase Realtime event for office_report_versions:", payload);
         const { eventType, new: newRec, old: oldRec } = payload;
         const targetCode = newRec?.office_code || oldRec?.office_code;
+        const canonTarget = getCanonicalOfficeCode(targetCode) || targetCode;
+
         if (eventType === 'DELETE' && targetCode) {
           delete otReportSnapshotsStore[targetCode];
+          if (canonTarget) delete otReportSnapshotsStore[canonTarget];
         } else if (newRec && newRec.office_code) {
-          otReportSnapshotsStore[newRec.office_code] = {
+          const snapObj = {
             officeCode: newRec.office_code,
             officeName: newRec.office_name,
             referenceNumber: newRec.reference_number,
@@ -4036,7 +4188,7 @@ function subscribeToRealtimeOfficerProfiles() {
             verifiedAt: newRec.verified_at,
             isVerified: newRec.is_verified,
             reverificationRequired: newRec.reverification_required,
-            isForwarded: newRec.is_forwarded,
+            isForwarded: !!newRec.is_forwarded,
             verifiedBy: {
               name: newRec.verified_by_name || "",
               designation: newRec.verified_by_designation || ""
@@ -4055,13 +4207,23 @@ function subscribeToRealtimeOfficerProfiles() {
             totalOfficersCount: (newRec.included_officer_pens || []).length,
             historicalCopies: []
           };
+          otReportSnapshotsStore[newRec.office_code] = snapObj;
+          if (canonTarget) otReportSnapshotsStore[canonTarget] = snapObj;
+          if (typeof window !== 'undefined') {
+            if (!window.otReportSnapshotsStore) window.otReportSnapshotsStore = {};
+            window.otReportSnapshotsStore[newRec.office_code] = snapObj;
+            if (canonTarget) window.otReportSnapshotsStore[canonTarget] = snapObj;
+          }
         }
         localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
         renderOfficeSummaryReport();
         if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
         const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
-        if (targetCode && currentSelectedOffice === targetCode && typeof checkOfficeAccessAndLock === 'function') {
-          checkOfficeAccessAndLock(targetCode);
+        const curCanon = getCanonicalOfficeCode(currentSelectedOffice) || currentSelectedOffice;
+        if (targetCode && (currentSelectedOffice === targetCode || curCanon === canonTarget || currentSelectedOffice === canonTarget) && typeof checkOfficeAccessAndLock === 'function') {
+          toggleOfficerFormDisabled(false);
+          checkOfficeAccessAndLock(currentSelectedOffice);
+          renderOfficeEditOptionList(currentSelectedOffice);
         }
       }
     ).subscribe((status) => {
@@ -4206,7 +4368,7 @@ async function syncOfficerReportsWithSupabase() {
 
     if (!error && data && data.length > 0) {
       data.forEach(r => {
-        otReportSnapshotsStore[r.office_code] = {
+        const snapObj = {
           officeCode: r.office_code,
           officeName: r.office_name,
           referenceNumber: r.reference_number,
@@ -4215,13 +4377,14 @@ async function syncOfficerReportsWithSupabase() {
           verifiedAt: r.verified_at,
           isVerified: r.is_verified,
           reverificationRequired: r.reverification_required,
-          isForwarded: r.is_forwarded,
+          isForwarded: !!r.is_forwarded,
           verifiedBy: {
             name: r.verified_by_name || "",
             designation: r.verified_by_designation || ""
           },
           verifiedRemarks: r.verification_remarks || "",
           dispatchDetails: r.is_forwarded ? {
+            fileNo: r.outward_number || "",
             outwardNo: r.outward_number || "",
             forwardDate: r.forward_date || "",
             remarks: r.forwarding_remarks || "",
@@ -4231,7 +4394,11 @@ async function syncOfficerReportsWithSupabase() {
           totalOfficersCount: (r.included_officer_pens || []).length,
           historicalCopies: []
         };
+        otReportSnapshotsStore[r.office_code] = snapObj;
+        const canon = getCanonicalOfficeCode(r.office_code);
+        if (canon) otReportSnapshotsStore[canon] = snapObj;
       });
+      if (typeof window !== 'undefined') window.otReportSnapshotsStore = otReportSnapshotsStore;
       localStorage.setItem('mvd_ot_report_snapshots', JSON.stringify(otReportSnapshotsStore));
     }
   } catch (e) {
