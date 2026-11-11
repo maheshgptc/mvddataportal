@@ -1168,7 +1168,7 @@ input:checked + .slider:before {
     color: #000000 !important;
     font-size: 11pt !important;
   }
-  body * {
+  body.printing-modal * {
     visibility: hidden;
   }
   .print-hide, .portal-sidebar, .top-gov-bar, .modal-header.print-hide, .btn, nav, header {

@@ -1894,7 +1894,7 @@ input:checked+.slider:before {
     min-width: 100% !important;
   }
 
-  /* Hide navigation, sidebars, headers, action buttons, closed modals, alerts, auth */
+  /* Hide common navigation, sidebars, headers, action buttons, alerts, auth */
   .portal-sidebar,
   .top-gov-bar,
   .app-footer,
@@ -1906,8 +1906,6 @@ input:checked+.slider:before {
   .auth-overlay,
   .toast-container,
   #googleAuthOverlay,
-  #adminContainer,
-  #publicContainer,
   #genericModuleContainer,
   .ot-role-switcher-box,
   #otReportActionToolbar,
@@ -1944,22 +1942,18 @@ input:checked+.slider:before {
     display: block !important;
   }
 
-  #officerTrainingContainer {
-    display: block !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
+  /* -------------------------------------------------------------
+     MODE 1: Officer Training Summary Report Print
+     ------------------------------------------------------------- */
+  body.printing-ot-report #adminContainer,
+  body.printing-ot-report #publicContainer {
+    display: none !important;
+    visibility: hidden !important;
   }
 
-  #otTabContentReport {
-    display: block !important;
-    visibility: visible !important;
-    margin: 0 !important;
-    padding: 0 !important;
-    width: 100% !important;
-  }
-
-  .ot-report-official-container {
+  body.printing-ot-report #officerTrainingContainer,
+  body.printing-ot-report #otTabContentReport,
+  body.printing-ot-report .ot-report-official-container {
     display: block !important;
     visibility: visible !important;
     border: none !important;
@@ -1969,7 +1963,104 @@ input:checked+.slider:before {
     width: 100% !important;
   }
 
-  .ot-report-official-container * {
+  body.printing-ot-report .ot-report-official-container * {
+    visibility: visible !important;
+  }
+
+  /* -------------------------------------------------------------
+     MODE 2: IT Inventory Master Table Print ("Print Quick Table")
+     ------------------------------------------------------------- */
+  body.printing-it-master-table #officerTrainingContainer,
+  body.printing-it-master-table #publicContainer,
+  body.printing-it-master-table #adminSubViewDashboard,
+  body.printing-it-master-table #adminSubViewSummary,
+  body.printing-it-master-table #adminOfficersSubView,
+  body.printing-it-master-table #adminSubViewMenuManager,
+  body.printing-it-master-table #adminSubViewLocks,
+  body.printing-it-master-table #otTabContentReport {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-it-master-table #adminContainer,
+  body.printing-it-master-table #adminSubViewTable {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.printing-it-master-table #itMasterPrintHeader {
+    display: block !important;
+    visibility: visible !important;
+    margin-bottom: 16px !important;
+  }
+
+  body.printing-it-master-table #adminDataTableWrapper,
+  body.printing-it-master-table #adminDataTable,
+  body.printing-it-master-table #adminDataTable * {
+    visibility: visible !important;
+  }
+
+  body.printing-it-master-table #adminDataTableWrapper {
+    overflow: visible !important;
+    box-shadow: none !important;
+    border: none !important;
+  }
+
+  /* -------------------------------------------------------------
+     MODE 3: IT Summary Report Print ("Download / Print Summary Report")
+     ------------------------------------------------------------- */
+  body.printing-it-summary #officerTrainingContainer,
+  body.printing-it-summary #publicContainer,
+  body.printing-it-summary #adminSubViewDashboard,
+  body.printing-it-summary #adminSubViewTable,
+  body.printing-it-summary #adminOfficersSubView,
+  body.printing-it-summary #adminSubViewMenuManager,
+  body.printing-it-summary #adminSubViewLocks,
+  body.printing-it-summary #otTabContentReport {
+    display: none !important;
+    visibility: hidden !important;
+  }
+
+  body.printing-it-summary #adminContainer,
+  body.printing-it-summary #adminSubViewSummary {
+    display: block !important;
+    visibility: visible !important;
+    width: 100% !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  body.printing-it-summary #itSummaryPrintHeader {
+    display: block !important;
+    visibility: visible !important;
+    margin-bottom: 16px !important;
+  }
+
+  body.printing-it-summary .summary-report-card {
+    border: none !important;
+    box-shadow: none !important;
+  }
+
+  body.printing-it-summary .summary-filter-bar,
+  body.printing-it-summary .summary-controls-row {
+    display: none !important;
+  }
+
+  body.printing-it-summary #summaryQuickStatsStrip,
+  body.printing-it-summary .summary-table-wrapper,
+  body.printing-it-summary #adminSummaryReportTable,
+  body.printing-it-summary #adminSummaryReportTable * {
+    visibility: visible !important;
+  }
+
+  /* -------------------------------------------------------------
+     DEFAULT FALLBACK (when no print class is set on body)
+     ------------------------------------------------------------- */
+  body:not(.printing-ot-report):not(.printing-it-master-table):not(.printing-it-summary):not(.printing-modal) #adminContainer {
+    display: block !important;
     visibility: visible !important;
   }
 
@@ -2174,4 +2265,85 @@ input:checked+.slider:before {
 @keyframes otFadeInDown {
   from { opacity: 0; transform: translateY(-6px); }
   to { opacity: 1; transform: translateY(0); }
+}
+
+/* Expanded IT Drill-Down & Modern Dashboard Styles */
+.it-drilldown-table th,
+.it-drilldown-table td {
+  padding: 8px 10px;
+  font-size: 0.82rem;
+  vertical-align: middle;
+}
+.it-drilldown-table thead th {
+  position: sticky;
+  top: 0;
+  background: #0B3B24;
+  color: #ffffff;
+  z-index: 10;
+  font-weight: 700;
+  border-bottom: 2px solid #062C1A;
+}
+.it-drilldown-badge-w {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #dcfce7;
+  color: #166534;
+  font-weight: 700;
+  font-size: 0.74rem;
+}
+.it-drilldown-badge-nw {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: #fee2e2;
+  color: #991b1b;
+  font-weight: 700;
+  font-size: 0.74rem;
+}
+.it-pill-toggle {
+  background: #f1f5f9;
+  border: 1px solid #cbd5e1;
+  color: #475569;
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.it-pill-toggle.active {
+  background: #0B3B24;
+  border-color: #0B3B24;
+  color: #ffffff;
+  box-shadow: 0 2px 6px rgba(11, 59, 36, 0.2);
+}
+.ot-offices-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 8px;
+  border-radius: 12px;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+.ot-offices-status-entered {
+  background: #dcfce7;
+  color: #15803d;
+  border: 1px solid #86efac;
+}
+.ot-offices-status-not-entered {
+  background: #fef2f2;
+  color: #b91c1c;
+  border: 1px solid #fca5a5;
+}
+.ot-offices-forward-sent {
+  background: #e0f2fe;
+  color: #0369a1;
+  border: 1px solid #7dd3fc;
+}
+.ot-offices-forward-pending {
+  background: #fffbeb;
+  color: #b45309;
+  border: 1px solid #fde68a;
 }

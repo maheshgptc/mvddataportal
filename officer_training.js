@@ -4251,6 +4251,11 @@ function subscribeToRealtimeOfficerProfiles() {
             renderAdminOfficersDirectory();
             renderOfficeSummaryReport();
             if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+            if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+            const repModalDel = document.getElementById('otOfficesReportedModal');
+            if (repModalDel && repModalDel.style.display !== 'none' && typeof renderOtOfficesReportedTable === 'function') {
+              renderOtOfficesReportedTable();
+            }
             const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
             if (currentSelectedOffice) renderOfficeEditOptionList(currentSelectedOffice);
           }
@@ -4298,6 +4303,11 @@ function subscribeToRealtimeOfficerProfiles() {
           renderAdminOfficersDirectory();
           renderOfficeSummaryReport();
           if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+          if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
+          const repModalIns = document.getElementById('otOfficesReportedModal');
+          if (repModalIns && repModalIns.style.display !== 'none' && typeof renderOtOfficesReportedTable === 'function') {
+            renderOtOfficesReportedTable();
+          }
           const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
           if (currentSelectedOffice) renderOfficeEditOptionList(currentSelectedOffice);
         }
@@ -4650,6 +4660,12 @@ async function saveOfficerQualificationToSupabase(record) {
   }
 
   try {
+    // Accurately map Stream: if 'Others', map the custom stream text box value
+    const mappedStream = (record.qualificationStream === 'Others')
+      ? (record.qualificationStreamOther ? record.qualificationStreamOther.trim() : 'Others')
+      : (record.qualificationStream ? record.qualificationStream.trim() : null);
+    const mappedStreamOther = record.qualificationStreamOther ? record.qualificationStreamOther.trim() : null;
+
     // 1. Save to officer_profiles
     const profilePayload = {
       id: record.id || ('off_' + record.pen),
@@ -4662,8 +4678,8 @@ async function saveOfficerQualificationToSupabase(record) {
       general_education_other: record.generalEducationOther || null,
       technical_qualification: record.technicalQualification || 'B.Tech',
       technical_qualification_other: record.technicalQualificationOther || null,
-      qualification_stream: record.qualificationStream || null,
-      qualification_stream_other: record.qualificationStreamOther || null,
+      qualification_stream: mappedStream,
+      qualification_stream_other: mappedStreamOther,
       institution: record.institution || null,
       passing_year: record.passingYear ? parseInt(record.passingYear) : null,
       class_grade: record.grade || null,
@@ -4681,14 +4697,35 @@ async function saveOfficerQualificationToSupabase(record) {
       updated_at: new Date().toISOString()
     };
 
-    const { data: upsertData, error: profileError } = await client
+    let { data: upsertData, error: profileError } = await client
       .from('officer_profiles')
       .upsert(profilePayload, { onConflict: 'pen' })
       .select();
 
     if (profileError) {
-      console.error("Could not upsert to officer_profiles:", profileError);
-      return { success: false, error: profileError };
+      console.warn("Upsert with qualification_stream notice:", profileError);
+      // Auto-fallback: If schema cache or database table does not yet have qualification_stream,
+      // retry without these columns so user data submission succeeds into Supabase immediately.
+      if (profileError.message && (profileError.message.includes('qualification_stream') || profileError.message.includes('schema cache'))) {
+        console.info("[Schema Auto-Recovery] Retrying upsert without unrecognised stream columns pending schema refresh...");
+        const safePayload = { ...profilePayload };
+        delete safePayload.qualification_stream;
+        delete safePayload.qualification_stream_other;
+
+        const retryRes = await client
+          .from('officer_profiles')
+          .upsert(safePayload, { onConflict: 'pen' })
+          .select();
+
+        if (!retryRes.error) {
+          profileError = null;
+          upsertData = retryRes.data;
+        } else {
+          return { success: false, error: retryRes.error };
+        }
+      } else {
+        return { success: false, error: profileError };
+      }
     }
 
     // 2. Also save to legacy officer_qualifications for compatibility
@@ -4705,8 +4742,8 @@ async function saveOfficerQualificationToSupabase(record) {
         officer_email: record.enteredBy?.userId,
         educational_qualification: record.technicalQualification || record.generalEducation || 'Plus Two',
         qualification_other: record.technicalQualificationOther,
-        qualification_stream: record.qualificationStream || null,
-        qualification_stream_other: record.qualificationStreamOther || null,
+        qualification_stream: mappedStream,
+        qualification_stream_other: mappedStreamOther,
         specialization: (record.specializedSkills || []).join(', '),
         technical_certifications: (record.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', '),
         willingness_to_contribute: record.willingnessToContribute || null,
@@ -4717,9 +4754,17 @@ async function saveOfficerQualificationToSupabase(record) {
         updated_at: new Date().toISOString()
       };
 
-      await client
+      const legRes = await client
         .from('officer_qualifications')
         .upsert(legacyPayload, { onConflict: 'officer_pen' });
+
+      if (legRes.error && legRes.error.message && (legRes.error.message.includes('qualification_stream') || legRes.error.message.includes('schema cache'))) {
+        delete legacyPayload.qualification_stream;
+        delete legacyPayload.qualification_stream_other;
+        await client
+          .from('officer_qualifications')
+          .upsert(legacyPayload, { onConflict: 'officer_pen' });
+      }
     } catch (legErr) {
       console.warn("Legacy officer_qualifications sync warning (ignored):", legErr);
     }
@@ -5098,6 +5143,23 @@ function updateOfficerDashboardKpis(allOfficers, filteredOfficers) {
   if (elWilling) elWilling.textContent = willing;
   if (elWillingPct) elWillingPct.textContent = total > 0 ? `${Math.round((willing / total) * 100)}% ready for special duties` : '0% ready for special duties';
 
+  // Calculate Offices Reported (entered / Not entered) metric across 105 MVD offices
+  const totalOfficesCount = (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0) ? ALL_MVD_OFFICES.length : 105;
+  const enteredOfficeCodes = new Set();
+  (allOfficers || []).forEach(o => {
+    if (o && o.officeCode) {
+      const canon = getCanonicalOfficeCode(o.officeCode) || o.officeCode;
+      enteredOfficeCodes.add(canon);
+    }
+  });
+  const enteredCount = enteredOfficeCodes.size;
+  const notEnteredCount = Math.max(0, totalOfficesCount - enteredCount);
+
+  const elReportedSummary = document.getElementById('kpiOtOfficesReportedSummary');
+  const elReportedSub = document.getElementById('kpiOtOfficesReportedSub');
+  if (elReportedSummary) elReportedSummary.textContent = `${enteredCount} / ${notEnteredCount}`;
+  if (elReportedSub) elReportedSub.textContent = `${enteredCount} Entered • ${notEnteredCount} Not entered (${totalOfficesCount} Total)`;
+
   // Calculate completed & pending offices for "Send to Transport Commissionerate" action
   const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
   const knownOffices = new Set();
@@ -5122,9 +5184,9 @@ function updateOfficerDashboardKpis(allOfficers, filteredOfficers) {
   const elPendingSub = document.getElementById('kpiOtOfficesPendingSub');
 
   if (elCompleted) elCompleted.textContent = officesCompleted;
-  if (elCompletedSub) elCompletedSub.textContent = `${officesCompleted} office(s) sent`;
+  if (elCompletedSub) elCompletedSub.textContent = `${officesCompleted} office(s) sent to TC Office`;
   if (elPending) elPending.textContent = officesPending;
-  if (elPendingSub) elPendingSub.textContent = `${officesPending} office(s) pending action`;
+  if (elPendingSub) elPendingSub.textContent = `${officesPending} office(s) pending send to TC Office`;
 
   // Highlight active KPI card
   document.querySelectorAll('.ot-kpi-card').forEach(c => c.classList.remove('active'));
@@ -5133,6 +5195,7 @@ function updateOfficerDashboardKpis(allOfficers, filteredOfficers) {
     else if (otDashboardFilter.drillDownValue === 'add_qual') document.getElementById('kpiCardAddQual')?.classList.add('active');
     else if (otDashboardFilter.drillDownValue === 'skills_trainings') document.getElementById('kpiCardSkillsTrainings')?.classList.add('active');
     else if (otDashboardFilter.drillDownValue === 'willing') document.getElementById('kpiCardWilling')?.classList.add('active');
+    else if (otDashboardFilter.drillDownValue === 'offices_reported') document.getElementById('kpiCardOfficesReported')?.classList.add('active');
     else if (otDashboardFilter.drillDownValue === 'offices_completed') document.getElementById('kpiCardOfficesCompleted')?.classList.add('active');
     else if (otDashboardFilter.drillDownValue === 'offices_pending') document.getElementById('kpiCardOfficesPending')?.classList.add('active');
   }
@@ -5444,6 +5507,11 @@ function clearDrillDown() {
 }
 
 function applyQuickKpiFilter(kpiType) {
+  if (kpiType === 'offices_reported') {
+    openOtOfficesReportedDrillDown();
+    return;
+  }
+
   if (otDashboardFilter.drillDownType === 'kpi' && otDashboardFilter.drillDownValue === kpiType) {
     clearDrillDown();
     return;
@@ -5460,8 +5528,9 @@ function applyQuickKpiFilter(kpiType) {
       add_qual: 'Officers with Additional Qualifications',
       skills_trainings: 'Officers with Specialized Skills / In-Service Trainings',
       willing: 'Officers Willing to Contribute More',
-      offices_completed: 'Offices Sent to Transport Commissionerate (Completed)',
-      offices_pending: 'Offices Pending "Send to Transport Commissionerate"'
+      offices_reported: 'Offices Reported (entered/Not entered)',
+      offices_completed: 'Offices sent to TC Office',
+      offices_pending: 'Offices Pending Send to TC Office'
     };
     label.textContent = `KPI Metric: ${names[kpiType] || kpiType}`;
   }
@@ -5470,6 +5539,313 @@ function applyQuickKpiFilter(kpiType) {
   const tableEl = document.getElementById('otDashboardTableWrapper');
   if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
+window.applyQuickKpiFilter = applyQuickKpiFilter;
+
+// --- OFFICES REPORTED (ENTERED / NOT ENTERED) INTERACTIVE DRILL-DOWN ---
+let otOfficesReportedFilterState = {
+  filter: 'all', // 'all', 'entered', 'not_entered', 'sent_tc', 'pending_tc'
+  searchQuery: '',
+  cachedList: []
+};
+
+function openOtOfficesReportedDrillDown() {
+  const modal = document.getElementById('otOfficesReportedModal');
+  if (!modal) return;
+
+  otOfficesReportedFilterState.filter = 'all';
+  otOfficesReportedFilterState.searchQuery = '';
+
+  const searchInput = document.getElementById('otOfficesReportedSearchInput');
+  if (searchInput) searchInput.value = '';
+
+  document.querySelectorAll('#otOfficesReportedFilterPills .it-pill-toggle').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-filter') === 'all');
+  });
+
+  renderOtOfficesReportedTable();
+  modal.style.display = 'flex';
+}
+window.openOtOfficesReportedDrillDown = openOtOfficesReportedDrillDown;
+
+function closeOtOfficesReportedModal() {
+  const modal = document.getElementById('otOfficesReportedModal');
+  if (modal) modal.style.display = 'none';
+}
+window.closeOtOfficesReportedModal = closeOtOfficesReportedModal;
+
+function handleOtOfficesReportedSearch(val) {
+  otOfficesReportedFilterState.searchQuery = (val || '').toLowerCase().trim();
+  renderOtOfficesReportedTable();
+}
+window.handleOtOfficesReportedSearch = handleOtOfficesReportedSearch;
+
+function filterOtOfficesReported(filter) {
+  otOfficesReportedFilterState.filter = filter || 'all';
+  document.querySelectorAll('#otOfficesReportedFilterPills .it-pill-toggle').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-filter') === otOfficesReportedFilterState.filter);
+  });
+  renderOtOfficesReportedTable();
+}
+window.filterOtOfficesReported = filterOtOfficesReported;
+
+function renderOtOfficesReportedTable() {
+  const container = document.getElementById('otOfficesReportedModalBody');
+  const footerStats = document.getElementById('otOfficesReportedModalFooterStats');
+  if (!container) return;
+
+  const allOfficers = getAdminOfficerDashboardData();
+  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+
+  // Group officers by canonical office code
+  const officeOfficerCounts = {};
+  allOfficers.forEach(o => {
+    if (o && o.officeCode) {
+      const canon = getCanonicalOfficeCode(o.officeCode) || o.officeCode;
+      officeOfficerCounts[canon] = (officeOfficerCounts[canon] || 0) + 1;
+    }
+  });
+
+  const masterOffices = (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0)
+    ? ALL_MVD_OFFICES
+    : [];
+
+  let fullList = masterOffices.map((off, idx) => {
+    const canon = getCanonicalOfficeCode(off.code) || off.code;
+    const count = officeOfficerCounts[canon] || officeOfficerCounts[off.code] || 0;
+    const snap = snapStore[canon] || snapStore[off.code];
+    const isForwarded = snap && snap.isForwarded === true;
+    const isEntered = count > 0;
+
+    return {
+      index: idx + 1,
+      code: off.code,
+      name: off.name,
+      category: off.category || 'MVD Office',
+      officersCount: count,
+      isEntered,
+      isForwarded
+    };
+  });
+
+  // Calculate counts for pills
+  const totalEntered = fullList.filter(o => o.isEntered).length;
+  const totalNotEntered = fullList.length - totalEntered;
+  const totalSentTc = fullList.filter(o => o.isForwarded).length;
+  const totalPendingTc = fullList.filter(o => o.isEntered && !o.isForwarded).length;
+
+  const pillEntered = document.getElementById('pillCountEntered');
+  const pillNotEntered = document.getElementById('pillCountNotEntered');
+  const pillSentTc = document.getElementById('pillCountSentTc');
+  const pillPendingTc = document.getElementById('pillCountPendingTc');
+
+  if (pillEntered) pillEntered.textContent = totalEntered;
+  if (pillNotEntered) pillNotEntered.textContent = totalNotEntered;
+  if (pillSentTc) pillSentTc.textContent = totalSentTc;
+  if (pillPendingTc) pillPendingTc.textContent = totalPendingTc;
+
+  // Filter list by pill state
+  let filtered = fullList;
+  const filter = otOfficesReportedFilterState.filter;
+  if (filter === 'entered') {
+    filtered = filtered.filter(o => o.isEntered);
+  } else if (filter === 'not_entered') {
+    filtered = filtered.filter(o => !o.isEntered);
+  } else if (filter === 'sent_tc') {
+    filtered = filtered.filter(o => o.isForwarded);
+  } else if (filter === 'pending_tc') {
+    filtered = filtered.filter(o => o.isEntered && !o.isForwarded);
+  }
+
+  // Filter list by search query
+  if (otOfficesReportedFilterState.searchQuery) {
+    const q = otOfficesReportedFilterState.searchQuery;
+    filtered = filtered.filter(o => {
+      return (o.code && o.code.toLowerCase().includes(q)) ||
+             (o.name && o.name.toLowerCase().includes(q)) ||
+             (o.category && o.category.toLowerCase().includes(q));
+    });
+  }
+
+  otOfficesReportedFilterState.cachedList = filtered;
+
+  if (footerStats) {
+    footerStats.innerHTML = `
+      <span>Showing <strong>${filtered.length}</strong> of ${fullList.length} offices</span>
+      <span style="margin: 0 8px;">•</span>
+      <span style="color: #15803d;"><i class="fa-solid fa-circle-check"></i> <strong>${totalEntered}</strong> Entered</span>
+      <span style="margin: 0 8px;">•</span>
+      <span style="color: #b91c1c;"><i class="fa-solid fa-clock"></i> <strong>${totalNotEntered}</strong> Not Entered</span>
+      <span style="margin: 0 8px;">•</span>
+      <span style="color: #0369a1;"><i class="fa-solid fa-paper-plane"></i> <strong>${totalSentTc}</strong> Sent to TC Office</span>
+    `;
+  }
+
+  if (filtered.length === 0) {
+    container.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+        <i class="fa-solid fa-building-circle-xmark" style="font-size: 2.2rem; color: #cbd5e1; margin-bottom: 8px; display: block;"></i>
+        <div style="font-size: 0.95rem; font-weight: 700; color: #475569;">No offices match the selected filter.</div>
+      </div>
+    `;
+    return;
+  }
+
+  container.innerHTML = `
+    <table class="data-table" style="width: 100%; border-collapse: collapse; min-width: 850px;">
+      <thead>
+        <tr style="background: #0B3B24; color: white;">
+          <th style="width: 40px; text-align: center;">#</th>
+          <th style="width: 90px;">Office Code</th>
+          <th style="min-width: 180px;">Office Name</th>
+          <th style="min-width: 140px;">Category</th>
+          <th style="min-width: 130px; text-align: center;">Profiles Entered</th>
+          <th style="min-width: 140px; text-align: center;">Reporting Status</th>
+          <th style="min-width: 160px; text-align: center;">TC Forwarding Status</th>
+          <th style="min-width: 120px; text-align: center;">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        ${filtered.map((item, idx) => {
+          const statusBadge = item.isEntered
+            ? `<span class="ot-offices-status-pill ot-offices-status-entered"><i class="fa-solid fa-check"></i> Entered</span>`
+            : `<span class="ot-offices-status-pill ot-offices-status-not-entered"><i class="fa-solid fa-xmark"></i> Not Entered</span>`;
+
+          let forwardBadge = `<span style="color: #94a3b8; font-size: 0.78rem;">Not Started</span>`;
+          if (item.isEntered) {
+            forwardBadge = item.isForwarded
+              ? `<span class="ot-offices-status-pill ot-offices-forward-sent"><i class="fa-solid fa-paper-plane"></i> Sent to TC Office</span>`
+              : `<span class="ot-offices-status-pill ot-offices-forward-pending"><i class="fa-solid fa-clock"></i> Pending Send to TC</span>`;
+          }
+
+          return `
+            <tr style="${!item.isEntered ? 'background: #fffafa;' : ''}">
+              <td style="text-align: center; font-weight: 700; color: #64748b;">${idx + 1}</td>
+              <td><span class="badge badge-info" style="font-weight: 800;">${escapeHtml(item.code)}</span></td>
+              <td><strong>${escapeHtml(item.name)}</strong></td>
+              <td><small style="color: #475569; font-weight: 600;">${escapeHtml(item.category)}</small></td>
+              <td style="text-align: center;">
+                ${item.isEntered 
+                  ? `<span class="badge badge-working" style="font-size: 0.8rem; font-weight: 700;">${item.officersCount} profile(s)</span>` 
+                  : `<span style="color: #94a3b8; font-size: 0.8rem;">0 profiles</span>`}
+              </td>
+              <td style="text-align: center;">${statusBadge}</td>
+              <td style="text-align: center;">${forwardBadge}</td>
+              <td style="text-align: center;">
+                <div style="display: flex; gap: 4px; justify-content: center;">
+                  ${item.isEntered ? `
+                    <button class="btn btn-outline btn-sm" onclick="inspectOfficeFromReportedModal('${escapeHtml(item.code)}')" title="Filter Dashboard to this Office" style="padding: 3px 8px; font-size: 0.74rem;">
+                      <i class="fa-solid fa-filter"></i> View Profiles
+                    </button>
+                  ` : `
+                    <button class="btn btn-outline btn-sm" onclick="jumpToOfficeEntryFromModal('${escapeHtml(item.code)}')" title="Open Entry Form for this Office" style="padding: 3px 8px; font-size: 0.74rem; color: #047857;">
+                      <i class="fa-solid fa-pen"></i> Enter Data
+                    </button>
+                  `}
+                </div>
+              </td>
+            </tr>
+          `;
+        }).join('')}
+      </tbody>
+    </table>
+  `;
+}
+window.renderOtOfficesReportedTable = renderOtOfficesReportedTable;
+
+function inspectOfficeFromReportedModal(code) {
+  closeOtOfficesReportedModal();
+  applyDrillDown('office', code);
+}
+window.inspectOfficeFromReportedModal = inspectOfficeFromReportedModal;
+
+function jumpToOfficeEntryFromModal(code) {
+  closeOtOfficesReportedModal();
+  switchOfficerSubTab('form');
+  const sel = document.getElementById('otMainOfficeSelect');
+  if (sel) {
+    sel.value = code;
+    handleOfficeSelectChange(code);
+  }
+}
+window.jumpToOfficeEntryFromModal = jumpToOfficeEntryFromModal;
+
+function exportOtOfficesReportedExcel() {
+  const list = otOfficesReportedFilterState.cachedList || [];
+  if (list.length === 0) {
+    showToast('No office records to export', 'warning');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    exportOtOfficesReportedCSV();
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN');
+  const fileDate = now.toISOString().slice(0, 10);
+
+  const headerRows = [
+    ["MOTOR VEHICLES DEPARTMENT, KERALA"],
+    ["Officer Training & Qualification — Offices Reported (entered/Not entered) Audit Report"],
+    [`Generated On: ${dateStr}`, `Filter: ${otOfficesReportedFilterState.filter.toUpperCase()}`, `Total Offices Listed: ${list.length}`],
+    []
+  ];
+
+  const columns = ["#", "Office Code", "Office Name", "Category", "Profiles Entered", "Entry Status", "Forwarding to TC Office Status"];
+  const dataRows = list.map((o, idx) => [
+    idx + 1,
+    o.code,
+    o.name,
+    o.category,
+    o.officersCount,
+    o.isEntered ? 'Entered' : 'Not Entered',
+    o.isEntered ? (o.isForwarded ? 'Sent to TC Office' : 'Pending Send to TC Office') : 'Not Started'
+  ]);
+
+  const sheetData = [...headerRows, columns, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Offices Status");
+  XLSX.writeFile(wb, `MVD_Offices_Reported_Audit_${fileDate}.xlsx`);
+  showToast('Offices Reported Audit Excel exported successfully!', 'success');
+}
+window.exportOtOfficesReportedExcel = exportOtOfficesReportedExcel;
+
+function exportOtOfficesReportedCSV() {
+  const list = otOfficesReportedFilterState.cachedList || [];
+  if (list.length === 0) return;
+
+  const headers = ["#", "Office Code", "Office Name", "Category", "Profiles Entered", "Entry Status", "TC Forwarding Status"];
+  const rows = list.map((o, idx) => [
+    idx + 1,
+    `"${o.code}"`,
+    `"${o.name.replace(/"/g, '""')}"`,
+    `"${o.category.replace(/"/g, '""')}"`,
+    o.officersCount,
+    o.isEntered ? '"Entered"' : '"Not Entered"',
+    o.isEntered ? (o.isForwarded ? '"Sent to TC Office"' : '"Pending Send to TC Office"') : '"Not Started"'
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [
+    `"MOTOR VEHICLES DEPARTMENT, KERALA"`,
+    `"Officer Training & Qualification — Offices Reported (entered/Not entered) Audit Report"`,
+    `"Generated On: ${new Date().toLocaleString('en-IN')}"`,
+    "",
+    headers.join(','),
+    ...rows.map(r => r.join(','))
+  ].join('\n');
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `MVD_Offices_Reported_Audit_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Offices Reported Audit CSV exported', 'success');
+}
+window.exportOtOfficesReportedCSV = exportOtOfficesReportedCSV;
 
 function populateDashboardOfficeFilter() {
   const sel = document.getElementById('adminOfficerOfficeFilter');
@@ -5662,11 +6038,17 @@ function exportOfficerDashboardToExcel() {
     else offPending++;
   });
 
+  const totalOfficesCount = (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0) ? ALL_MVD_OFFICES.length : 105;
+  const enteredOfficeCodes = new Set();
+  officers.forEach(o => { if (o && o.officeCode) enteredOfficeCodes.add(getCanonicalOfficeCode(o.officeCode) || o.officeCode); });
+  const enteredCount = enteredOfficeCodes.size;
+  const notEnteredCount = Math.max(0, totalOfficesCount - enteredCount);
+
   const headerRows = [
     ["KERALAM MOTOR VEHICLES DEPARTMENT"],
     ["OFFICER TRAINING & QUALIFICATIONS — EXECUTIVE ADMIN DASHBOARD REPORT"],
     [`Generated On: ${dateStr}`, `Applied Filters: Office: ${otDashboardFilter.office} | Designation: ${otDashboardFilter.designation} | Qual: ${otDashboardFilter.qualification} | Skill: ${otDashboardFilter.skill}`],
-    [`Summary KPIs: Total Officers: ${total}`, `With Addl Qual: ${withAddl}`, `With Skills/Trainings: ${withSkills}`, `Willing to Contribute: ${willing}`, `Offices Sent to TC: ${offCompleted}`, `Offices Pending: ${offPending}`],
+    [`Summary KPIs: Total Officers: ${total}`, `With Addl Qual: ${withAddl}`, `With Skills/Trainings: ${withSkills}`, `Willing to Contribute: ${willing}`, `Offices Reported (entered/Not entered): ${enteredCount} Entered / ${notEnteredCount} Not entered (Total ${totalOfficesCount})`, `Offices sent to TC Office: ${offCompleted}`, `Offices Pending Send to TC Office: ${offPending}`],
     []
   ];
 
@@ -5779,8 +6161,14 @@ function exportOfficerDashboardToPDF() {
     else offPending++;
   });
 
+  const totalOfficesCount = (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0) ? ALL_MVD_OFFICES.length : 105;
+  const enteredOfficeCodes = new Set();
+  officers.forEach(o => { if (o && o.officeCode) enteredOfficeCodes.add(getCanonicalOfficeCode(o.officeCode) || o.officeCode); });
+  const enteredCount = enteredOfficeCodes.size;
+  const notEnteredCount = Math.max(0, totalOfficesCount - enteredCount);
+
   const kpiY = 64;
-  const kpiW = 118;
+  const kpiW = 100;
   const kpiH = 34;
 
   const kpis = [
@@ -5788,8 +6176,9 @@ function exportOfficerDashboardToPDF() {
     { label: "ADDITIONAL QUAL", val: `${withAddl} (${total > 0 ? Math.round((withAddl/total)*100) : 0}%)`, color: [239, 246, 255], stroke: [147, 197, 253], text: [30, 58, 138] },
     { label: "SKILLS & TRAININGS", val: `${withSkills} (${total > 0 ? Math.round((withSkills/total)*100) : 0}%)`, color: [250, 245, 255], stroke: [216, 180, 254], text: [88, 28, 135] },
     { label: "WILLING TO CONTRIBUTE", val: `${willing} (${total > 0 ? Math.round((willing/total)*100) : 0}%)`, color: [255, 251, 235], stroke: [253, 230, 138], text: [120, 53, 15] },
-    { label: "OFFICES SENT TO TC", val: `${offCompleted} (${knownOffices.size > 0 ? Math.round((offCompleted/knownOffices.size)*100) : 0}%)`, color: [236, 253, 245], stroke: [110, 231, 183], text: [6, 95, 70] },
-    { label: "OFFICES PENDING TC", val: `${offPending} (${knownOffices.size > 0 ? Math.round((offPending/knownOffices.size)*100) : 0}%)`, color: [255, 247, 237], stroke: [253, 186, 116], text: [154, 52, 18] }
+    { label: "OFFICES REPORTED", val: `${enteredCount} / ${notEnteredCount}`, color: [240, 253, 250], stroke: [94, 234, 212], text: [15, 118, 110] },
+    { label: "OFFICES SENT TO TC", val: `${offCompleted}`, color: [236, 253, 245], stroke: [110, 231, 183], text: [6, 95, 70] },
+    { label: "OFFICES PENDING TC", val: `${offPending}`, color: [255, 247, 237], stroke: [253, 186, 116], text: [154, 52, 18] }
   ];
 
   kpis.forEach((kpi, idx) => {

@@ -1670,20 +1670,29 @@
           <div id="adminOfficersSubView" style="display: none;">
             
             <div class="summary-report-card" style="box-shadow: 0 4px 16px rgba(0,0,0,0.06); border-radius: 12px; overflow: hidden; border: 1px solid var(--border-color);">
-              <!-- Header Bar with Integrated Export Buttons -->
-              <div class="summary-filter-bar" style="background: linear-gradient(135deg, #0B3B24 0%, #15803d 100%); color: white; padding: 18px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px;">
-                <div>
-                  <h3 style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin: 0; display: flex; align-items: center; gap: 10px;">
-                    <i class="fa-solid fa-graduation-cap" style="color: #6ee7b7;"></i>
-                    Officer Training &amp; Qualification — Executive Admin Dashboard
-                  </h3>
-                  <p style="font-size: 0.82rem; color: #d1fae5; margin: 4px 0 0 0;">
-                    Centralized executive analytics, qualification distributions, specialized skills capacity, and office-wise profile submission tracking.
-                  </p>
+              <!-- Executive Header Bar with Branding & Action Controls -->
+              <div class="summary-filter-bar" style="background: linear-gradient(135deg, #0B3B24 0%, #047857 50%, #064e3b 100%); color: white; padding: 20px 24px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 14px; border-bottom: 2px solid #062C1A;">
+                <div style="display: flex; align-items: center; gap: 14px;">
+                  <div style="width: 46px; height: 46px; border-radius: 10px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 1.35rem; color: #6ee7b7; border: 1px solid rgba(255,255,255,0.25);">
+                    <i class="fa-solid fa-graduation-cap"></i>
+                  </div>
+                  <div>
+                    <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
+                      <h3 style="font-size: 1.25rem; font-weight: 800; color: #ffffff; margin: 0; letter-spacing: -0.2px;">
+                        Officer Training &amp; Qualification — Executive Admin Dashboard
+                      </h3>
+                      <span class="badge" style="background: rgba(16, 185, 129, 0.25); color: #a7f3d0; border: 1px solid rgba(16, 185, 129, 0.5); font-size: 0.72rem; font-weight: 700; padding: 3px 8px;">
+                        <i class="fa-solid fa-bolt"></i> Realtime Synced
+                      </span>
+                    </div>
+                    <p style="font-size: 0.82rem; color: #d1fae5; margin: 4px 0 0 0;">
+                      Centralized executive analytics, qualification stream distributions, specialized skills capacity, and office submission tracking across 105 MVD offices.
+                    </p>
+                  </div>
                 </div>
 
-                <div style="display: flex; align-items: center; gap: 10px; flex-wrap: wrap;">
-                  <button class="btn btn-sm" id="btnAdminRevertForwardModal" onclick="openAdminRevertForwardingModal()" style="background: rgba(239, 68, 68, 0.9); color: white; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 7px 14px; border-radius: 6px; cursor: pointer;" title="Revert an Office's Forwarding Status (Undo Send to TC)">
+                <div style="display: flex; align-items: center; gap: 8px; flex-wrap: wrap;">
+                  <button class="btn btn-sm" id="btnAdminRevertForwardModal" onclick="openAdminRevertForwardingModal()" style="background: #ef4444; color: white; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 7px 14px; border-radius: 6px; cursor: pointer;" title="Revert an Office's Forwarding Status (Undo Send to TC)">
                     <i class="fa-solid fa-rotate-left"></i> Revert Office Status
                   </button>
                   <button class="btn btn-sm" onclick="exportOfficerDashboardToExcel()" style="background: #16a34a; color: white; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px; box-shadow: 0 2px 6px rgba(0,0,0,0.2); padding: 7px 14px; border-radius: 6px; cursor: pointer;">
@@ -1701,8 +1710,8 @@
                 </div>
               </div>
 
-              <!-- Top-Level Summary Cards: 6 Prominent KPIs -->
-              <div class="dashboard-grid-4" style="padding: 16px 20px; margin: 0; background: #ffffff; border-bottom: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 14px;">
+              <!-- Top-Level Summary Cards: 7 Prominent Executive KPIs -->
+              <div class="dashboard-grid-4" style="padding: 16px 20px; margin: 0; background: #ffffff; border-bottom: 1px solid var(--border-color); display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px;">
                 <!-- Card 1: Total Officers Entered -->
                 <div class="ot-kpi-card" id="kpiCardTotalOfficers" onclick="applyQuickKpiFilter('all')" style="cursor: pointer; background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #86efac; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to view all registered officers">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
@@ -1759,13 +1768,27 @@
                   </div>
                 </div>
 
-                <!-- Card 5: Offices Completed "Send to TC" Action -->
-                <div class="ot-kpi-card" id="kpiCardOfficesCompleted" onclick="applyQuickKpiFilter('offices_completed')" style="cursor: pointer; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 1px solid #6ee7b7; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to filter officers from offices that have completed 'Send to Transport Commissionerate'">
+                <!-- Card 5: Offices Reported (entered/Not entered) [NEW TITLE CARD] -->
+                <div class="ot-kpi-card" id="kpiCardOfficesReported" onclick="openOtOfficesReportedDrillDown()" style="cursor: pointer; background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%); border: 1px solid #5eead4; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to view full breakdown of Offices Reported vs Not Entered across all 105 MVD Offices">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div>
-                      <div style="font-size: 0.72rem; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">OFFICES COMPLETED</div>
+                      <div style="font-size: 0.72rem; font-weight: 800; color: #0f766e; text-transform: uppercase; letter-spacing: 0.5px;">Offices Reported (entered/Not entered)</div>
+                      <div id="kpiOtOfficesReportedSummary" style="font-size: 1.65rem; font-weight: 800; color: #115e59; margin-top: 4px; line-height: 1;">0 / 105</div>
+                      <div id="kpiOtOfficesReportedSub" style="font-size: 0.74rem; color: #0d9488; margin-top: 6px; font-weight: 600;">0 Entered • 105 Not entered</div>
+                    </div>
+                    <div style="background: #99f6e4; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #0f766e; font-size: 1.15rem;">
+                      <i class="fa-solid fa-building-circle-check"></i>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Card 6: Offices sent to TC Office [RENAMED from Offices Completed] -->
+                <div class="ot-kpi-card" id="kpiCardOfficesCompleted" onclick="applyQuickKpiFilter('offices_completed')" style="cursor: pointer; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%); border: 1px solid #6ee7b7; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to filter officers from offices sent to TC Office">
+                  <div style="display: flex; justify-content: space-between; align-items: flex-start;">
+                    <div>
+                      <div style="font-size: 0.72rem; font-weight: 800; color: #065f46; text-transform: uppercase; letter-spacing: 0.5px;">Offices sent to TC Office</div>
                       <div id="kpiOtOfficesCompleted" style="font-size: 1.85rem; font-weight: 800; color: #064e3b; margin-top: 4px; line-height: 1;">0</div>
-                      <div id="kpiOtOfficesCompletedSub" style="font-size: 0.74rem; color: #059669; margin-top: 6px; font-weight: 600;">Sent to Commissionerate</div>
+                      <div id="kpiOtOfficesCompletedSub" style="font-size: 0.74rem; color: #059669; margin-top: 6px; font-weight: 600;">0 office(s) sent</div>
                     </div>
                     <div style="background: #a7f3d0; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #065f46; font-size: 1.15rem;">
                       <i class="fa-solid fa-paper-plane"></i>
@@ -1773,13 +1796,13 @@
                   </div>
                 </div>
 
-                <!-- Card 6: Offices Pending "Send to TC" Action -->
-                <div class="ot-kpi-card" id="kpiCardOfficesPending" onclick="applyQuickKpiFilter('offices_pending')" style="cursor: pointer; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border: 1px solid #fdba74; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to filter officers from offices pending 'Send to Transport Commissionerate'">
+                <!-- Card 7: Offices Pending Send to TC Office [RENAMED from Offices Pending] -->
+                <div class="ot-kpi-card" id="kpiCardOfficesPending" onclick="applyQuickKpiFilter('offices_pending')" style="cursor: pointer; background: linear-gradient(135deg, #fff7ed 0%, #ffedd5 100%); border: 1px solid #fdba74; border-radius: 10px; padding: 14px 16px; transition: transform 0.15s, box-shadow 0.15s;" title="Click to filter officers from offices pending send to TC Office">
                   <div style="display: flex; justify-content: space-between; align-items: flex-start;">
                     <div>
-                      <div style="font-size: 0.72rem; font-weight: 800; color: #9a3412; text-transform: uppercase; letter-spacing: 0.5px;">OFFICES PENDING</div>
+                      <div style="font-size: 0.72rem; font-weight: 800; color: #9a3412; text-transform: uppercase; letter-spacing: 0.5px;">Offices Pending Send to TC Office</div>
                       <div id="kpiOtOfficesPending" style="font-size: 1.85rem; font-weight: 800; color: #7c2d12; margin-top: 4px; line-height: 1;">0</div>
-                      <div id="kpiOtOfficesPendingSub" style="font-size: 0.74rem; color: #ea580c; margin-top: 6px; font-weight: 600;">Pending "Send to TC" action</div>
+                      <div id="kpiOtOfficesPendingSub" style="font-size: 0.74rem; color: #ea580c; margin-top: 6px; font-weight: 600;">0 office(s) pending send</div>
                     </div>
                     <div style="background: #fed7aa; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; color: #9a3412; font-size: 1.15rem;">
                       <i class="fa-solid fa-clock-rotate-left"></i>
@@ -2247,7 +2270,7 @@
                   <button class="btn btn-outline btn-sm" onclick="exportDataToCSV()">
                     <i class="fa-solid fa-file-excel"></i> Export CSV
                   </button>
-                  <button class="btn btn-secondary btn-sm" onclick="window.print()">
+                  <button class="btn btn-secondary btn-sm" onclick="printQuickTable()">
                     <i class="fa-solid fa-print"></i> Print Quick Table
                   </button>
                 </div>
@@ -2257,6 +2280,16 @@
                 <div class="search-box">
                   <i class="fa-solid fa-magnifying-glass"></i>
                   <input type="text" id="adminSearchInput" class="form-control" placeholder="Filter by office, code, district..." onkeyup="filterAdminTable()">
+                </div>
+              </div>
+
+              <!-- IT Master Inventory Official Print Header -->
+              <div id="itMasterPrintHeader" class="it-print-header" style="display: none;">
+                <div style="text-align: center; border-bottom: 3px solid #0B3B24; padding-bottom: 12px; margin-bottom: 16px;">
+                  <h2 style="font-size: 1.25rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">MOTOR VEHICLES DEPARTMENT • GOVERNMENT OF KERALAM</h2>
+                  <h3 style="font-size: 1.05rem; color: #047857; margin: 4px 0 0 0; font-weight: 700;">Comprehensive Statewide IT &amp; Power Audit Report</h3>
+                  <h4 style="font-size: 0.9rem; color: #0B3B24; margin: 4px 0 0 0; font-weight: 700;">IT &amp; POWER INFRASTRUCTURE INVENTORY MASTER TABLE</h4>
+                  <div style="font-size: 0.78rem; color: #475569; margin-top: 4px;">Comprehensive Statewide Office Equipment, Network, Power &amp; Lifecycle Records</div>
                 </div>
               </div>
 
@@ -2467,6 +2500,16 @@
               <!-- Summary Quick Statistics Pill Strip -->
               <div id="summaryQuickStatsStrip" style="padding: 10px 20px; background: #f1f5f9; border-bottom: 1px solid var(--border-color); display: flex; gap: 16px; flex-wrap: wrap; font-size: 0.82rem; color: #334155;"></div>
 
+              <!-- IT Summary Official Print Header -->
+              <div id="itSummaryPrintHeader" class="it-print-header" style="display: none;">
+                <div style="text-align: center; border-bottom: 3px solid #0B3B24; padding-bottom: 12px; margin-bottom: 16px;">
+                  <h2 style="font-size: 1.25rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">MOTOR VEHICLES DEPARTMENT, KERALA</h2>
+                  <h3 style="font-size: 1.05rem; color: #047857; margin: 4px 0 0 0; font-weight: 700;">IT INFRASTRUCTURE INVENTORY</h3>
+                  <h4 style="font-size: 0.95rem; color: #0B3B24; margin: 4px 0 0 0; font-weight: 700;">STATEWIDE SUMMARY REPORT</h4>
+                  <div style="font-size: 0.8rem; color: #475569; margin-top: 4px;">District-Wise &amp; Office-Wise IT Infrastructure, Lifecycle &amp; Power Summary</div>
+                </div>
+              </div>
+
               <!-- Summary Report Table -->
               <div class="summary-table-wrapper">
                 <table class="summary-report-table" id="adminSummaryReportTable">
@@ -2568,19 +2611,57 @@
     </div>
   </div>
 
-  <!-- Office Details Modal View -->
+  <!-- Office Details Modal View (Expanded Statewide IT Inventory Drill-Down) -->
   <div id="officeDetailModal" class="modal-overlay" style="display: none;">
-    <div class="modal-card" style="max-width: 680px;">
-      <div class="modal-header">
-        <h3 id="modalOfficeTitle"><i class="fa-solid fa-building-circle-check"></i> Office Detail Summary</h3>
-        <button class="btn btn-outline btn-sm" onclick="closeOfficeDetailModal()"><i class="fa-solid fa-xmark"></i></button>
+    <div class="modal-card printable-report-card" style="max-width: 1280px; width: 96%; max-height: 92vh; display: flex; flex-direction: column;">
+      <div class="modal-header print-hide" style="background: linear-gradient(135deg, #0B3B24 0%, #062C1A 100%); color: white; margin: -24px -24px 16px -24px; padding: 18px 24px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 40px; height: 40px; border-radius: 8px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 1.2rem; color: #a7f3d0;">
+            <i class="fa-solid fa-layer-group"></i>
+          </div>
+          <div>
+            <h3 id="modalOfficeTitle" style="font-size: 1.15rem; color: #ffffff; margin: 0; font-weight: 800;">
+              <i class="fa-solid fa-list-check"></i> Statewide IT Infrastructure Drill-Down
+            </h3>
+            <div id="modalOfficeSubtitle" style="font-size: 0.78rem; color: #a7f3d0; margin-top: 2px;">
+              Comprehensive office-by-office breakdown across hardware systems, network infrastructure, lifecycle age, and power provisioning.
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="btn btn-sm" onclick="exportDrillDownToExcel()" style="background: #16a34a; color: white; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; cursor: pointer;">
+            <i class="fa-solid fa-file-excel"></i> Export Excel
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="closeOfficeDetailModal()" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-xmark"></i></button>
+        </div>
       </div>
-      <div id="modalOfficeBody" style="max-height: 70vh; overflow-y: auto; font-size: 0.9rem;"></div>
-      <div style="margin-top: 20px; display: flex; justify-content: space-between; align-items: center;">
-        <button class="btn btn-outline btn-sm" onclick="exportDrillDownToCSV()">
-          <i class="fa-solid fa-file-excel"></i> Download CSV
-        </button>
-        <button class="btn btn-secondary" onclick="closeOfficeDetailModal()">Close Window</button>
+
+      <!-- Interactive Toolbar inside Modal: Search + Category Filters -->
+      <div class="print-hide" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <div style="flex: 1; min-width: 240px; position: relative;">
+          <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.85rem;"></i>
+          <input type="text" id="itDrillDownSearchInput" class="form-control" placeholder="Search office name, provider, speed, officer..." oninput="handleItDrillDownSearch(this.value)" style="padding-left: 32px; font-size: 0.85rem; height: 34px;">
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;">
+          <button class="it-pill-toggle active" data-view="all" onclick="switchItDrillDownView('all')">All Columns</button>
+          <button class="it-pill-toggle" data-view="systems" onclick="switchItDrillDownView('systems')">Systems &amp; Hardware</button>
+          <button class="it-pill-toggle" data-view="age" onclick="switchItDrillDownView('age')">Age Profile</button>
+          <button class="it-pill-toggle" data-view="network" onclick="switchItDrillDownView('network')">Network &amp; Switches</button>
+          <button class="it-pill-toggle" data-view="power" onclick="switchItDrillDownView('power')">Power &amp; UPS</button>
+          <button class="it-pill-toggle" data-view="officers" onclick="switchItDrillDownView('officers')">Reporting Officers</button>
+        </div>
+      </div>
+
+      <div id="modalOfficeBody" style="flex: 1; overflow-y: auto; overflow-x: auto; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px;"></div>
+      
+      <div class="print-hide" style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+        <div id="modalOfficeFooterStats" style="font-size: 0.82rem; color: #475569; font-weight: 600;"></div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-outline btn-sm" onclick="exportDrillDownToCSV()">
+            <i class="fa-solid fa-file-csv"></i> Download CSV
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="closeOfficeDetailModal()">Close Window</button>
+        </div>
       </div>
     </div>
   </div>
@@ -2663,6 +2744,64 @@
             <i class="fa-solid fa-download"></i> Download Report
           </button>
           <button class="btn btn-secondary btn-sm" onclick="closeOfficerReportModal()">Close Window</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- OFFICER TRAINING: OFFICES REPORTED (ENTERED / NOT ENTERED) DRILL-DOWN MODAL -->
+  <div id="otOfficesReportedModal" class="modal-overlay" style="display: none;">
+    <div class="modal-card printable-report-card" style="max-width: 1100px; width: 96%; max-height: 92vh; display: flex; flex-direction: column;">
+      <div class="modal-header print-hide" style="background: linear-gradient(135deg, #0B3B24 0%, #064e3b 100%); color: white; margin: -24px -24px 16px -24px; padding: 18px 24px; border-radius: var(--radius-lg) var(--radius-lg) 0 0; display: flex; justify-content: space-between; align-items: center;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <div style="width: 42px; height: 42px; border-radius: 8px; background: rgba(255,255,255,0.15); display: flex; align-items: center; justify-content: center; font-size: 1.25rem; color: #6ee7b7; border: 1px solid rgba(255,255,255,0.25);">
+            <i class="fa-solid fa-building-circle-check"></i>
+          </div>
+          <div>
+            <h3 style="font-size: 1.2rem; margin: 0; color: #ffffff; font-weight: 800;">
+              Offices Reported (entered / Not entered) — Statewide Audit
+            </h3>
+            <div id="otOfficesReportedModalSub" style="font-size: 0.8rem; color: #a7f3d0; margin-top: 2px;">
+              Tracking profile submissions across all 105 Motor Vehicles Department offices in Kerala.
+            </div>
+          </div>
+        </div>
+        <div style="display: flex; align-items: center; gap: 10px;">
+          <button class="btn btn-sm" onclick="exportOtOfficesReportedExcel()" style="background: #16a34a; color: white; font-weight: 700; border: none; display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 6px; cursor: pointer;">
+            <i class="fa-solid fa-file-excel"></i> Export Excel
+          </button>
+          <button class="btn btn-outline btn-sm" onclick="closeOtOfficesReportedModal()" style="color: white; border-color: rgba(255,255,255,0.4);"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+      </div>
+
+      <!-- Quick Filter Bar -->
+      <div class="print-hide" style="display: flex; justify-content: space-between; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 12px; background: #f8fafc; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--border-color);">
+        <div style="flex: 1; min-width: 240px; position: relative;">
+          <i class="fa-solid fa-magnifying-glass" style="position: absolute; left: 10px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 0.85rem;"></i>
+          <input type="text" id="otOfficesReportedSearchInput" class="form-control" placeholder="Search office code, name, category..." oninput="handleOtOfficesReportedSearch(this.value)" style="padding-left: 32px; font-size: 0.85rem; height: 34px;">
+        </div>
+        <div style="display: flex; gap: 6px; flex-wrap: wrap;" id="otOfficesReportedFilterPills">
+          <button class="it-pill-toggle active" data-filter="all" onclick="filterOtOfficesReported('all')">All Offices (105)</button>
+          <button class="it-pill-toggle" data-filter="entered" onclick="filterOtOfficesReported('entered')">Entered (<span id="pillCountEntered">0</span>)</button>
+          <button class="it-pill-toggle" data-filter="not_entered" onclick="filterOtOfficesReported('not_entered')">Not Entered (<span id="pillCountNotEntered">0</span>)</button>
+          <button class="it-pill-toggle" data-filter="sent_tc" onclick="filterOtOfficesReported('sent_tc')">Sent to TC (<span id="pillCountSentTc">0</span>)</button>
+          <button class="it-pill-toggle" data-filter="pending_tc" onclick="filterOtOfficesReported('pending_tc')">Pending Send (<span id="pillCountPendingTc">0</span>)</button>
+        </div>
+      </div>
+
+      <!-- Table Container -->
+      <div id="otOfficesReportedModalBody" style="flex: 1; overflow-y: auto; overflow-x: auto; font-size: 0.85rem; border: 1px solid var(--border-color); border-radius: 8px;">
+        <!-- Dynamic Offices Table -->
+      </div>
+
+      <!-- Footer Bar -->
+      <div class="print-hide" style="margin-top: 14px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px; padding-top: 10px; border-top: 1px solid var(--border-color);">
+        <div id="otOfficesReportedModalFooterStats" style="font-size: 0.82rem; color: #475569; font-weight: 600;"></div>
+        <div style="display: flex; gap: 10px;">
+          <button class="btn btn-outline btn-sm" onclick="exportOtOfficesReportedCSV()">
+            <i class="fa-solid fa-file-csv"></i> Download CSV
+          </button>
+          <button class="btn btn-secondary btn-sm" onclick="closeOtOfficesReportedModal()">Close Window</button>
         </div>
       </div>
     </div>

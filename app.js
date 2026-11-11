@@ -770,8 +770,13 @@ function subscribeToRealtimeITEquipment() {
         localStorage.setItem('mvd_it_inventory_store', JSON.stringify(inventoryStore));
         renderPublicDataTable();
         renderAdminDataTable();
+        if (typeof renderAdminSummaryReport === 'function') renderAdminSummaryReport();
         if (typeof renderAdminDashboard === 'function' && activeSession === 'admin') {
           renderAdminDashboard();
+        }
+        const drillModal = document.getElementById('officeDetailModal');
+        if (drillModal && drillModal.style.display !== 'none' && typeof renderItDrillDownContent === 'function') {
+          renderItDrillDownContent();
         }
       }
     ).subscribe((status) => {
@@ -2741,42 +2746,514 @@ function renderAdminDashboard() {
   }
 }
 
+let itDrillDownState = {
+  type: 'all',
+  view: 'all',
+  searchQuery: '',
+  cachedList: []
+};
+
 function drillDownDashboard(type) {
-  // Generic drill down handler
   const modal = document.getElementById('officeDetailModal');
   const title = document.getElementById('modalOfficeTitle');
+  const subtitle = document.getElementById('modalOfficeSubtitle');
   const body = document.getElementById('modalOfficeBody');
 
   if (!modal || !title || !body) return;
 
-  const entries = Object.values(inventoryStore);
-  title.innerHTML = `<i class="fa-solid fa-list-check"></i> ${type.toUpperCase()} Breakdown`;
+  itDrillDownState.type = type || 'all';
+  itDrillDownState.view = 'all';
+  itDrillDownState.searchQuery = '';
 
-  body.innerHTML = `
-    <table class="data-table">
-      <thead><tr><th>Office Name</th><th>Monitors</th><th>CPUs</th><th>Laptops</th></tr></thead>
-      <tbody>
-        ${entries.map(e => `
-          <tr>
-            <td><strong>${escapeHtml(e.officeName)}</strong></td>
-            <td>${e.monitorsWorking} W / ${e.monitorsNotWorking} NW</td>
-            <td>${e.cpuWorking} W / ${e.cpuNotWorking} NW</td>
-            <td>${e.laptopsWorking} W / ${e.laptopsNotWorking} NW</td>
-          </tr>
-        `).join('')}
-      </tbody>
-    </table>
+  const searchInput = document.getElementById('itDrillDownSearchInput');
+  if (searchInput) searchInput.value = '';
+
+  document.querySelectorAll('#officeDetailModal .it-pill-toggle').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-view') === 'all');
+  });
+
+  const reportedEntries = Object.values(inventoryStore);
+  let titleText = 'Statewide IT Infrastructure Drill-Down';
+  let subText = 'Detailed office-wise records across all hardware systems, network connectivity, lifecycle age, and power provisioning.';
+
+  if (type === 'offices') {
+    titleText = 'Offices Reported vs Pending Status Drill-Down';
+    subText = `${reportedEntries.length} of ${typeof MVD_OFFICES !== 'undefined' ? MVD_OFFICES.length : 105} offices have submitted equipment inventory data.`;
+  } else if (type === 'systems') {
+    titleText = 'IT Systems & Workstations Distribution Drill-Down';
+    subText = 'Workstation hardware deployment across reported offices in Kerala MVD.';
+  } else if (type === 'defective') {
+    titleText = 'Defective & Non-Working Hardware Drill-Down';
+    subText = 'Offices with non-working monitors, CPUs, laptops, AIOs, UPS units, or systems >8 years old.';
+  } else if (type === 'network') {
+    titleText = 'KSWAN & KFONE Network Connectivity Drill-Down';
+    subText = 'Bandwidth speed, ISP provider, and high-speed government network distribution.';
+  } else if (type === 'switches') {
+    titleText = 'Network Switches Availability Drill-Down';
+    subText = 'LAN switches installed across reported offices.';
+  } else if (type === 'servers') {
+    titleText = 'Servers & Database Infrastructure Drill-Down';
+    subText = 'Server hardware installed in offices across Kerala.';
+  } else if (type === 'ups' || type === 'power') {
+    titleText = 'Power & UPS Infrastructure Drill-Down';
+    subText = 'UPS health, battery backup capacity, and provisioning status.';
+  } else if (type === 'service_reports') {
+    titleText = 'TCO Service Reports Dispatch Drill-Down';
+    subText = 'Service report submission tracking to Transport Commissionerate.';
+  } else if (type === 'age') {
+    titleText = 'Hardware Lifecycle & Age Profile Drill-Down';
+    subText = 'Systems categorized by age: <3 years, 3-5 years, 5-8 years, and obsolete >8 years.';
+  }
+
+  title.innerHTML = `<i class="fa-solid fa-list-check"></i> ${titleText}`;
+  if (subtitle) subtitle.textContent = subText;
+
+  renderItDrillDownContent();
+  modal.style.display = 'flex';
+}
+
+function handleItDrillDownSearch(val) {
+  itDrillDownState.searchQuery = (val || '').toLowerCase().trim();
+  renderItDrillDownContent();
+}
+
+function switchItDrillDownView(view) {
+  itDrillDownState.view = view || 'all';
+  document.querySelectorAll('#officeDetailModal .it-pill-toggle').forEach(btn => {
+    btn.classList.toggle('active', btn.getAttribute('data-view') === itDrillDownState.view);
+  });
+  renderItDrillDownContent();
+}
+
+function renderItDrillDownContent() {
+  const body = document.getElementById('modalOfficeBody');
+  const footerStats = document.getElementById('modalOfficeFooterStats');
+  if (!body) return;
+
+  const reportedEntries = Object.values(inventoryStore);
+  let list = [];
+
+  if (itDrillDownState.type === 'offices' && typeof MVD_OFFICES !== 'undefined') {
+    list = MVD_OFFICES.map(offName => {
+      const rec = inventoryStore[offName];
+      if (rec) {
+        return { ...rec, isReported: true };
+      }
+      return {
+        officeName: offName,
+        isReported: false,
+        availableNetwork: 'Pending',
+        networkSpeed: '-',
+        switchesAvailable: 'Pending',
+        serversAvailable: 'Pending',
+        operatingSystem: 'Pending',
+        monitorsWorking: 0,
+        monitorsNotWorking: 0,
+        cpuWorking: 0,
+        cpuNotWorking: 0,
+        laptopsWorking: 0,
+        laptopsNotWorking: 0,
+        aioWorking: 0,
+        aioNotWorking: 0,
+        upsWorking: 0,
+        upsNotWorking: 0,
+        ageUnder3: 0,
+        age3To5: 0,
+        age5To8: 0,
+        ageAbove8: 0,
+        batteriesInUse: 0,
+        minBatteriesRequired: 0,
+        lastUpdated: 'Not Submitted'
+      };
+    });
+  } else {
+    list = reportedEntries.map(e => ({ ...e, isReported: true }));
+  }
+
+  // Sort based on type
+  if (itDrillDownState.type === 'defective') {
+    list.sort((a, b) => {
+      const defA = (a.monitorsNotWorking || 0) + (a.cpuNotWorking || 0) + (a.laptopsNotWorking || 0) + (a.aioNotWorking || 0) + (a.upsNotWorking || 0);
+      const defB = (b.monitorsNotWorking || 0) + (b.cpuNotWorking || 0) + (b.laptopsNotWorking || 0) + (b.aioNotWorking || 0) + (b.upsNotWorking || 0);
+      return defB - defA;
+    });
+  } else if (itDrillDownState.type === 'age') {
+    list.sort((a, b) => (b.ageAbove8 || 0) - (a.ageAbove8 || 0));
+  } else if (itDrillDownState.type === 'systems') {
+    list.sort((a, b) => {
+      const sysA = (a.monitorsWorking || 0) + (a.cpuWorking || 0) + (a.laptopsWorking || 0) + (a.aioWorking || 0);
+      const sysB = (b.monitorsWorking || 0) + (b.cpuWorking || 0) + (b.laptopsWorking || 0) + (b.aioWorking || 0);
+      return sysB - sysA;
+    });
+  }
+
+  // Filter query
+  if (itDrillDownState.searchQuery) {
+    const q = itDrillDownState.searchQuery;
+    list = list.filter(e => {
+      return (e.officeName && e.officeName.toLowerCase().includes(q)) ||
+             (e.availableNetwork && e.availableNetwork.toLowerCase().includes(q)) ||
+             (e.operatingSystem && e.operatingSystem.toLowerCase().includes(q)) ||
+             (e.entryOfficerName && e.entryOfficerName.toLowerCase().includes(q)) ||
+             (e.createdOfficerName && e.createdOfficerName.toLowerCase().includes(q)) ||
+             (e.remarks && e.remarks.toLowerCase().includes(q));
+    });
+  }
+
+  itDrillDownState.cachedList = list;
+
+  if (list.length === 0) {
+    body.innerHTML = `
+      <div style="text-align: center; padding: 40px 20px; color: var(--text-muted);">
+        <i class="fa-solid fa-folder-open" style="font-size: 2.2rem; color: #cbd5e1; margin-bottom: 10px; display: block;"></i>
+        <div style="font-size: 1rem; font-weight: 700; color: #475569;">No offices match your search or filter criteria.</div>
+        <small style="color: #94a3b8;">Try clearing the search query.</small>
+      </div>
+    `;
+    if (footerStats) footerStats.textContent = 'Showing 0 records';
+    return;
+  }
+
+  const view = itDrillDownState.view;
+  const isTypeDefective = itDrillDownState.type === 'defective';
+  const isTypeNetwork = itDrillDownState.type === 'network' || itDrillDownState.type === 'switches' || itDrillDownState.type === 'servers';
+  const isTypePower = itDrillDownState.type === 'ups' || itDrillDownState.type === 'power' || itDrillDownState.type === 'service_reports';
+  const isTypeAge = itDrillDownState.type === 'age';
+
+  let totalWorkingWorkstations = 0;
+  let totalDefectiveUnits = 0;
+  let totalAbove8Count = 0;
+
+  list.forEach(e => {
+    totalWorkingWorkstations += (e.monitorsWorking || 0) + (e.cpuWorking || 0) + (e.laptopsWorking || 0) + (e.aioWorking || 0);
+    totalDefectiveUnits += (e.monitorsNotWorking || 0) + (e.cpuNotWorking || 0) + (e.laptopsNotWorking || 0) + (e.aioNotWorking || 0) + (e.upsNotWorking || 0);
+    totalAbove8Count += (e.ageAbove8 || 0);
+  });
+
+  if (footerStats) {
+    footerStats.innerHTML = `
+      <span>Showing <strong>${list.length}</strong> office records</span>
+      <span style="margin: 0 8px;">•</span>
+      <span style="color: #166534;"><i class="fa-solid fa-circle-check"></i> <strong>${totalWorkingWorkstations}</strong> Working Systems</span>
+      <span style="margin: 0 8px;">•</span>
+      <span style="color: #991b1b;"><i class="fa-solid fa-triangle-exclamation"></i> <strong>${totalDefectiveUnits}</strong> Defective Units</span>
+      <span style="margin: 0 8px;">•</span>
+      <span style="color: #b45309;"><i class="fa-solid fa-clock-rotate-left"></i> <strong>${totalAbove8Count}</strong> Systems &gt;8 Yrs</span>
+    `;
+  }
+
+  let tableHtml = `
+    <table class="data-table it-drilldown-table" style="width: 100%; border-collapse: collapse; min-width: 1100px;">
+      <thead>
+        <tr>
+          <th style="width: 40px; text-align: center;">#</th>
+          <th style="min-width: 170px;">Office Name & Code</th>
   `;
 
-  modal.style.display = 'flex';
+  if (view === 'all' || view === 'systems') {
+    tableHtml += `
+          <th style="min-width: 110px; text-align: center;">Monitors (W/NW)</th>
+          <th style="min-width: 100px; text-align: center;">CPUs (W/NW)</th>
+          <th style="min-width: 110px; text-align: center;">Laptops (W/NW)</th>
+          <th style="min-width: 90px; text-align: center;">AIO (W/NW)</th>
+          <th style="min-width: 95px; text-align: center;">Total Systems</th>
+    `;
+  }
+
+  if (view === 'all' || view === 'age') {
+    tableHtml += `
+          <th style="min-width: 75px; text-align: center;">&lt;3 Yrs</th>
+          <th style="min-width: 75px; text-align: center;">3-5 Yrs</th>
+          <th style="min-width: 75px; text-align: center;">5-8 Yrs</th>
+          <th style="min-width: 80px; text-align: center;">&gt;8 Yrs</th>
+    `;
+  }
+
+  if (view === 'all' || view === 'network') {
+    tableHtml += `
+          <th style="min-width: 130px;">Network & Speed</th>
+          <th style="min-width: 120px;">Switches</th>
+          <th style="min-width: 110px;">Servers</th>
+          <th style="min-width: 110px;">Operating System</th>
+    `;
+  }
+
+  if (view === 'all' || view === 'power') {
+    tableHtml += `
+          <th style="min-width: 120px; text-align: center;">UPS Health</th>
+          <th style="min-width: 110px; text-align: center;">Capacity</th>
+          <th style="min-width: 120px; text-align: center;">Batteries (In-Use / Req)</th>
+          <th style="min-width: 120px;">TCO Service Report</th>
+    `;
+  }
+
+  if (view === 'all' || view === 'officers') {
+    tableHtml += `
+          <th style="min-width: 140px;">Reporting Officer</th>
+          <th style="min-width: 110px;">Contact / Mobile</th>
+          <th style="min-width: 130px;">Last Updated</th>
+    `;
+  }
+
+  tableHtml += `
+          <th style="min-width: 70px; text-align: center;">Status</th>
+        </tr>
+      </thead>
+      <tbody>
+  `;
+
+  list.forEach((rec, idx) => {
+    const isReported = rec.isReported !== false;
+    const totalWorking = (rec.monitorsWorking || 0) + (rec.cpuWorking || 0) + (rec.laptopsWorking || 0) + (rec.aioWorking || 0);
+    const totalNW = (rec.monitorsNotWorking || 0) + (rec.cpuNotWorking || 0) + (rec.laptopsNotWorking || 0) + (rec.aioNotWorking || 0);
+    const hasDefects = totalNW > 0 || (rec.upsNotWorking || 0) > 0 || (rec.ageAbove8 || 0) > 0;
+
+    let rowBg = '';
+    if (isTypeDefective && hasDefects) rowBg = 'background: #fff1f2;';
+    else if (!isReported) rowBg = 'background: #f8fafc; color: #94a3b8;';
+
+    tableHtml += `<tr style="${rowBg}">`;
+    tableHtml += `<td style="text-align: center; font-weight: 700; color: #64748b;">${idx + 1}</td>`;
+    tableHtml += `<td><strong>${escapeHtml(rec.officeName)}</strong></td>`;
+
+    if (view === 'all' || view === 'systems') {
+      tableHtml += `
+        <td style="text-align: center;">
+          <span class="it-drilldown-badge-w">${rec.monitorsWorking ?? 0}</span> / 
+          <span class="${rec.monitorsNotWorking > 0 ? 'it-drilldown-badge-nw' : ''}">${rec.monitorsNotWorking ?? 0}</span>
+        </td>
+        <td style="text-align: center;">
+          <span class="it-drilldown-badge-w">${rec.cpuWorking ?? 0}</span> / 
+          <span class="${rec.cpuNotWorking > 0 ? 'it-drilldown-badge-nw' : ''}">${rec.cpuNotWorking ?? 0}</span>
+        </td>
+        <td style="text-align: center;">
+          <span class="it-drilldown-badge-w">${rec.laptopsWorking ?? 0}</span> / 
+          <span class="${rec.laptopsNotWorking > 0 ? 'it-drilldown-badge-nw' : ''}">${rec.laptopsNotWorking ?? 0}</span>
+        </td>
+        <td style="text-align: center;">
+          <span class="it-drilldown-badge-w">${rec.aioWorking ?? 0}</span> / 
+          <span class="${rec.aioNotWorking > 0 ? 'it-drilldown-badge-nw' : ''}">${rec.aioNotWorking ?? 0}</span>
+        </td>
+        <td style="text-align: center;">
+          <strong>${totalWorking}</strong> <small style="color: #64748b;">(${totalWorking + totalNW})</small>
+        </td>
+      `;
+    }
+
+    if (view === 'all' || view === 'age') {
+      tableHtml += `
+        <td style="text-align: center;"><span class="badge-pill-age-safe">${rec.ageUnder3 ?? 0}</span></td>
+        <td style="text-align: center;"><span class="badge-pill-age-safe">${rec.age3To5 ?? 0}</span></td>
+        <td style="text-align: center;"><span class="badge-pill-age-safe">${rec.age5To8 ?? 0}</span></td>
+        <td style="text-align: center;"><span class="${(rec.ageAbove8 || 0) > 0 ? 'badge-pill-age-alert' : 'badge-pill-age-safe'}">${rec.ageAbove8 ?? 0}</span></td>
+      `;
+    }
+
+    if (view === 'all' || view === 'network') {
+      const netClass = (rec.availableNetwork === 'KSWAN' || rec.availableNetwork === 'KFONE') ? 'badge-working' : 'badge-info';
+      tableHtml += `
+        <td>
+          <span class="badge ${netClass}" style="font-size: 0.74rem;">${escapeHtml(rec.availableNetwork || 'N/A')}</span>
+          ${rec.networkSpeed ? `<br><small style="color: #475569; font-weight: 600;">${escapeHtml(rec.networkSpeed)}</small>` : ''}
+        </td>
+        <td>
+          <small><strong>${escapeHtml(rec.switchesAvailable || 'Not Sure')}</strong></small>
+          ${rec.switchesDetails ? `<br><small style="color: #64748b;">${escapeHtml(rec.switchesDetails)}</small>` : ''}
+        </td>
+        <td>
+          <small><strong>${escapeHtml(rec.serversAvailable || 'No')}</strong></small>
+          ${rec.serversDetails ? `<br><small style="color: #64748b;">${escapeHtml(rec.serversDetails)}</small>` : ''}
+        </td>
+        <td><small style="color: #334155;">${escapeHtml(rec.operatingSystem || 'N/A')}</small></td>
+      `;
+    }
+
+    if (view === 'all' || view === 'power') {
+      const upsCond = rec.upsCondition || ((rec.upsNotWorking > 0) ? 'Defective' : 'Working');
+      tableHtml += `
+        <td style="text-align: center;">
+          <span class="it-drilldown-badge-w">${rec.upsWorking ?? 0} W</span> / 
+          <span class="${rec.upsNotWorking > 0 ? 'it-drilldown-badge-nw' : ''}">${rec.upsNotWorking ?? 0} NW</span>
+          <br><small style="color: #64748b;">${escapeHtml(upsCond)}</small>
+        </td>
+        <td style="text-align: center;">
+          <small><strong>${escapeHtml(rec.upsCapacity || 'N/A')}</strong></small>
+          ${rec.upsUnitsCount ? `<br><small style="color: #64748b;">${rec.upsUnitsCount} units</small>` : ''}
+        </td>
+        <td style="text-align: center;">
+          <strong>${rec.batteriesInUse || 0}</strong> in use / <small style="color:#64748b;">Req: ${rec.minBatteriesRequired || 0}</small>
+          ${rec.batteryMake ? `<br><small style="color: #475569;">${escapeHtml(rec.batteryMake)} (${rec.batteryAh || 0}Ah)</small>` : ''}
+        </td>
+        <td>
+          <small><strong>${rec.serviceReportSent === 'Yes' ? '<span style="color:#166534;"><i class="fa-solid fa-circle-check"></i> Sent</span>' : '<span style="color:#94a3b8;">Pending</span>'}</strong></small>
+          ${rec.serviceReportDate ? `<br><small style="color: #64748b;">${escapeHtml(rec.serviceReportDate)}</small>` : ''}
+        </td>
+      `;
+    }
+
+    if (view === 'all' || view === 'officers') {
+      tableHtml += `
+        <td>
+          <strong>${escapeHtml(rec.createdOfficerName || rec.entryOfficerName || 'N/A')}</strong>
+          <br><small style="color: #64748b;">${escapeHtml(rec.createdOfficerDesignation || rec.entryOfficerDesignation || '')}</small>
+        </td>
+        <td>
+          <small>${escapeHtml(rec.createdOfficerMobile || rec.entryOfficerMobile || 'N/A')}</small>
+          <br><small style="color: #047857;">${escapeHtml(rec.createdOfficerEmail || rec.submittedByEmail || '')}</small>
+        </td>
+        <td><small style="color: #475569;">${escapeHtml(rec.lastUpdated || 'N/A')}</small></td>
+      `;
+    }
+
+    tableHtml += `
+      <td style="text-align: center;">
+        ${isReported 
+          ? '<span class="badge badge-working" style="font-size: 0.72rem;"><i class="fa-solid fa-check"></i> Reported</span>' 
+          : '<span class="badge badge-warning" style="font-size: 0.72rem;"><i class="fa-solid fa-clock"></i> Pending</span>'}
+      </td>
+    `;
+
+    tableHtml += `</tr>`;
+  });
+
+  tableHtml += `</tbody></table>`;
+  body.innerHTML = tableHtml;
 }
 
 function closeOfficeDetailModal() {
   document.getElementById('officeDetailModal').style.display = 'none';
 }
 
+function exportDrillDownToExcel() {
+  const list = itDrillDownState.cachedList || Object.values(inventoryStore);
+  if (list.length === 0) {
+    showToast('No records to export', 'warning');
+    return;
+  }
+
+  if (typeof XLSX === 'undefined') {
+    exportDrillDownToCSV();
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN');
+  const fileDate = now.toISOString().slice(0, 10);
+
+  const headerRows = [
+    ["MOTOR VEHICLES DEPARTMENT, KERALA"],
+    ["Comprehensive Statewide IT & Power Audit Report — Executive Drill-Down"],
+    [`Generated On: ${dateStr}`, `Category / Context: ${itDrillDownState.type.toUpperCase()}`, `Total Offices Listed: ${list.length}`],
+    []
+  ];
+
+  const columns = [
+    "#", "Office Name", "Report Status", "Network Provider", "Network Speed", "Operating System",
+    "Switches", "Servers", "Monitors Working", "Monitors NW", "CPUs Working", "CPUs NW",
+    "Laptops Working", "Laptops NW", "AIO Working", "AIO NW", "Total Working Workstations",
+    "Age <3 Yrs", "Age 3-5 Yrs", "Age 5-8 Yrs", "Age >8 Yrs",
+    "UPS Working", "UPS NW", "UPS Capacity", "Batteries In Use", "Batteries Not In Use", "Min Batteries Required", "Battery Make & Ah",
+    "TCO Service Report Sent", "TCO Service Date", "Power Remarks",
+    "Reporting Officer Name", "Designation", "Mobile", "Email", "Last Updated"
+  ];
+
+  const dataRows = list.map((e, idx) => [
+    idx + 1,
+    e.officeName || '',
+    e.isReported !== false ? 'Reported' : 'Pending',
+    e.availableNetwork || '',
+    e.networkSpeed || '',
+    e.operatingSystem || '',
+    e.switchesAvailable || '',
+    e.serversAvailable || '',
+    e.monitorsWorking ?? 0,
+    e.monitorsNotWorking ?? 0,
+    e.cpuWorking ?? 0,
+    e.cpuNotWorking ?? 0,
+    e.laptopsWorking ?? 0,
+    e.laptopsNotWorking ?? 0,
+    e.aioWorking ?? 0,
+    e.aioNotWorking ?? 0,
+    (e.monitorsWorking || 0) + (e.cpuWorking || 0) + (e.laptopsWorking || 0) + (e.aioWorking || 0),
+    e.ageUnder3 ?? 0,
+    e.age3To5 ?? 0,
+    e.age5To8 ?? 0,
+    e.ageAbove8 ?? 0,
+    e.upsWorking ?? 0,
+    e.upsNotWorking ?? 0,
+    e.upsCapacity || '',
+    e.batteriesInUse ?? 0,
+    e.batteriesNotInUse ?? 0,
+    e.minBatteriesRequired ?? 0,
+    `${e.batteryMake || ''} ${e.batteryAh ? e.batteryAh + 'Ah' : ''}`.trim(),
+    e.serviceReportSent || '',
+    e.serviceReportDate || '',
+    e.powerRemarks || '',
+    e.createdOfficerName || e.entryOfficerName || '',
+    e.createdOfficerDesignation || e.entryOfficerDesignation || '',
+    e.createdOfficerMobile || e.entryOfficerMobile || '',
+    e.createdOfficerEmail || e.submittedByEmail || '',
+    e.lastUpdated || ''
+  ]);
+
+  const sheetData = [...headerRows, columns, ...dataRows];
+  const ws = XLSX.utils.aoa_to_sheet(sheetData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "IT Infrastructure DrillDown");
+  XLSX.writeFile(wb, `MVD_IT_Infrastructure_Audit_${fileDate}.xlsx`);
+  showToast('Statewide IT Audit Report Excel downloaded successfully!', 'success');
+}
+
 function exportDrillDownToCSV() {
-  exportDataToCSV();
+  const list = itDrillDownState.cachedList || Object.values(inventoryStore);
+  if (list.length === 0) return;
+
+  const headers = [
+    "Office Name", "Status", "Network", "Speed", "OS", "Monitors Working", "Monitors NW",
+    "CPUs Working", "CPUs NW", "Laptops Working", "Laptops NW", "AIO Working", "AIO NW",
+    "Age <3 Yrs", "Age 3-5 Yrs", "Age 5-8 Yrs", "Age >8 Yrs",
+    "UPS Working", "UPS NW", "UPS Capacity", "Batteries In Use", "Min Batteries Required",
+    "TCO Service Report", "Reporting Officer", "Designation", "Mobile", "Last Updated"
+  ];
+
+  const rows = list.map(e => [
+    `"${(e.officeName || '').replace(/"/g, '""')}"`,
+    e.isReported !== false ? '"Reported"' : '"Pending"',
+    `"${(e.availableNetwork || '').replace(/"/g, '""')}"`,
+    `"${(e.networkSpeed || '').replace(/"/g, '""')}"`,
+    `"${(e.operatingSystem || '').replace(/"/g, '""')}"`,
+    e.monitorsWorking ?? 0, e.monitorsNotWorking ?? 0,
+    e.cpuWorking ?? 0, e.cpuNotWorking ?? 0,
+    e.laptopsWorking ?? 0, e.laptopsNotWorking ?? 0,
+    e.aioWorking ?? 0, e.aioNotWorking ?? 0,
+    e.ageUnder3 ?? 0, e.age3To5 ?? 0, e.age5To8 ?? 0, e.ageAbove8 ?? 0,
+    e.upsWorking ?? 0, e.upsNotWorking ?? 0,
+    `"${(e.upsCapacity || '').replace(/"/g, '""')}"`,
+    e.batteriesInUse ?? 0, e.minBatteriesRequired ?? 0,
+    `"${(e.serviceReportSent || '').replace(/"/g, '""')}"`,
+    `"${(e.createdOfficerName || e.entryOfficerName || '').replace(/"/g, '""')}"`,
+    `"${(e.createdOfficerDesignation || e.entryOfficerDesignation || '').replace(/"/g, '""')}"`,
+    `"${(e.createdOfficerMobile || e.entryOfficerMobile || '').replace(/"/g, '""')}"`,
+    `"${(e.lastUpdated || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [
+    `"MOTOR VEHICLES DEPARTMENT, KERALA"`,
+    `"Comprehensive Statewide IT & Power Audit Report — Executive Drill-Down"`,
+    `"Generated: ${new Date().toLocaleString('en-IN')}"`,
+    "",
+    headers.join(','),
+    ...rows.map(r => r.join(','))
+  ].join('\n');
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Comprehensive_Statewide_IT_Audit_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Statewide IT Audit Report CSV exported', 'success');
 }
 
 // --- 17. ADMIN IT TABLES & CSV EXPORTS ---
@@ -2883,35 +3360,155 @@ function resetSummaryFilters() {
   renderAdminSummaryReport();
 }
 
-function exportSummaryReportCSV() {
-  exportDataToCSV();
+function printQuickTable() {
+  document.body.classList.remove('printing-ot-report', 'printing-it-summary', 'printing-modal');
+  document.body.classList.add('printing-it-master-table');
+
+  const cleanup = () => {
+    document.body.classList.remove('printing-it-master-table');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
+  window.print();
+  setTimeout(cleanup, 2000);
 }
+window.printQuickTable = printQuickTable;
 
 function printSummaryReport() {
+  document.body.classList.remove('printing-ot-report', 'printing-it-master-table', 'printing-modal');
+  document.body.classList.add('printing-it-summary');
+
+  const cleanup = () => {
+    document.body.classList.remove('printing-it-summary');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
   window.print();
+  setTimeout(cleanup, 2000);
 }
+window.printSummaryReport = printSummaryReport;
 
-function exportDataToCSV() {
+function exportSummaryReportCSV() {
   const entries = Object.values(inventoryStore);
-  if (entries.length === 0) return;
+  if (entries.length === 0) {
+    showToast('No summary entries to export', 'warning');
+    return;
+  }
 
-  const headers = ["Office Name", "Network", "Operating System", "Monitors Working", "Monitors Not Working", "CPUs Working", "CPUs Not Working", "Laptops Working", "Laptops Not Working", "UPS Working", "UPS Not Working", "Last Updated"];
-  const rows = entries.map(e => [
-    `"${e.officeName}"`, `"${e.availableNetwork}"`, `"${e.operatingSystem}"`,
-    e.monitorsWorking, e.monitorsNotWorking, e.cpuWorking, e.cpuNotWorking,
-    e.laptopsWorking, e.laptopsNotWorking, e.upsWorking, e.upsNotWorking, `"${e.lastUpdated}"`
-  ]);
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN');
+  const fileDate = now.toISOString().slice(0, 10);
 
-  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const headers = [
+    "#", "Office Name", "Network Provider", "Network Speed", "Monitors Working", "Monitors NW",
+    "CPUs Working", "CPUs NW", "Laptops Working", "Laptops NW", "Operating System",
+    "Systems Under 8 Yrs", "Systems Over 8 Yrs", "UPS Condition", "Batteries In-Use", "Min Batteries Required", "Last Updated"
+  ];
+
+  const rows = entries.map((rec, idx) => {
+    const ageUnder8 = (rec.ageUnder3 || 0) + (rec.age3To5 || 0) + (rec.age5To8 || 0);
+    const ageOver8 = rec.ageAbove8 || 0;
+    return [
+      idx + 1,
+      `"${(rec.officeName || '').replace(/"/g, '""')}"`,
+      `"${(rec.availableNetwork || '').replace(/"/g, '""')}"`,
+      `"${(rec.networkSpeed || '').replace(/"/g, '""')}"`,
+      rec.monitorsWorking ?? 0,
+      rec.monitorsNotWorking ?? 0,
+      rec.cpuWorking ?? 0,
+      rec.cpuNotWorking ?? 0,
+      rec.laptopsWorking ?? 0,
+      rec.laptopsNotWorking ?? 0,
+      `"${(rec.operatingSystem || '').replace(/"/g, '""')}"`,
+      ageUnder8,
+      ageOver8,
+      `"${rec.upsWorking} W / ${rec.upsNotWorking} NW"`,
+      rec.batteriesInUse || 0,
+      rec.minBatteriesRequired || 0,
+      `"${(rec.lastUpdated || '').replace(/"/g, '""')}"`
+    ];
+  });
+
+  const csvContent = "data:text/csv;charset=utf-8," + [
+    `"MOTOR VEHICLES DEPARTMENT, KERALA"`,
+    `"IT INFRASTRUCTURE INVENTORY — STATEWIDE SUMMARY REPORT"`,
+    `"Generated On: ${dateStr}"`,
+    "",
+    headers.join(','),
+    ...rows.map(r => r.join(','))
+  ].join('\n');
+
   const encodedUri = encodeURI(csvContent);
   const link = document.createElement("a");
   link.setAttribute("href", encodedUri);
-  link.setAttribute("download", `MVD_IT_Equipment_Report_${new Date().toISOString().slice(0, 10)}.csv`);
+  link.setAttribute("download", `MVD_IT_Statewide_Summary_Report_${fileDate}.csv`);
   document.body.appendChild(link);
   link.click();
   document.body.removeChild(link);
-  showToast('IT Equipment CSV exported', 'success');
+  showToast('IT Infrastructure Statewide Summary CSV exported', 'success');
 }
+window.exportSummaryReportCSV = exportSummaryReportCSV;
+
+function exportDataToCSV() {
+  const entries = Object.values(inventoryStore);
+  if (entries.length === 0) {
+    showToast('No IT equipment records to export', 'warning');
+    return;
+  }
+
+  const fileDate = new Date().toISOString().slice(0, 10);
+  const headers = [
+    "Office Name", "Network Provider", "Network Speed", "Switches Available", "Servers Available",
+    "Operating System", "Monitors Working", "Monitors Not Working", "CPUs Working", "CPUs Not Working",
+    "Laptops Working", "Laptops Not Working", "AIO Working", "AIO Not Working",
+    "Age <3 Yrs", "Age 3-5 Yrs", "Age 5-8 Yrs", "Age >8 Yrs",
+    "UPS Working", "UPS Not Working", "UPS Capacity", "Batteries In Use", "Min Batteries Required",
+    "TCO Service Report Sent", "Reporting Officer", "Designation", "Mobile", "Last Updated"
+  ];
+
+  const rows = entries.map(e => [
+    `"${(e.officeName || '').replace(/"/g, '""')}"`,
+    `"${(e.availableNetwork || '').replace(/"/g, '""')}"`,
+    `"${(e.networkSpeed || '').replace(/"/g, '""')}"`,
+    `"${(e.switchesAvailable || '').replace(/"/g, '""')}"`,
+    `"${(e.serversAvailable || '').replace(/"/g, '""')}"`,
+    `"${(e.operatingSystem || '').replace(/"/g, '""')}"`,
+    e.monitorsWorking ?? 0, e.monitorsNotWorking ?? 0,
+    e.cpuWorking ?? 0, e.cpuNotWorking ?? 0,
+    e.laptopsWorking ?? 0, e.laptopsNotWorking ?? 0,
+    e.aioWorking ?? 0, e.aioNotWorking ?? 0,
+    e.ageUnder3 ?? 0, e.age3To5 ?? 0, e.age5To8 ?? 0, e.ageAbove8 ?? 0,
+    e.upsWorking ?? 0, e.upsNotWorking ?? 0,
+    `"${(e.upsCapacity || '').replace(/"/g, '""')}"`,
+    e.batteriesInUse ?? 0, e.minBatteriesRequired ?? 0,
+    `"${(e.serviceReportSent || '').replace(/"/g, '""')}"`,
+    `"${(e.createdOfficerName || e.entryOfficerName || '').replace(/"/g, '""')}"`,
+    `"${(e.createdOfficerDesignation || e.entryOfficerDesignation || '').replace(/"/g, '""')}"`,
+    `"${(e.createdOfficerMobile || e.entryOfficerMobile || '').replace(/"/g, '""')}"`,
+    `"${(e.lastUpdated || '').replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [
+    `"MOTOR VEHICLES DEPARTMENT • GOVERNMENT OF KERALAM"`,
+    `"Comprehensive Statewide IT & Power Audit Report"`,
+    `"Generated On: ${new Date().toLocaleString('en-IN')}"`,
+    "",
+    headers.join(','),
+    ...rows.map(r => r.join(','))
+  ].join('\n');
+
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `Comprehensive_Statewide_IT_and_Power_Audit_Report_${fileDate}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Comprehensive Statewide IT & Power Audit CSV exported', 'success');
+}
+window.exportDataToCSV = exportDataToCSV;
 
 // --- 18. MODULE & MENU MANAGER ---
 function renderMenuManagerUI() {
@@ -3055,42 +3652,83 @@ function generateComprehensiveReport() {
         <img src="mvd_logo.png" onerror="this.src='https://upload.wikimedia.org/wikipedia/commons/thumb/5/5c/Emblem_of_Kerala.svg/200px-Emblem_of_Kerala.svg.png'" alt="MVD Emblem" style="height: 64px; width: auto;">
         <div>
           <h2 style="font-size: 1.35rem; color: #0B3B24; margin: 0; font-weight: 800; text-transform: uppercase;">Motor Vehicles Department • Government of Keralam</h2>
-          <h4 style="font-size: 1.05rem; color: #047857; margin: 3px 0 0 0; font-weight: 700;">STATEWIDE IT INFRASTRUCTURE COMPREHENSIVE AUDIT REPORT</h4>
+          <h4 style="font-size: 1.05rem; color: #047857; margin: 3px 0 0 0; font-weight: 700;">Comprehensive Statewide IT &amp; Power Audit Report</h4>
+          <div style="font-size: 0.8rem; color: #475569; margin-top: 3px;">Consolidated Hardware Systems, Network Connectivity, Hardware Lifecycle &amp; Power Audit</div>
         </div>
       </div>
-      <div><strong>Generated On:</strong> ${formattedDate}</div>
+      <div style="text-align: right; font-size: 0.85rem;">
+        <div><strong>Generated On:</strong> ${formattedDate}</div>
+        <div style="color: #047857; font-weight: 700; margin-top: 2px;">Total Reported Offices: ${entries.length}</div>
+      </div>
     </div>
 
-    <table class="data-table">
-      <thead>
-        <tr style="background: #0B3B24; color: white;">
-          <th>Office Name</th><th>Monitors (W/NW)</th><th>CPUs (W/NW)</th><th>Laptops (W/NW)</th><th>UPS</th>
-        </tr>
-      </thead>
-      <tbody>
-        ${entries.map(e => `
-          <tr>
-            <td><strong>${escapeHtml(e.officeName)}</strong></td>
-            <td>${e.monitorsWorking} / ${e.monitorsNotWorking}</td>
-            <td>${e.cpuWorking} / ${e.cpuNotWorking}</td>
-            <td>${e.laptopsWorking} / ${e.laptopsNotWorking}</td>
-            <td>${e.upsWorking} / ${e.upsNotWorking}</td>
+    <div style="overflow-x: auto;">
+      <table class="data-table" style="width: 100%; border-collapse: collapse; font-size: 0.8rem;">
+        <thead>
+          <tr style="background: #0B3B24; color: white;">
+            <th style="width: 36px; text-align: center;">#</th>
+            <th style="min-width: 150px;">Office Name</th>
+            <th style="min-width: 110px;">Network &amp; Speed</th>
+            <th style="text-align: center;">Monitors (W/NW)</th>
+            <th style="text-align: center;">CPUs (W/NW)</th>
+            <th style="text-align: center;">Laptops (W/NW)</th>
+            <th style="text-align: center;">AIO (W/NW)</th>
+            <th style="text-align: center;">Age &gt;8 Yrs</th>
+            <th style="text-align: center;">UPS Health</th>
+            <th style="text-align: center;">Batteries (In-Use/Req)</th>
+            <th style="min-width: 100px;">TCO Report</th>
+            <th style="min-width: 120px;">Reporting Officer</th>
           </tr>
-        `).join('')}
-      </tbody>
-    </table>
+        </thead>
+        <tbody>
+          ${entries.map((e, idx) => `
+            <tr>
+              <td style="text-align: center; font-weight: 700; color: #64748b;">${idx + 1}</td>
+              <td><strong>${escapeHtml(e.officeName)}</strong></td>
+              <td><span class="badge badge-info" style="font-size: 0.72rem;">${escapeHtml(e.availableNetwork || 'N/A')}</span> <small>(${escapeHtml(e.networkSpeed || 'N/A')})</small></td>
+              <td style="text-align: center;">${e.monitorsWorking ?? 0} / <span style="color:#b91c1c;">${e.monitorsNotWorking ?? 0}</span></td>
+              <td style="text-align: center;">${e.cpuWorking ?? 0} / <span style="color:#b91c1c;">${e.cpuNotWorking ?? 0}</span></td>
+              <td style="text-align: center;">${e.laptopsWorking ?? 0} / <span style="color:#b91c1c;">${e.laptopsNotWorking ?? 0}</span></td>
+              <td style="text-align: center;">${e.aioWorking ?? 0} / <span style="color:#b91c1c;">${e.aioNotWorking ?? 0}</span></td>
+              <td style="text-align: center;"><span class="${(e.ageAbove8 || 0) > 0 ? 'badge-pill-age-alert' : 'badge-pill-age-safe'}">${e.ageAbove8 ?? 0}</span></td>
+              <td style="text-align: center;">${e.upsWorking ?? 0} W / <span style="color:#b91c1c;">${e.upsNotWorking ?? 0} NW</span></td>
+              <td style="text-align: center;">${e.batteriesInUse || 0} / ${e.minBatteriesRequired || 0}</td>
+              <td><small>${e.serviceReportSent === 'Yes' ? '<span style="color:#166534; font-weight: 700;">Sent</span> (' + escapeHtml(e.serviceReportDate || '') + ')' : '<span style="color:#94a3b8;">Pending</span>'}</small></td>
+              <td><small><strong>${escapeHtml(e.createdOfficerName || e.entryOfficerName || 'N/A')}</strong><br>${escapeHtml(e.createdOfficerMobile || e.entryOfficerMobile || '')}</small></td>
+            </tr>
+          `).join('')}
+        </tbody>
+      </table>
+    </div>
   `;
 
   modal.style.display = 'flex';
 }
+window.generateComprehensiveReport = generateComprehensiveReport;
 
 function closeComprehensiveReportModal() {
   document.getElementById('comprehensiveReportModal').style.display = 'none';
 }
+window.closeComprehensiveReportModal = closeComprehensiveReportModal;
 
 function triggerReportPrint() {
+  document.body.classList.remove('printing-ot-report', 'printing-it-master-table', 'printing-it-summary');
+  document.body.classList.add('printing-modal');
+
+  const modal = document.getElementById('comprehensiveReportModal');
+  if (modal) modal.classList.add('print-active');
+
+  const cleanup = () => {
+    document.body.classList.remove('printing-modal');
+    if (modal) modal.classList.remove('print-active');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
   window.print();
+  setTimeout(cleanup, 2000);
 }
+window.triggerReportPrint = triggerReportPrint;
 
 // --- 20. TOAST NOTIFICATIONS & UTILITIES ---
 function showToast(message, type = 'info') {
