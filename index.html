@@ -806,6 +806,28 @@
                   </div>
                 </div>
 
+                <div class="ot-form-grid-2" style="margin-top: 16px;">
+                  <!-- In which Stream -->
+                  <div class="form-group">
+                    <label for="otTechStreamSelect"><i class="fa-solid fa-code-branch"></i> In which Stream <span class="req-star">*</span></label>
+                    <select id="otTechStreamSelect" class="form-control" required onchange="handleQualificationStreamChange(this.value)">
+                      <option value="">-- Choose Stream --</option>
+                      <option value="Automobile Engineering">Automobile Engineering</option>
+                      <option value="Mechanical Engineering">Mechanical Engineering</option>
+                      <option value="Production Engineering">Production Engineering</option>
+                      <option value="Others">Others</option>
+                    </select>
+                    <div class="field-error" id="err_otTechStreamSelect"></div>
+                  </div>
+
+                  <!-- Conditional Specify Other Stream -->
+                  <div id="otTechStreamOtherGroup" class="form-group" style="display: none;">
+                    <label for="otTechStreamOtherInput"><i class="fa-solid fa-pen"></i> Please specify Stream <span class="req-star">*</span></label>
+                    <input type="text" id="otTechStreamOtherInput" class="form-control" placeholder="Please specify Stream" oninput="markFormDirty(true)">
+                    <div class="field-error" id="err_otTechStreamOtherInput"></div>
+                  </div>
+                </div>
+
                 <div class="form-grid-3" style="margin-top: 16px;">
                   <!-- Institution / Board / University -->
                   <div class="form-group">

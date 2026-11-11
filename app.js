@@ -3208,6 +3208,21 @@ async function saveOfficeLocksToSupabase(locks) {
     const { data, error } = await client
       .from('mvd_app_settings')
       .upsert(payload, { onConflict: 'id' });
+
+    // Also mirror to dedicated mvd_office_locks table
+    try {
+      const lockEntries = Object.entries(locks || {}).map(([code, email]) => ({
+        office_code: code,
+        locked_email: email,
+        updated_at: new Date().toISOString()
+      }));
+      if (lockEntries.length > 0) {
+        await client.from('mvd_office_locks').upsert(lockEntries, { onConflict: 'office_code' });
+      }
+    } catch (e3) {
+      console.warn('Mirror to mvd_office_locks warning:', e3);
+    }
+
     if (error) {
       console.warn('Could not sync office locks to database:', error);
       return { success: false, error };
@@ -3229,28 +3244,44 @@ async function syncOfficeLocksFromSupabase() {
       .select('*')
       .eq('id', 'office_locks')
       .single();
+    let remoteLocks = {};
     if (!error && data) {
-      const remoteLocks = (data.menu_visibility && typeof data.menu_visibility === 'object') ? data.menu_visibility : {};
-      localStorage.setItem('mvd_ot_office_locks', JSON.stringify(remoteLocks));
+      remoteLocks = (data.menu_visibility && typeof data.menu_visibility === 'object') ? data.menu_visibility : {};
+    }
 
-      if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
-        for (const k in otOfficeLocks) {
-          if (!remoteLocks[k]) delete otOfficeLocks[k];
-        }
-        Object.assign(otOfficeLocks, remoteLocks);
+    // Also sync from dedicated mvd_office_locks table
+    try {
+      const { data: dbLocks, error: dbErr } = await client.from('mvd_office_locks').select('*');
+      if (!dbErr && Array.isArray(dbLocks)) {
+        dbLocks.forEach(row => {
+          if (row.office_code && row.locked_email) {
+            remoteLocks[row.office_code] = row.locked_email;
+          }
+        });
       }
-      if (window.otOfficeLocks) {
-        for (const k in window.otOfficeLocks) {
-          if (!remoteLocks[k]) delete window.otOfficeLocks[k];
-        }
-        Object.assign(window.otOfficeLocks, remoteLocks);
-      }
+    } catch (e2) {
+      console.warn('mvd_office_locks sync fallback:', e2);
+    }
 
-      if (typeof renderAdminOfficeLocksTable === 'function') renderAdminOfficeLocksTable();
-      const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
-      if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
-        checkOfficeAccessAndLock(currentSelectedOffice);
+    localStorage.setItem('mvd_ot_office_locks', JSON.stringify(remoteLocks));
+
+    if (typeof otOfficeLocks !== 'undefined' && otOfficeLocks) {
+      for (const k in otOfficeLocks) {
+        if (!remoteLocks[k]) delete otOfficeLocks[k];
       }
+      Object.assign(otOfficeLocks, remoteLocks);
+    }
+    if (window.otOfficeLocks) {
+      for (const k in window.otOfficeLocks) {
+        if (!remoteLocks[k]) delete window.otOfficeLocks[k];
+      }
+      Object.assign(window.otOfficeLocks, remoteLocks);
+    }
+
+    if (typeof renderAdminOfficeLocksTable === 'function') renderAdminOfficeLocksTable();
+    const currentSelectedOffice = document.getElementById('otMainOfficeSelect')?.value;
+    if (currentSelectedOffice && typeof checkOfficeAccessAndLock === 'function') {
+      checkOfficeAccessAndLock(currentSelectedOffice);
     }
   } catch (e) {
     console.warn('Could not load remote office locks:', e);
@@ -3631,6 +3662,15 @@ async function clearOfficeLock(code) {
   } catch (e) {}
 
   await saveOfficeLocksToSupabase(locks);
+
+  // Clear from mvd_office_locks table
+  try {
+    const client = (typeof getSupabaseClient === 'function' ? getSupabaseClient() : null) || window.supabaseClient || supabaseClient;
+    if (client) {
+      await client.from('mvd_office_locks').delete().eq('office_code', canonical || cleanCode);
+    }
+  } catch (e) {}
+
   renderAdminOfficeLocksTable();
   showToast(`Office lock cleared for ${code}. Status reverted to Open.`, 'success');
 
@@ -3665,6 +3705,14 @@ async function clearAllOfficeLocks() {
   if (typeof window.removeAllOfficeLocks === 'function') {
     window.removeAllOfficeLocks();
   }
+
+  // Clear from mvd_office_locks table
+  try {
+    const client = (typeof getSupabaseClient === 'function' ? getSupabaseClient() : null) || window.supabaseClient || supabaseClient;
+    if (client) {
+      await client.from('mvd_office_locks').delete().neq('office_code', '');
+    }
+  } catch (e) {}
 
   // Clear owner fields in IT inventory store if any
   try {

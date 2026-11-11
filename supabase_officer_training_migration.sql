@@ -26,6 +26,8 @@ CREATE TABLE IF NOT EXISTS public.officer_profiles (
     general_education_other TEXT,
     technical_qualification TEXT NOT NULL DEFAULT 'B.Tech',
     technical_qualification_other TEXT,
+    qualification_stream TEXT,
+    qualification_stream_other TEXT,
     institution TEXT,
     passing_year INTEGER,
     class_grade TEXT,
@@ -227,6 +229,73 @@ DROP POLICY IF EXISTS "Allow public upsert of officer qualifications" ON public.
 CREATE POLICY "Allow public read of officer qualifications" ON public.officer_qualifications FOR SELECT USING (true);
 CREATE POLICY "Allow public upsert of officer qualifications" ON public.officer_qualifications FOR ALL USING (true);
 
+-- 9. Dedicated Office Locks Table with Strict Unique Primary Key (Race Condition Prevention)
+CREATE TABLE IF NOT EXISTS public.mvd_office_locks (
+    office_code TEXT PRIMARY KEY,
+    locked_email TEXT NOT NULL,
+    locked_by_name TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mvd_office_locks_office_code ON public.mvd_office_locks(office_code);
+
+ALTER TABLE public.mvd_office_locks ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public read of office locks" ON public.mvd_office_locks;
+DROP POLICY IF EXISTS "Allow public write of office locks" ON public.mvd_office_locks;
+CREATE POLICY "Allow public read of office locks" ON public.mvd_office_locks FOR SELECT USING (true);
+CREATE POLICY "Allow public write of office locks" ON public.mvd_office_locks FOR ALL USING (true);
+
+-- Atomic Lock Acquisition & Concurrency Verification Stored Procedure
+CREATE OR REPLACE FUNCTION public.acquire_or_verify_office_lock(
+    p_office_code TEXT,
+    p_email TEXT,
+    p_name TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_clean_code TEXT := UPPER(TRIM(p_office_code));
+    v_clean_email TEXT := LOWER(TRIM(p_email));
+    v_existing_email TEXT;
+BEGIN
+    -- Check if lock already exists
+    SELECT LOWER(TRIM(locked_email)) INTO v_existing_email
+    FROM public.mvd_office_locks
+    WHERE office_code = v_clean_code
+    FOR UPDATE;
+
+    IF v_existing_email IS NOT NULL THEN
+        IF v_existing_email = v_clean_email THEN
+            RETURN jsonb_build_object('success', true, 'locked', true, 'owner', v_existing_email, 'is_owner', true);
+        ELSE
+            RETURN jsonb_build_object('success', false, 'locked', true, 'owner', v_existing_email, 'is_owner', false, 'message', 'Submission failed: This office was just locked by another user. You cannot submit data for this office.');
+        END IF;
+    ELSE
+        BEGIN
+            INSERT INTO public.mvd_office_locks (office_code, locked_email, locked_by_name, created_at, updated_at)
+            VALUES (v_clean_code, v_clean_email, p_name, NOW(), NOW());
+
+            RETURN jsonb_build_object('success', true, 'locked', true, 'owner', v_clean_email, 'is_owner', true, 'newly_locked', true);
+        EXCEPTION WHEN unique_violation THEN
+            SELECT LOWER(TRIM(locked_email)) INTO v_existing_email
+            FROM public.mvd_office_locks
+            WHERE office_code = v_clean_code;
+
+            IF v_existing_email = v_clean_email THEN
+                RETURN jsonb_build_object('success', true, 'locked', true, 'owner', v_existing_email, 'is_owner', true);
+            ELSE
+                RETURN jsonb_build_object('success', false, 'locked', true, 'owner', v_existing_email, 'is_owner', false, 'message', 'Submission failed: This office was just locked by another user. You cannot submit data for this office.');
+            END IF;
+        END;
+    END IF;
+END;
+$$;
+
+GRANT EXECUTE ON FUNCTION public.acquire_or_verify_office_lock(TEXT, TEXT, TEXT) TO anon, authenticated, service_role;
+
 -- 10. Explicit Table Grants for PostgREST Data API Access
 GRANT ALL ON TABLE public.mvd_offices_master TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.officer_profiles TO anon, authenticated, service_role;
@@ -236,6 +305,7 @@ GRANT ALL ON TABLE public.officer_training_records TO anon, authenticated, servi
 GRANT ALL ON TABLE public.office_report_versions TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.officer_audit_logs TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.officer_qualifications TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.mvd_office_locks TO anon, authenticated, service_role;
 
 -- 11. Reload PostgREST Schema Cache
 NOTIFY pgrst, 'reload schema';
@@ -269,6 +339,13 @@ BEGIN
     WHERE pubname = 'supabase_realtime' AND tablename = 'officer_qualifications'
   ) THEN
     ALTER PUBLICATION supabase_realtime ADD TABLE public.officer_qualifications;
+  END IF;
+
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_publication_tables 
+    WHERE pubname = 'supabase_realtime' AND tablename = 'mvd_office_locks'
+  ) THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.mvd_office_locks;
   END IF;
 END $$;
 

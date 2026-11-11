@@ -115,6 +115,8 @@ CREATE TABLE IF NOT EXISTS officer_profiles (
     general_education_other TEXT,
     technical_qualification TEXT NOT NULL CHECK (technical_qualification IN ('PhD with Postdoctoral Research', 'PhD', 'M.Tech', 'B.Tech', 'Diploma', 'Others')),
     technical_qualification_other TEXT,
+    qualification_stream TEXT,
+    qualification_stream_other TEXT,
     institution TEXT,
     passing_year INTEGER,
     class_grade TEXT,
@@ -266,6 +268,8 @@ CREATE TABLE IF NOT EXISTS officer_qualifications (
     officer_email TEXT,
     educational_qualification TEXT NOT NULL,
     qualification_other TEXT,
+    qualification_stream TEXT,
+    qualification_stream_other TEXT,
     specialization TEXT,
     technical_certifications TEXT,
     training_attended TEXT,
@@ -288,6 +292,19 @@ CREATE TABLE IF NOT EXISTS mvd_app_settings (
 );
 
 -- ----------------------------------------------------------------------------
+-- 11. Dedicated Office Locks Table (Strict Concurrency & Race Condition Control)
+-- ----------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS public.mvd_office_locks (
+    office_code TEXT PRIMARY KEY,
+    locked_email TEXT NOT NULL,
+    locked_by_name TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS idx_mvd_office_locks_office_code ON public.mvd_office_locks(office_code);
+
+-- ----------------------------------------------------------------------------
 -- Row Level Security (RLS) Policies (Idempotent: Drop & Recreate)
 -- ----------------------------------------------------------------------------
 ALTER TABLE mvd_it_equipment ENABLE ROW LEVEL SECURITY;
@@ -300,6 +317,7 @@ ALTER TABLE office_report_versions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE officer_audit_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE officer_qualifications ENABLE ROW LEVEL SECURITY;
 ALTER TABLE mvd_app_settings ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.mvd_office_locks ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS "Allow public read of all tables" ON mvd_it_equipment;
 DROP POLICY IF EXISTS "Allow public write of it equipment" ON mvd_it_equipment;
@@ -351,6 +369,61 @@ DROP POLICY IF EXISTS "Allow public update of app settings" ON mvd_app_settings;
 CREATE POLICY "Allow public read of app settings" ON mvd_app_settings FOR SELECT USING (true);
 CREATE POLICY "Allow public update of app settings" ON mvd_app_settings FOR ALL USING (true);
 
+DROP POLICY IF EXISTS "Allow public read of office locks" ON public.mvd_office_locks;
+DROP POLICY IF EXISTS "Allow public write of office locks" ON public.mvd_office_locks;
+CREATE POLICY "Allow public read of office locks" ON public.mvd_office_locks FOR SELECT USING (true);
+CREATE POLICY "Allow public write of office locks" ON public.mvd_office_locks FOR ALL USING (true);
+
+-- ----------------------------------------------------------------------------
+-- Atomic Lock Acquisition & Concurrency Verification Stored Procedure
+-- ----------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.acquire_or_verify_office_lock(
+    p_office_code TEXT,
+    p_email TEXT,
+    p_name TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql
+SECURITY DEFINER
+AS $$
+DECLARE
+    v_clean_code TEXT := UPPER(TRIM(p_office_code));
+    v_clean_email TEXT := LOWER(TRIM(p_email));
+    v_existing_email TEXT;
+BEGIN
+    -- Check if lock already exists
+    SELECT LOWER(TRIM(locked_email)) INTO v_existing_email
+    FROM public.mvd_office_locks
+    WHERE office_code = v_clean_code
+    FOR UPDATE;
+
+    IF v_existing_email IS NOT NULL THEN
+        IF v_existing_email = v_clean_email THEN
+            RETURN jsonb_build_object('success', true, 'locked', true, 'owner', v_existing_email, 'is_owner', true);
+        ELSE
+            RETURN jsonb_build_object('success', false, 'locked', true, 'owner', v_existing_email, 'is_owner', false, 'message', 'Submission failed: This office was just locked by another user. You cannot submit data for this office.');
+        END IF;
+    ELSE
+        BEGIN
+            INSERT INTO public.mvd_office_locks (office_code, locked_email, locked_by_name, created_at, updated_at)
+            VALUES (v_clean_code, v_clean_email, p_name, NOW(), NOW());
+
+            RETURN jsonb_build_object('success', true, 'locked', true, 'owner', v_clean_email, 'is_owner', true, 'newly_locked', true);
+        EXCEPTION WHEN unique_violation THEN
+            SELECT LOWER(TRIM(locked_email)) INTO v_existing_email
+            FROM public.mvd_office_locks
+            WHERE office_code = v_clean_code;
+
+            IF v_existing_email = v_clean_email THEN
+                RETURN jsonb_build_object('success', true, 'locked', true, 'owner', v_existing_email, 'is_owner', true);
+            ELSE
+                RETURN jsonb_build_object('success', false, 'locked', true, 'owner', v_existing_email, 'is_owner', false, 'message', 'Submission failed: This office was just locked by another user. You cannot submit data for this office.');
+            END IF;
+        END;
+    END IF;
+END;
+$$;
+
 -- ----------------------------------------------------------------------------
 -- Explicit Table Grants for PostgREST Data API Access
 -- ----------------------------------------------------------------------------
@@ -364,6 +437,21 @@ GRANT ALL ON TABLE public.office_report_versions TO anon, authenticated, service
 GRANT ALL ON TABLE public.officer_audit_logs TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.officer_qualifications TO anon, authenticated, service_role;
 GRANT ALL ON TABLE public.mvd_app_settings TO anon, authenticated, service_role;
+GRANT ALL ON TABLE public.mvd_office_locks TO anon, authenticated, service_role;
+GRANT EXECUTE ON FUNCTION public.acquire_or_verify_office_lock(TEXT, TEXT, TEXT) TO anon, authenticated, service_role;
+
+-- ----------------------------------------------------------------------------
+-- Enable Realtime Replication for mvd_office_locks
+-- ----------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_publication WHERE pubname = 'supabase_realtime') THEN
+    ALTER PUBLICATION supabase_realtime ADD TABLE public.mvd_office_locks;
+  END IF;
+EXCEPTION WHEN OTHERS THEN
+  NULL;
+END;
+$$;
 
 -- ----------------------------------------------------------------------------
 -- Reload PostgREST Schema Cache

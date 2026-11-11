@@ -843,20 +843,10 @@ function checkOfficeAccessAndLock(officeCode) {
       showToast(alertMsg, 'error');
     }
   } else {
-    // Unlocked / Open office (first entry will lock to current account)
+    // Unlocked / Open office: DELAYED LOCKING
+    // The office will ONLY become permanently locked to a user's Gmail ID after the successful database submission
+    // of the first officer entry for that office, rather than immediately upon selection from the dropdown.
     toggleOfficerFormDisabled(false);
-    if (currentEmail) {
-      const canonical = getCanonicalOfficeCode(officeCode) || officeCode;
-      if (canonical && canonical !== 'DTC' && !otOfficeLocks[canonical]) {
-        otOfficeLocks[canonical] = currentEmail;
-        delete otOfficeLocks['DTC'];
-        localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
-        window.otOfficeLocks = otOfficeLocks;
-        if (typeof saveOfficeLocksToSupabase === 'function') {
-          saveOfficeLocksToSupabase(otOfficeLocks);
-        }
-      }
-    }
     if (authPanel) {
       const officeProfiles = otProfilesStore.filter(p => p.officeCode === officeCode);
       if (officeProfiles.length > 0) {
@@ -867,15 +857,15 @@ function checkOfficeAccessAndLock(officeCode) {
     }
     if (alertBox) {
       if (currentEmail) {
-        alertBox.className = 'reflection-alert alert-authorized';
+        alertBox.className = 'reflection-alert alert-unlocked';
         alertBox.style.display = 'flex';
         alertBox.style.background = '#f0fdf4';
         alertBox.style.borderColor = '#86efac';
         alertBox.style.color = '#064e3b';
         alertBox.innerHTML = `
           <div style="display: flex; align-items: center; gap: 8px;">
-            <i class="fa-solid fa-circle-check" style="color:#059669; font-size: 1.15rem;"></i>
-            <span>Use this Gmail ID: <strong>${escapeHtml(currentEmail)}</strong> for entering all officers Details. This Gmail ID is assigned for this office.</span>
+            <i class="fa-solid fa-lock-open" style="color:#059669; font-size: 1.15rem;"></i>
+            <span>This office is Open for data entry. The office will be permanently assigned to <strong>${escapeHtml(currentEmail)}</strong> upon submitting the first officer profile.</span>
           </div>
         `;
       } else {
@@ -1266,7 +1256,7 @@ function renderAdditionalQualOptions() {
 
           <div class="form-group" style="margin-top: 10px;">
             <label><i class="fa-solid fa-note-sticky"></i> Remarks / Specialization</label>
-            <input type="text" class="form-control ot-detail-remarks" placeholder="e.g. Evening Batch, Distance Education, First Class">
+            <input type="text" class="form-control ot-detail-remarks" placeholder="">
           </div>
 
           ${isOther ? `
@@ -1381,6 +1371,16 @@ function handleTechnicalQualificationChange(val) {
   if (group) group.style.display = show ? 'block' : 'none';
   if (input && !show) input.value = '';
 }
+
+function handleQualificationStreamChange(val) {
+  markFormDirty(true);
+  const group = document.getElementById('otTechStreamOtherGroup');
+  const input = document.getElementById('otTechStreamOtherInput');
+  const show = val === 'Others';
+  if (group) group.style.display = show ? 'block' : 'none';
+  if (input && !show) input.value = '';
+}
+window.handleQualificationStreamChange = handleQualificationStreamChange;
 
 // --- 8. REPEATABLE IN-SERVICE TRAINING TABLE ENGINE ---
 
@@ -1658,6 +1658,8 @@ function extractOfficerFormData(status = 'submitted') {
   const genEdOther = (document.getElementById('otGenEdOtherInput')?.value || "").trim();
   const techQual = document.getElementById('otTechQualSelect')?.value || "";
   const techQualOther = (document.getElementById('otTechQualOtherInput')?.value || "").trim();
+  const qualificationStream = document.getElementById('otTechStreamSelect')?.value || "";
+  const qualificationStreamOther = (document.getElementById('otTechStreamOtherInput')?.value || "").trim();
   const institution = (document.getElementById('otTechInstitutionInput')?.value || "").trim();
   const passingYearVal = parseInt(document.getElementById('otPassingYearInput')?.value) || null;
   const grade = (document.getElementById('otGradeInput')?.value || "").trim();
@@ -1766,6 +1768,15 @@ function extractOfficerFormData(status = 'submitted') {
       isValid = false;
     }
 
+    if (!qualificationStream) {
+      setFieldError('otTechStreamSelect', "Stream is required");
+      isValid = false;
+    }
+    if (qualificationStream === 'Others' && !qualificationStreamOther) {
+      setFieldError('otTechStreamOtherInput', "Please specify Stream");
+      isValid = false;
+    }
+
     const currentYear = new Date().getFullYear();
     if (passingYearVal && passingYearVal > currentYear) {
       setFieldError('otPassingYearInput', `Passing year cannot be in the future (Max ${currentYear})`);
@@ -1813,6 +1824,8 @@ function extractOfficerFormData(status = 'submitted') {
     generalEducationOther: genEdOther,
     technicalQualification: techQual,
     technicalQualificationOther: techQualOther,
+    qualificationStream,
+    qualificationStreamOther,
     institution,
     passingYear: passingYearVal,
     grade,
@@ -1847,6 +1860,121 @@ function extractOfficerFormData(status = 'submitted') {
   return { isValid, data };
 }
 
+// Backend Concurrency & Strict Office Lock Acquisition
+async function acquireOrVerifyOfficeLock(officeCode, userEmail, userName) {
+  const canonical = getCanonicalOfficeCode(officeCode) || officeCode;
+  if (!canonical) return { success: true };
+  const cleanEmail = (userEmail || '').trim().toLowerCase();
+  const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
+  if (isAdmin) return { success: true, is_admin: true };
+
+  // 1. Check local / in-memory cache first
+  const localOwner = getOfficeLockedEmail(canonical);
+  if (localOwner && cleanEmail && localOwner.toLowerCase() !== cleanEmail) {
+    return {
+      success: false,
+      owner: localOwner,
+      message: "Submission failed: This office was just locked by another user. You cannot submit data for this office."
+    };
+  }
+
+  const client = getSupabaseClient();
+  if (!client) {
+    return { success: true, owner: localOwner || cleanEmail };
+  }
+
+  // 2. Try Atomic Supabase Stored Procedure
+  try {
+    const { data: rpcData, error: rpcErr } = await client.rpc('acquire_or_verify_office_lock', {
+      p_office_code: canonical,
+      p_email: cleanEmail,
+      p_name: userName || null
+    });
+    if (!rpcErr && rpcData) {
+      if (rpcData.success === false) {
+        return {
+          success: false,
+          owner: rpcData.owner,
+          message: rpcData.message || "Submission failed: This office was just locked by another user. You cannot submit data for this office."
+        };
+      }
+      return { success: true, owner: rpcData.owner || cleanEmail };
+    }
+  } catch (eRpc) {
+    console.warn("acquire_or_verify_office_lock RPC attempt notice:", eRpc);
+  }
+
+  // 3. Strict Backend Concurrency via mvd_office_locks Table (Unique Primary Key)
+  try {
+    const { data: existing, error: selErr } = await client
+      .from('mvd_office_locks')
+      .select('*')
+      .eq('office_code', canonical)
+      .maybeSingle();
+
+    if (!selErr && existing && existing.locked_email) {
+      const existEmail = existing.locked_email.trim().toLowerCase();
+      if (existEmail === cleanEmail) {
+        return { success: true, owner: existing.locked_email };
+      } else {
+        return {
+          success: false,
+          owner: existing.locked_email,
+          message: "Submission failed: This office was just locked by another user. You cannot submit data for this office."
+        };
+      }
+    }
+
+    if (cleanEmail) {
+      const { data: insData, error: insErr } = await client
+        .from('mvd_office_locks')
+        .insert({
+          office_code: canonical,
+          locked_email: cleanEmail,
+          locked_by_name: userName || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+
+      if (insErr) {
+        // Unique constraint code 23505 indicates another user submitted concurrently and won the race
+        if (insErr.code === '23505' || insErr.message?.includes('unique') || insErr.message?.includes('duplicate key')) {
+          const { data: fresh } = await client.from('mvd_office_locks').select('locked_email').eq('office_code', canonical).maybeSingle();
+          const winner = fresh?.locked_email || 'another user';
+          if (winner.trim().toLowerCase() !== cleanEmail) {
+            return {
+              success: false,
+              owner: winner,
+              message: "Submission failed: This office was just locked by another user. You cannot submit data for this office."
+            };
+          }
+        }
+      }
+    }
+  } catch (eTable) {
+    console.warn("Direct mvd_office_locks fallback notice:", eTable);
+  }
+
+  // 4. Fallback check against mvd_app_settings office_locks
+  try {
+    const { data: settingsData } = await client.from('mvd_app_settings').select('*').eq('id', 'office_locks').single();
+    if (settingsData && settingsData.menu_visibility) {
+      const remoteLocks = typeof settingsData.menu_visibility === 'object' ? settingsData.menu_visibility : JSON.parse(settingsData.menu_visibility);
+      const remoteOwner = remoteLocks[canonical];
+      if (remoteOwner && cleanEmail && remoteOwner.toLowerCase() !== cleanEmail) {
+        return {
+          success: false,
+          owner: remoteOwner,
+          message: "Submission failed: This office was just locked by another user. You cannot submit data for this office."
+        };
+      }
+    }
+  } catch (eSet) {}
+
+  return { success: true, owner: cleanEmail };
+}
+window.acquireOrVerifyOfficeLock = acquireOrVerifyOfficeLock;
+
 async function handleSaveDraft() {
   const { isValid, data } = extractOfficerFormData('draft');
   if (!isValid || !data) {
@@ -1857,14 +1985,20 @@ async function handleSaveDraft() {
   const currentEmail = otGetLoggedInEmail();
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   if (data.officeCode) {
-    const lockedEmail = getOfficeLockedEmail(data.officeCode);
-    if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
-      showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
+    const canonical = getCanonicalOfficeCode(data.officeCode) || data.officeCode;
+    const lockCheck = await acquireOrVerifyOfficeLock(canonical, currentEmail, (data.enteredBy?.fullName || ''));
+    if (!lockCheck.success) {
+      showToast(lockCheck.message || "Submission failed: This office was just locked by another user. You cannot submit data for this office.", 'error');
+      if (lockCheck.owner) {
+        otOfficeLocks[canonical] = lockCheck.owner;
+        localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+        window.otOfficeLocks = otOfficeLocks;
+      }
+      checkOfficeAccessAndLock(data.officeCode);
       return;
     }
-    if (!lockedEmail && currentEmail) {
-      const lockKey = getCanonicalOfficeCode(data.officeCode) || data.officeCode;
-      otOfficeLocks[lockKey] = currentEmail;
+    if (currentEmail) {
+      otOfficeLocks[canonical] = currentEmail;
       delete otOfficeLocks['DTC'];
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
       window.otOfficeLocks = otOfficeLocks;
@@ -1919,14 +2053,21 @@ async function handleProfileSubmit(e) {
   const currentEmail = otGetLoggedInEmail();
   const isAdmin = (otCurrentRole === 'admin' || (typeof activeSession !== 'undefined' && activeSession === 'admin'));
   if (data.officeCode) {
-    const lockedEmail = getOfficeLockedEmail(data.officeCode);
-    if (lockedEmail && !isAdmin && currentEmail && lockedEmail.toLowerCase() !== currentEmail.toLowerCase()) {
-      showToast(`This office is entered by ${lockedEmail}. Please login with ${lockedEmail} to add and edit details.`, 'error');
+    const canonical = getCanonicalOfficeCode(data.officeCode) || data.officeCode;
+    const lockCheck = await acquireOrVerifyOfficeLock(canonical, currentEmail, (data.enteredBy?.fullName || ''));
+    if (!lockCheck.success) {
+      const errMsg = lockCheck.message || "Submission failed: This office was just locked by another user. You cannot submit data for this office.";
+      showToast(errMsg, 'error');
+      if (lockCheck.owner) {
+        otOfficeLocks[canonical] = lockCheck.owner;
+        localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+        window.otOfficeLocks = otOfficeLocks;
+      }
+      checkOfficeAccessAndLock(data.officeCode);
       return;
     }
-    if (!lockedEmail && currentEmail) {
-      const lockKey = getCanonicalOfficeCode(data.officeCode) || data.officeCode;
-      otOfficeLocks[lockKey] = currentEmail;
+    if (currentEmail) {
+      otOfficeLocks[canonical] = currentEmail;
       delete otOfficeLocks['DTC'];
       localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
       window.otOfficeLocks = otOfficeLocks;
@@ -2010,6 +2151,8 @@ function saveOfficerRecordToStore(profile) {
       officer_designation: profile.designation,
       educational_qualification: profile.technicalQualification || profile.generalEducation || 'Plus Two',
       qualification_other: profile.technicalQualificationOther || '',
+      qualification_stream: profile.qualificationStream || '',
+      qualification_stream_other: profile.qualificationStreamOther || '',
       specialization: (profile.specializedSkills || []).join(', ') || 'General',
       technical_certifications: (profile.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', ') || 'None',
       training_attended: (profile.trainingHistory || []).map(t => t.attended).join('; ') || 'None',
@@ -2064,6 +2207,12 @@ function resetOfficerFormSync() {
   if (genEdGroup) genEdGroup.style.display = 'none';
   const techQualGroup = document.getElementById('otTechQualOtherGroup');
   if (techQualGroup) techQualGroup.style.display = 'none';
+  const streamGroup = document.getElementById('otTechStreamOtherGroup');
+  if (streamGroup) streamGroup.style.display = 'none';
+  const streamInput = document.getElementById('otTechStreamOtherInput');
+  if (streamInput) streamInput.value = '';
+  const streamSel = document.getElementById('otTechStreamSelect');
+  if (streamSel) streamSel.value = '';
 
   renderStagedTrainingTable();
   prefillEnteredByDetails();
@@ -2159,6 +2308,8 @@ function loadProfileForEditing(profileId) {
   const normGenEdOther = profile.generalEducationOther || profile.general_education_other || "";
   const normTechQual = profile.technicalQualification || profile.technical_qualification || profile.educational_qualification || "";
   const normTechQualOther = profile.technicalQualificationOther || profile.technical_qualification_other || profile.qualification_other || "";
+  const normStream = profile.qualificationStream || profile.qualification_stream || "";
+  const normStreamOther = profile.qualificationStreamOther || profile.qualification_stream_other || "";
   const normInstitution = profile.institution || "";
   const normPassingYear = profile.passingYear || profile.passing_year || profile.recent_training_year || "";
   const normGrade = profile.grade || profile.class_grade || "";
@@ -2270,6 +2421,19 @@ function loadProfileForEditing(profileId) {
   const techOtherIn = document.getElementById('otTechQualOtherInput');
   if (techOtherIn) {
     techOtherIn.value = (techQualSel && techQualSel.value === "Others" && !normTechQualOther) ? normTechQual : normTechQualOther;
+  }
+
+  const streamSel = document.getElementById('otTechStreamSelect');
+  if (streamSel) {
+    streamSel.value = normStream;
+    if (!streamSel.value && normStream) {
+      streamSel.value = "Others";
+    }
+    handleQualificationStreamChange(streamSel.value);
+  }
+  const streamOtherIn = document.getElementById('otTechStreamOtherInput');
+  if (streamOtherIn) {
+    streamOtherIn.value = (streamSel && streamSel.value === "Others" && !normStreamOther) ? normStream : normStreamOther;
   }
 
   document.getElementById('otTechInstitutionInput').value = normInstitution;
@@ -2512,7 +2676,7 @@ function openProfilePreviewModal(profile) {
         <h4><i class="fa-solid fa-graduation-cap"></i> 2. Academic & Basic Technical Credentials</h4>
         <div class="form-grid-2" style="font-size: 0.9rem; margin-bottom: 12px;">
           <div><strong>General Education:</strong> ${escapeHtml(profile.generalEducation === 'Others' ? profile.generalEducationOther : profile.generalEducation)}</div>
-          <div><strong>Basic Technical Qualification:</strong> <strong>${escapeHtml(profile.technicalQualification === 'Others' ? profile.technicalQualificationOther : profile.technicalQualification)}</strong></div>
+          <div><strong>Basic Technical Qualification:</strong> <strong>${escapeHtml(profile.technicalQualification === 'Others' ? profile.technicalQualificationOther : profile.technicalQualification)}</strong>${(profile.qualificationStream || profile.qualification_stream) ? ` (Stream: ${escapeHtml(((profile.qualificationStream || profile.qualification_stream) === 'Others') ? (profile.qualificationStreamOther || profile.qualification_stream_other || 'Others') : (profile.qualificationStream || profile.qualification_stream))})` : ''}</div>
           <div><strong>Institution / Board / University:</strong> ${escapeHtml(profile.institution || 'N/A')}</div>
           <div><strong>Passing Year & Grade:</strong> ${escapeHtml(profile.passingYear || 'N/A')} (${escapeHtml(profile.grade || 'N/A')})</div>
         </div>
@@ -2812,7 +2976,7 @@ function exportOfficersDirectoryDualCSV() {
   // 1. Primary Profiles CSV
   const profileHeaders = [
     "PEN", "Full Name", "Designation", "Office Code", "Office Name",
-    "General Education", "Basic Technical Qualification", "Institution", "Passing Year", "Grade",
+    "General Education", "Basic Technical Qualification", "Stream", "Institution", "Passing Year", "Grade",
     "Completed Additional Quals", "Pursuing Additional Quals", "Specialized Skills",
     "Willingness to Contribute",
     "Total Trainings Count", "Status", "Entered By Name", "Entered By Designation", "Entered By Mobile", "Last Updated IST"
@@ -2823,6 +2987,7 @@ function exportOfficersDirectoryDualCSV() {
     const purQuals = (p.additionalQualifications || []).filter(q => q.status === 'Pursuing').map(q => q.qualification).join("; ");
     const skills = (p.specializedSkills || []).join("; ");
     const trCount = (p.trainingHistory || []).length;
+    const streamStr = ((p.qualificationStream || p.qualification_stream) === 'Others' ? (p.qualificationStreamOther || p.qualification_stream_other) : (p.qualificationStream || p.qualification_stream)) || '';
 
     return [
       `"${p.pen}"`,
@@ -2832,6 +2997,7 @@ function exportOfficersDirectoryDualCSV() {
       `"${p.officeName.replace(/"/g, '""')}"`,
       `"${p.generalEducation === 'Others' ? p.generalEducationOther : p.generalEducation}"`,
       `"${p.technicalQualification === 'Others' ? p.technicalQualificationOther : p.technicalQualification}"`,
+      `"${streamStr.replace(/"/g, '""')}"`,
       `"${(p.institution || '').replace(/"/g, '""')}"`,
       p.passingYear || "",
       `"${(p.grade || '').replace(/"/g, '""')}"`,
@@ -3184,7 +3350,8 @@ function renderOfficeSummaryReport() {
             <td><strong>${escapeHtml(p.designation)}</strong></td>
             <td>${escapeHtml(p.generalEducation === 'Others' ? p.generalEducationOther : p.generalEducation)}</td>
             <td>
-              <strong>${escapeHtml(p.technicalQualification === 'Others' ? p.technicalQualificationOther : p.technicalQualification)}</strong><br>
+              <strong>${escapeHtml(p.technicalQualification === 'Others' ? p.technicalQualificationOther : p.technicalQualification)}</strong>
+              ${(p.qualificationStream || p.qualification_stream) ? `<br><small style="color: #1d4ed8; font-weight: 600;">Stream: ${escapeHtml(((p.qualificationStream || p.qualification_stream) === 'Others') ? (p.qualificationStreamOther || p.qualification_stream_other || 'Others') : (p.qualificationStream || p.qualification_stream))}</small>` : ''}<br>
               <small style="color: #475569;">${escapeHtml(p.institution || 'N/A')}</small><br>
               <small style="color: #047857;">Passing Year: ${p.passingYear || 'N/A'} • Grade: ${escapeHtml(p.grade || 'N/A')}</small>
             </td>
@@ -4099,6 +4266,8 @@ function subscribeToRealtimeOfficerProfiles() {
             generalEducationOther: newRec.general_education_other || "",
             technicalQualification: newRec.technical_qualification || "B.Tech",
             technicalQualificationOther: newRec.technical_qualification_other || "",
+            qualificationStream: newRec.qualification_stream || "",
+            qualificationStreamOther: newRec.qualification_stream_other || "",
             institution: newRec.institution || "",
             passingYear: newRec.passing_year || 2020,
             grade: newRec.class_grade || "",
@@ -4164,6 +4333,36 @@ function subscribeToRealtimeOfficerProfiles() {
           } catch (e) {
             console.warn("Could not process realtime office_locks update:", e);
           }
+        }
+      }
+    ).on(
+      'postgres_changes',
+      { event: '*', schema: 'public', table: 'mvd_office_locks' },
+      (payload) => {
+        console.log("Supabase Realtime event for mvd_office_locks:", payload);
+        try {
+          const { eventType, new: newRec, old: oldRec } = payload;
+          const officeCode = (newRec?.office_code || oldRec?.office_code || '').trim().toUpperCase();
+          const canonical = getCanonicalOfficeCode(officeCode) || officeCode;
+
+          if (eventType === 'DELETE' && canonical) {
+            delete otOfficeLocks[canonical];
+            if (window.otOfficeLocks) delete window.otOfficeLocks[canonical];
+          } else if (newRec && newRec.office_code && newRec.locked_email) {
+            otOfficeLocks[canonical] = newRec.locked_email.trim();
+            if (window.otOfficeLocks) window.otOfficeLocks[canonical] = newRec.locked_email.trim();
+          }
+
+          localStorage.setItem('mvd_ot_office_locks', JSON.stringify(otOfficeLocks));
+          if (typeof window.renderAdminOfficeLocksTable === 'function') {
+            window.renderAdminOfficeLocksTable();
+          }
+          const currentOffice = document.getElementById('otMainOfficeSelect')?.value;
+          if (currentOffice && typeof checkOfficeAccessAndLock === 'function') {
+            checkOfficeAccessAndLock(currentOffice);
+          }
+        } catch (errLock) {
+          console.warn("Realtime mvd_office_locks update warning:", errLock);
         }
       }
     ).on(
@@ -4257,6 +4456,8 @@ async function syncOfficerProfilesWithSupabase() {
         generalEducationOther: row.general_education_other || "",
         technicalQualification: row.technical_qualification || "B.Tech",
         technicalQualificationOther: row.technical_qualification_other || "",
+        qualificationStream: row.qualification_stream || "",
+        qualificationStreamOther: row.qualification_stream_other || "",
         institution: row.institution || "",
         passingYear: row.passing_year || 2020,
         grade: row.class_grade || "",
@@ -4309,6 +4510,8 @@ async function syncOfficerProfilesWithSupabase() {
           generalEducationOther: "",
           technicalQualification: row.educational_qualification || "B.Tech",
           technicalQualificationOther: row.qualification_other || "",
+          qualificationStream: row.qualification_stream || "",
+          qualificationStreamOther: row.qualification_stream_other || "",
           institution: row.training_institutes || "",
           passingYear: row.recent_training_year || 2018,
           grade: "First Class",
@@ -4459,6 +4662,8 @@ async function saveOfficerQualificationToSupabase(record) {
       general_education_other: record.generalEducationOther || null,
       technical_qualification: record.technicalQualification || 'B.Tech',
       technical_qualification_other: record.technicalQualificationOther || null,
+      qualification_stream: record.qualificationStream || null,
+      qualification_stream_other: record.qualificationStreamOther || null,
       institution: record.institution || null,
       passing_year: record.passingYear ? parseInt(record.passingYear) : null,
       class_grade: record.grade || null,
@@ -4500,6 +4705,8 @@ async function saveOfficerQualificationToSupabase(record) {
         officer_email: record.enteredBy?.userId,
         educational_qualification: record.technicalQualification || record.generalEducation || 'Plus Two',
         qualification_other: record.technicalQualificationOther,
+        qualification_stream: record.qualificationStream || null,
+        qualification_stream_other: record.qualificationStreamOther || null,
         specialization: (record.specializedSkills || []).join(', '),
         technical_certifications: (record.additionalQualifications || []).map(q => `${q.qualification} (${q.status})`).join(', '),
         willingness_to_contribute: record.willingnessToContribute || null,
@@ -4703,6 +4910,8 @@ function getAdminOfficerDashboardData() {
         pen: p.pen || p.officer_pen || '',
         designation: p.designation || p.current_designation || p.officer_designation || 'AMVI',
         basicQualification: p.technicalQualification || p.technical_qualification || p.educational_qualification || p.generalEducation || 'Diploma',
+        qualificationStream: p.qualificationStream || p.qualification_stream || '',
+        qualificationStreamOther: p.qualificationStreamOther || p.qualification_stream_other || '',
         institution: p.institution || '',
         passingYear: p.passingYear || p.passing_year || '',
         grade: p.grade || p.class_grade || '',
@@ -4748,6 +4957,8 @@ function getAdminOfficerDashboardData() {
         pen: o.officer_pen || '',
         designation: o.officer_designation || 'AMVI',
         basicQualification: o.educational_qualification || 'Diploma',
+        qualificationStream: o.qualification_stream || '',
+        qualificationStreamOther: o.qualification_stream_other || '',
         institution: '',
         passingYear: o.recent_training_year || '',
         grade: '',
@@ -5461,7 +5672,7 @@ function exportOfficerDashboardToExcel() {
 
   const columnHeaders = [
     "Sl No", "Office Code", "Office Name", "Officer Full Name", "PEN", "Designation",
-    "Basic Technical Qualification", "Institution", "Passing Year", "Class / Grade",
+    "Basic Technical Qualification", "Stream", "Institution", "Passing Year", "Class / Grade",
     "Additional Qualifications", "Specialized Skills", "In-Service Trainings Count",
     "Training Courses Attended", "Willingness to Contribute More",
     "Entered By Name", "Entered By Designation", "Entered By Mobile", "Status"
@@ -5472,6 +5683,7 @@ function exportOfficerDashboardToExcel() {
     const skillsStr = (o.specializedSkills || []).join(', ') || (o.customSkills || 'None');
     const trainCount = (o.trainingHistory || []).length;
     const trainCourses = (o.trainingHistory || []).map(t => `${t.attended} (${t.conductedBy || 'MVD'})`).join('; ') || 'None';
+    const streamStr = (o.qualificationStream === 'Others' ? (o.qualificationStreamOther || 'Others') : (o.qualificationStream || '')) || '';
 
     return [
       idx + 1,
@@ -5481,6 +5693,7 @@ function exportOfficerDashboardToExcel() {
       o.pen || '',
       o.designation || '',
       o.basicQualification || '',
+      streamStr,
       o.institution || '',
       o.passingYear || '',
       o.grade || '',
@@ -5500,7 +5713,7 @@ function exportOfficerDashboardToExcel() {
 
   ws['!cols'] = [
     { wch: 6 },  { wch: 12 }, { wch: 26 }, { wch: 24 }, { wch: 12 }, { wch: 18 },
-    { wch: 22 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 34 }, { wch: 32 },
+    { wch: 22 }, { wch: 22 }, { wch: 28 }, { wch: 12 }, { wch: 16 }, { wch: 34 }, { wch: 32 },
     { wch: 12 }, { wch: 38 }, { wch: 35 }, { wch: 20 }, { wch: 20 }, { wch: 14 },
     { wch: 12 }
   ];
@@ -5609,7 +5822,7 @@ function exportOfficerDashboardToPDF() {
       `${o.officeCode}\n${(o.officeName || '').replace(/^(RTO|SRTO|DTC),?\s*/i, '')}`,
       `${o.officerFullName}\nPEN: ${o.pen}`,
       o.designation,
-      `${o.basicQualification}${o.passingYear ? ' (' + o.passingYear + ')' : ''}`,
+      `${o.basicQualification}${o.qualificationStream ? ' - ' + (o.qualificationStream === 'Others' ? (o.qualificationStreamOther || 'Others') : o.qualificationStream) : ''}${o.passingYear ? ' (' + o.passingYear + ')' : ''}`,
       addl,
       skills,
       trStr,
