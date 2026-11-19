@@ -270,6 +270,8 @@ localStorage.setItem('mvd_it_portal_modules', JSON.stringify(portalModules));
 // Chart Instances
 let chartHealthInstance = null;
 let chartAgeInstance = null;
+let chartUpsConditionInstance = null;
+let chartUpsCapacityInstance = null;
 let chartOfficerQualInstance = null;
 let chartOfficerDesigInstance = null;
 
@@ -2483,8 +2485,11 @@ function openEnteredOfficeSummaryWindow(officeName) {
         </div>
         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
           <span class="badge badge-working" style="font-size: 0.85rem; padding: 6px 12px;"><i class="fa-solid fa-circle-check"></i> RECORDED &amp; SYNCHRONIZED</span>
-          <button type="button" class="btn btn-outline btn-sm print-hide" onclick="printEnteredOfficeSummary()" style="background: #ffffff; color: #064e3b; border: 1.5px solid #059669; font-weight: 700; border-radius: 6px; padding: 4px 10px;">
-            <i class="fa-solid fa-print"></i> Download / Print
+          <button type="button" class="btn btn-sm print-hide" onclick="downloadEnteredOfficeSummaryPDF()" style="background: #10b981; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 5px 12px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-download"></i> Download PDF
+          </button>
+          <button type="button" class="btn btn-outline btn-sm print-hide" onclick="printEnteredOfficeSummary()" style="background: #ffffff; color: #064e3b; border: 1.5px solid #059669; font-weight: 700; border-radius: 6px; padding: 5px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-print"></i> Print
           </button>
         </div>
       </div>
@@ -2722,11 +2727,37 @@ function printEnteredOfficeSummary() {
   document.body.classList.add('printing-modal');
 
   const modal = document.getElementById('publicOfficeSummaryModal');
+  const modalCard = modal ? modal.querySelector('.modal-card') : null;
+  const body = document.getElementById('publicModalOfficeBody');
   if (modal) modal.classList.add('print-active');
+
+  const prevMaxHeight = body ? body.style.maxHeight : '';
+  const prevOverflowY = body ? body.style.overflowY : '';
+  const prevCardMaxHeight = modalCard ? modalCard.style.maxHeight : '';
+  const prevCardOverflowY = modalCard ? modalCard.style.overflowY : '';
+
+  if (body) {
+    body.style.maxHeight = 'none';
+    body.style.overflowY = 'visible';
+    body.style.overflow = 'visible';
+  }
+  if (modalCard) {
+    modalCard.style.maxHeight = 'none';
+    modalCard.style.overflowY = 'visible';
+    modalCard.style.overflow = 'visible';
+  }
 
   const cleanup = () => {
     document.body.classList.remove('printing-modal');
     if (modal) modal.classList.remove('print-active');
+    if (body) {
+      body.style.maxHeight = prevMaxHeight;
+      body.style.overflowY = prevOverflowY;
+    }
+    if (modalCard) {
+      modalCard.style.maxHeight = prevCardMaxHeight;
+      modalCard.style.overflowY = prevCardOverflowY;
+    }
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
@@ -2735,6 +2766,351 @@ function printEnteredOfficeSummary() {
   setTimeout(cleanup, 2500);
 }
 window.printEnteredOfficeSummary = printEnteredOfficeSummary;
+
+function downloadEnteredOfficeSummaryPDF(officeName) {
+  const name = officeName || currentWindowOfficeName || document.getElementById('officeSelect')?.value;
+  if (!name) {
+    if (typeof showToast === 'function') showToast("Please select an office first", "warning");
+    return;
+  }
+
+  const data = inventoryStore[name] || {
+    officeName: name,
+    lastUpdated: 'Just now'
+  };
+
+  const jsPDF = window.jspdf ? window.jspdf.jsPDF : (typeof jspdf !== 'undefined' ? jspdf.jsPDF : null);
+  if (!jsPDF) {
+    if (typeof showToast === 'function') showToast("jsPDF library unavailable; opening print view...", "warning");
+    printEnteredOfficeSummary();
+    return;
+  }
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'pt',
+    format: 'a4'
+  });
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+
+  // 1. Header Banner
+  doc.setFillColor(11, 59, 36);
+  doc.rect(0, 0, 595.28, 64, 'F');
+
+  doc.setTextColor(167, 243, 208);
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text("GOVERNMENT OF KERALA • MOTOR VEHICLES DEPARTMENT", 40, 24);
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text("VERIFIED IT & POWER INFRASTRUCTURE RECORD", 40, 44);
+
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(209, 250, 229);
+  doc.text(`Generated: ${dateStr}`, 555.28, 44, { align: 'right' });
+
+  // 2. Metadata Box
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(40, 74, 515.28, 76, 4, 4, 'FD');
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(10.5);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Office Name: ${data.officeName || name}`, 50, 92);
+
+  doc.setFontSize(8.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(71, 85, 105);
+
+  const officerName = data.entryOfficerName || data.createdOfficerName || 'N/A';
+  const officerDesig = data.entryOfficerDesignation || data.createdOfficerDesignation || 'N/A';
+  const officerMobile = data.entryOfficerMobile || data.createdOfficerMobile || 'N/A';
+  const officerEmail = data.submittedByEmail || data.entryOfficerEmail || 'N/A';
+  const lastUpdated = data.lastUpdated || 'Saved';
+
+  doc.text(`Submitting Officer: ${officerName} (${officerDesig})`, 50, 108);
+  doc.text(`Contact: ${officerMobile} | Email: ${officerEmail}`, 50, 122);
+  doc.text(`Record Status: RECORDED & SYNCHRONIZED | Last Updated: ${lastUpdated}`, 50, 136);
+
+  const netProvider = data.availableNetwork || 'N/A';
+  const netSpeed = data.networkSpeed || 'N/A';
+  const netSwitches = data.switchesAvailable ? `${data.switchesAvailable}${data.switchesDetails ? ' (' + data.switchesDetails + ')' : ''}` : 'N/A';
+  const osName = data.operatingSystem || 'N/A';
+
+  doc.text(`Network: ${netProvider} (${netSpeed})`, 330, 108);
+  doc.text(`LAN Switches: ${netSwitches}`, 330, 122);
+  doc.text(`Operating System: ${osName}`, 330, 136);
+
+  let currentY = 162;
+
+  // 3. SECTION 1: Core IT Computing Hardware
+  const p = data.printers || {};
+  const dotW = p.dotMatrix?.working ?? data.dot_matrix_working ?? 0;
+  const dotNW = p.dotMatrix?.notWorking ?? data.dot_matrix_not_working ?? 0;
+  const dotMulti = !!(p.dotMatrix?.multipurpose);
+
+  const laserW = p.laser?.working ?? data.laser_working ?? 0;
+  const laserNW = p.laser?.notWorking ?? data.laser_not_working ?? 0;
+  const laserMulti = !!(p.laser?.multipurpose);
+
+  const inkW = p.inkjet?.working ?? data.inkjet_working ?? 0;
+  const inkNW = p.inkjet?.notWorking ?? data.inkjet_not_working ?? 0;
+  const inkMulti = !!(p.inkjet?.multipurpose);
+
+  const xeroxW = p.xerox?.working ?? data.xerox_working ?? 0;
+  const xeroxNW = p.xerox?.notWorking ?? data.xerox_not_working ?? 0;
+  const xeroxMulti = !!(p.xerox?.multipurpose);
+
+  const otherW = p.others?.working ?? data.others_working ?? 0;
+  const otherNW = p.others?.notWorking ?? data.others_not_working ?? 0;
+  const otherMulti = !!(p.others?.multipurpose);
+
+  const totalPrintersW = dotW + laserW + inkW + xeroxW + otherW;
+  const totalPrintersNW = dotNW + laserNW + inkNW + xeroxNW + otherNW;
+  const totalPrinters = totalPrintersW + totalPrintersNW;
+
+  const mWorking = data.monitorsWorking ?? 0;
+  const mNotWorking = data.monitorsNotWorking ?? 0;
+  const cpuWorking = data.cpuWorking ?? 0;
+  const cpuNotWorking = data.cpuNotWorking ?? 0;
+  const lapWorking = data.laptopsWorking ?? 0;
+  const lapNotWorking = data.laptopsNotWorking ?? 0;
+  const aioWorking = data.aioWorking ?? 0;
+  const aioNotWorking = data.aioNotWorking ?? 0;
+
+  const totalWorkingWorkstations = mWorking + cpuWorking + lapWorking + aioWorking;
+  const totalNotWorkingWorkstations = mNotWorking + cpuNotWorking + lapNotWorking + aioNotWorking;
+  const totalWorkstations = totalWorkingWorkstations + totalNotWorkingWorkstations;
+
+  doc.setTextColor(11, 59, 36);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text("1. Core IT Computing Hardware Inventory", 40, currentY);
+  currentY += 8;
+
+  const computingRows = [
+    ["Monitors / TFT Screens", String(mWorking), String(mNotWorking), String(mWorking + mNotWorking)],
+    ["Desktop CPU Units", String(cpuWorking), String(cpuNotWorking), String(cpuWorking + cpuNotWorking)],
+    ["Laptops / Portable Workstations", String(lapWorking), String(lapNotWorking), String(lapWorking + lapNotWorking)],
+    ["All-in-One (AIO) PCs", String(aioWorking), String(aioNotWorking), String(aioWorking + aioNotWorking)],
+    ["Total Workstation Hardware", String(totalWorkingWorkstations), String(totalNotWorkingWorkstations), String(totalWorkstations)]
+  ];
+
+  doc.autoTable({
+    startY: currentY,
+    head: [["Equipment Category", "Working Units", "Defective Units", "Total Fleet"]],
+    body: computingRows,
+    theme: 'grid',
+    margin: { left: 40, right: 40 },
+    headStyles: { fillColor: [11, 59, 36], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
+    bodyStyles: { fontSize: 8.5, cellPadding: 3.5 },
+    columnStyles: {
+      0: { cellWidth: 235, halign: 'left', fontStyle: 'bold' },
+      1: { cellWidth: 93, halign: 'center', textColor: [4, 120, 87] },
+      2: { cellWidth: 93, halign: 'center', textColor: [185, 28, 28] },
+      3: { cellWidth: 94, halign: 'center', fontStyle: 'bold' }
+    },
+    didParseCell: function(cellData) {
+      if (cellData.row.index === 4) {
+        cellData.cell.styles.fontStyle = 'bold';
+        cellData.cell.styles.fillColor = [241, 245, 249];
+      }
+    }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 16;
+
+  // 4. SECTION 2: Printer & Imaging Equipment Section
+  doc.setTextColor(11, 59, 36);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`2. Printer & Imaging Equipment Section (Total Fleet: ${totalPrinters})`, 40, currentY);
+  currentY += 8;
+
+  const printerRows = [
+    ["Dot Matrix Printers (High-duty RC/Permit)", String(dotW), String(dotNW), dotMulti ? "Multipurpose" : "Dedicated", String(dotW + dotNW)],
+    ["Laser Printers (Office & Counter)", String(laserW), String(laserNW), laserMulti ? "Multipurpose" : "Dedicated", String(laserW + laserNW)],
+    ["Inkjet Printers (Color/Draft)", String(inkW), String(inkNW), inkMulti ? "Multipurpose" : "Dedicated", String(inkW + inkNW)],
+    ["Photocopier / Multi-Function (Xerox)", String(xeroxW), String(xeroxNW), xeroxMulti ? "Multipurpose" : "Dedicated", String(xeroxW + xeroxNW)],
+    ["Scanners & Other Imaging Units", String(otherW), String(otherNW), otherMulti ? "Multipurpose" : "Dedicated", String(otherW + otherNW)],
+    ["Total Printer & Imaging Fleet", String(totalPrintersW), String(totalPrintersNW), "—", String(totalPrinters)]
+  ];
+
+  doc.autoTable({
+    startY: currentY,
+    head: [["Printer / Imaging Category", "Working", "Defective", "Function Type", "Category Total"]],
+    body: printerRows,
+    theme: 'grid',
+    margin: { left: 40, right: 40 },
+    headStyles: { fillColor: [11, 59, 36], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5, halign: 'center' },
+    bodyStyles: { fontSize: 8.5, cellPadding: 3.5 },
+    columnStyles: {
+      0: { cellWidth: 215, halign: 'left', fontStyle: 'bold' },
+      1: { cellWidth: 75, halign: 'center', textColor: [4, 120, 87] },
+      2: { cellWidth: 75, halign: 'center', textColor: [185, 28, 28] },
+      3: { cellWidth: 75, halign: 'center' },
+      4: { cellWidth: 75, halign: 'center', fontStyle: 'bold' }
+    },
+    didParseCell: function(cellData) {
+      if (cellData.row.index === 5) {
+        cellData.cell.styles.fontStyle = 'bold';
+        cellData.cell.styles.fillColor = [241, 245, 249];
+      }
+    }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 16;
+
+  if (currentY > 660) {
+    doc.addPage();
+    currentY = 40;
+  }
+
+  // 5. SECTION 3: Power and Battery Infrastructure
+  doc.setTextColor(11, 59, 36);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text("3. Power and Battery Infrastructure", 40, currentY);
+  currentY += 8;
+
+  const upsW = data.upsWorking ?? 0;
+  const upsNW = data.upsNotWorking ?? 0;
+  const upsTotal = (data.upsUnitsCount && data.upsUnitsCount > 0) ? data.upsUnitsCount : (upsW + upsNW);
+  const upsCap = data.upsCapacity ? (data.upsCapacity === 'Other' && data.upsCapacityOther ? `${data.upsCapacityOther} (Custom)` : data.upsCapacity) : (data.upsCapacityOther || 'Not Specified');
+  const batInUse = data.batteriesInUse ?? 0;
+  const batNotInUse = data.batteriesNotInUse ?? 0;
+  const minBat = data.minBatteriesRequired ?? 0;
+
+  const powerRows = [
+    ["UPS Operational Status", `Available: ${data.upsAvailable || 'Yes'} | Condition: ${data.upsCondition || 'Satisfactory'}`],
+    ["UPS Fleet & Rating", `Total Units: ${upsTotal} (Working: ${upsW}, Defective: ${upsNW}) | Capacity: ${upsCap}`],
+    ["Battery Bank Profile", `Make: ${data.batteryMake || 'N/A'} | Rating: ${data.batteryAh ? data.batteryAh + ' Ah' : 'N/A'}`],
+    ["Battery Provisioning", `In Use: ${batInUse} units | Standby: ${batNotInUse} units | Min Required: ${minBat} units (${minBat > batInUse ? 'SHORTFALL' : 'ADEQUATE'})`],
+    ["TCO Service Report", `Sent to TC: ${data.serviceReportSent || 'No'} | Submission Date: ${data.serviceReportDate || 'N/A'}`],
+    ["Power & Backup Remarks", data.powerRemarks || 'No power remarks specified.']
+  ];
+
+  doc.autoTable({
+    startY: currentY,
+    head: [["Power & UPS Audit Parameter", "Observed Value & Details"]],
+    body: powerRows,
+    theme: 'grid',
+    margin: { left: 40, right: 40 },
+    headStyles: { fillColor: [4, 120, 87], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+    bodyStyles: { fontSize: 8.5, cellPadding: 3.5 },
+    columnStyles: {
+      0: { cellWidth: 165, fontStyle: 'bold', fillColor: [248, 250, 252] },
+      1: { cellWidth: 350 }
+    }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 16;
+
+  if (currentY > 660) {
+    doc.addPage();
+    currentY = 40;
+  }
+
+  // 6. SECTION 4: System Age Distribution Profile
+  const ageU3 = data.ageUnder3 ?? 0;
+  const age35 = data.age3To5 ?? 0;
+  const age58 = data.age5To8 ?? 0;
+  const ageA8 = data.ageAbove8 ?? 0;
+  const totalAged = ageU3 + age35 + age58 + ageA8;
+
+  doc.setTextColor(11, 59, 36);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`4. System Age Distribution Profile (Total Categorized: ${totalAged})`, 40, currentY);
+  currentY += 8;
+
+  const ageRows = [
+    ["< 3 Years (Modern Fleet)", String(ageU3), ageU3 > 0 ? "Under Warranty / Current Generation" : "None Recorded"],
+    ["3 – 5 Years (Standard Active)", String(age35), age35 > 0 ? "Operational Lifecycle Standard" : "None Recorded"],
+    ["5 – 8 Years (Aging Hardware)", String(age58), age58 > 0 ? "Extended Service / Review Lifecycle" : "None Recorded"],
+    ["> 8 Years (Obsolete / Replacement Due)", String(ageA8), ageA8 > 0 ? "HIGH PRIORITY: End of Life / Replace" : "None Recorded"],
+    ["Total Hardware Audited", String(totalAged), "100% of recorded systems"]
+  ];
+
+  doc.autoTable({
+    startY: currentY,
+    head: [["Age Category", "System Count", "Audit & Lifecycle Status"]],
+    body: ageRows,
+    theme: 'grid',
+    margin: { left: 40, right: 40 },
+    headStyles: { fillColor: [11, 59, 36], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+    bodyStyles: { fontSize: 8.5, cellPadding: 3.5 },
+    columnStyles: {
+      0: { cellWidth: 200, fontStyle: 'bold' },
+      1: { cellWidth: 95, halign: 'center', fontStyle: 'bold' },
+      2: { cellWidth: 220 }
+    },
+    didParseCell: function(cellData) {
+      if (cellData.row.index === 4) {
+        cellData.cell.styles.fontStyle = 'bold';
+        cellData.cell.styles.fillColor = [241, 245, 249];
+      }
+    }
+  });
+
+  currentY = doc.lastAutoTable.finalY + 16;
+
+  if (currentY > 660) {
+    doc.addPage();
+    currentY = 40;
+  }
+
+  // 7. SECTION 5: Specific Condition Remarks & Digital Certification
+  doc.setTextColor(11, 59, 36);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text("5. Specific Condition Remarks & Digital Certification", 40, currentY);
+  currentY += 8;
+
+  const remarksRows = [
+    ["General Hardware Remarks", data.remarks || 'No general hardware remarks recorded.'],
+    ["Digital Verification Statement", "I hereby certify that the computing systems, printers, network, and power/battery infrastructure details listed above have been physically inspected and verified for this office under the Motor Vehicles Department IT Audit."]
+  ];
+
+  doc.autoTable({
+    startY: currentY,
+    head: [["Parameter", "Verification & Attestation"]],
+    body: remarksRows,
+    theme: 'grid',
+    margin: { left: 40, right: 40 },
+    headStyles: { fillColor: [11, 59, 36], textColor: [255, 255, 255], fontStyle: 'bold', fontSize: 8.5 },
+    bodyStyles: { fontSize: 8.5, cellPadding: 3.5 },
+    columnStyles: {
+      0: { cellWidth: 155, fontStyle: 'bold', fillColor: [248, 250, 252] },
+      1: { cellWidth: 360 }
+    }
+  });
+
+  // Page Numbers and Footer
+  const totalPages = doc.internal.getNumberOfPages();
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i);
+    doc.setDrawColor(203, 213, 225);
+    doc.line(40, 802, 555.28, 802);
+
+    doc.setFontSize(7.5);
+    doc.setTextColor(100, 116, 139);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Motor Vehicles Department, Kerala • Verified IT Infrastructure Record • ${data.officeName || name}`, 40, 816);
+    doc.text(`Page ${i} of ${totalPages}`, 555.28, 816, { align: 'right' });
+  }
+
+  const cleanName = (data.officeName || name).replace(/[^a-zA-Z0-9_-]/g, '_');
+  doc.save(`MVD_IT_Equipment_Record_${cleanName}.pdf`);
+  if (typeof showToast === 'function') showToast(`Downloaded PDF for ${data.officeName || name}`, "success");
+}
+window.downloadEnteredOfficeSummaryPDF = downloadEnteredOfficeSummaryPDF;
 
 function openStandalonePrintWindow() {
   printEnteredOfficeSummary();
@@ -2954,13 +3330,61 @@ function renderAdminDashboard() {
   });
 
   let switchesCount = 0, serversCount = 0, upsWorkingCount = 0, upsNotWorkingCount = 0, serviceReportsSentCount = 0;
+  let officesWithUps = 0, officesWithoutUps = 0;
+  let totalBatteriesInUse = 0, totalBatteriesNotInUse = 0, totalMinBatteriesRequired = 0;
+  let batteryDeficitOffices = 0;
+  const batteryMakes = {};
+  const batteryAhs = {};
+  const upsCapacityCounts = {
+    '0.5 kVA': 0,
+    '1 kVA': 0,
+    '2 kVA': 0,
+    '3 kVA': 0,
+    '5 kVA': 0,
+    '10 kVA': 0,
+    'Other / Custom': 0
+  };
 
   entries.forEach(e => {
     if (e.switchesAvailable === 'Yes') switchesCount++;
     if (e.serversAvailable === 'Yes') serversCount++;
-    upsWorkingCount += (e.upsWorking || 0);
-    upsNotWorkingCount += (e.upsNotWorking || 0);
+    const uw = e.upsWorking || 0;
+    const unw = e.upsNotWorking || 0;
+    upsWorkingCount += uw;
+    upsNotWorkingCount += unw;
     if (e.serviceReportSent === 'Yes') serviceReportsSentCount++;
+
+    if (e.upsAvailable === 'No') {
+      officesWithoutUps++;
+    } else {
+      officesWithUps++;
+    }
+
+    const inUse = e.batteriesInUse || 0;
+    const notInUse = e.batteriesNotInUse || 0;
+    const minReq = e.minBatteriesRequired || 0;
+    totalBatteriesInUse += inUse;
+    totalBatteriesNotInUse += notInUse;
+    totalMinBatteriesRequired += minReq;
+    if (minReq > inUse) batteryDeficitOffices++;
+
+    if (e.batteryMake && e.batteryMake.trim()) {
+      const m = e.batteryMake.trim();
+      batteryMakes[m] = (batteryMakes[m] || 0) + 1;
+    }
+    if (e.batteryAh) {
+      const ah = `${e.batteryAh} Ah`;
+      batteryAhs[ah] = (batteryAhs[ah] || 0) + 1;
+    }
+
+    const cap = (e.upsCapacity || '').trim();
+    if (cap === '0.5 kVA') upsCapacityCounts['0.5 kVA']++;
+    else if (cap === '1 kVA') upsCapacityCounts['1 kVA']++;
+    else if (cap === '2 kVA') upsCapacityCounts['2 kVA']++;
+    else if (cap === '3 kVA') upsCapacityCounts['3 kVA']++;
+    else if (cap === '5 kVA') upsCapacityCounts['5 kVA']++;
+    else if (cap === '10 kVA') upsCapacityCounts['10 kVA']++;
+    else if (cap || e.upsCapacityOther) upsCapacityCounts['Other / Custom']++;
   });
 
   if (document.getElementById('kpiOfficesReported')) document.getElementById('kpiOfficesReported').textContent = filterVal === 'ALL' ? `${totalOffices} / ${MVD_OFFICES.length}` : (totalOffices > 0 ? 'Reported ✓' : 'Pending');
@@ -3006,6 +3430,179 @@ function renderAdminDashboard() {
       },
       options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { y: { beginAtZero: true } } }
     });
+  }
+
+  // Row 2 Charts: UPS Condition & UPS Capacity
+  const ctxUpsCond = document.getElementById('chartDashboardUpsCondition')?.getContext('2d');
+  if (ctxUpsCond) {
+    if (chartUpsConditionInstance) chartUpsConditionInstance.destroy();
+    chartUpsConditionInstance = new Chart(ctxUpsCond, {
+      type: 'doughnut',
+      data: {
+        labels: ['Working UPS Units', 'Defective UPS Units'],
+        datasets: [{
+          data: [upsWorkingCount || (upsNotWorkingCount === 0 ? 1 : 0), upsNotWorkingCount || 0],
+          backgroundColor: ['#10b981', '#ef4444'],
+          borderWidth: 2,
+          borderColor: '#ffffff'
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'bottom' },
+          tooltip: {
+            callbacks: {
+              label: function(context) {
+                const total = upsWorkingCount + upsNotWorkingCount;
+                const val = context.raw || 0;
+                const pct = total > 0 ? ((val / total) * 100).toFixed(1) : 0;
+                return `${context.label}: ${val} units (${pct}%)`;
+              }
+            }
+          }
+        }
+      }
+    });
+  }
+
+  const ctxUpsCap = document.getElementById('chartDashboardUpsCapacity')?.getContext('2d');
+  if (ctxUpsCap) {
+    if (chartUpsCapacityInstance) chartUpsCapacityInstance.destroy();
+    chartUpsCapacityInstance = new Chart(ctxUpsCap, {
+      type: 'bar',
+      data: {
+        labels: Object.keys(upsCapacityCounts),
+        datasets: [{
+          label: 'Number of Offices',
+          data: Object.values(upsCapacityCounts),
+          backgroundColor: ['#06b6d4', '#3b82f6', '#6366f1', '#8b5cf6', '#10b981', '#f59e0b', '#ec4899'],
+          borderRadius: 6
+        }]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: {
+            beginAtZero: true,
+            ticks: { precision: 0 }
+          }
+        }
+      }
+    });
+  }
+
+  // Row 3: Available Network Distribution Grid
+  const netGridEl = document.getElementById('networkStatsGrid');
+  if (netGridEl) {
+    const netMeta = [
+      { name: 'KSWAN', icon: 'fa-shield-halved', colorClass: 'emerald', sub: 'Kerala State WAN' },
+      { name: 'KFONE', icon: 'fa-network-wired', colorClass: 'cyan', sub: 'State Optical Fiber' },
+      { name: 'BSNL', icon: 'fa-tower-broadcast', colorClass: 'indigo', sub: 'Govt Telecom ISP' },
+      { name: 'JIO', icon: 'fa-wifi', colorClass: 'purple', sub: 'Commercial Fiber / 4G' },
+      { name: 'Keralam Vision', icon: 'fa-satellite-dish', colorClass: 'gold', sub: 'Regional Broadband' },
+      { name: 'Asianet', icon: 'fa-globe', colorClass: 'rose', sub: 'Commercial Broadband' },
+      { name: 'Others', icon: 'fa-circle-nodes', colorClass: 'amber', sub: 'Local / Other ISP' }
+    ];
+
+    netGridEl.innerHTML = netMeta.map(item => {
+      const count = networkCounts[item.name] || 0;
+      const pct = entries.length > 0 ? Math.round((count / entries.length) * 100) : 0;
+      return `
+        <div class="metric-card ${item.colorClass}" onclick="drillDownDashboard('network')" style="cursor: pointer;" title="Click to view ${item.name} network offices">
+          <div class="metric-icon"><i class="fa-solid ${item.icon}"></i></div>
+          <div class="metric-content">
+            <h4>${item.name} <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+            <div class="metric-value">${count} <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Offices</span></div>
+            <div class="metric-sub">${item.sub} • ${pct}% Coverage</div>
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // Row 4: Power & UPS Infrastructure Status Grid
+  const powerGridEl = document.getElementById('powerStatsGrid');
+  if (powerGridEl) {
+    const totalUpsUnits = upsWorkingCount + upsNotWorkingCount;
+    const upsHealthPct = totalUpsUnits > 0 ? Math.round((upsWorkingCount / totalUpsUnits) * 100) : 100;
+
+    powerGridEl.innerHTML = `
+      <div class="metric-card emerald" onclick="drillDownDashboard('ups')" style="cursor: pointer;" title="Click to view Working UPS Offices">
+        <div class="metric-icon"><i class="fa-solid fa-bolt"></i></div>
+        <div class="metric-content">
+          <h4>Operational UPS Units <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+          <div class="metric-value">${upsWorkingCount} <span style="font-size: 0.85rem; font-weight: 600; color: #059669;">Units</span></div>
+          <div class="metric-sub">${upsHealthPct}% Fleet Reliability</div>
+        </div>
+      </div>
+
+      <div class="metric-card ${upsNotWorkingCount > 0 ? 'rose' : 'emerald'}" onclick="drillDownDashboard('defective')" style="cursor: pointer;" title="Click to view Defective Hardware Offices">
+        <div class="metric-icon"><i class="fa-solid fa-triangle-exclamation"></i></div>
+        <div class="metric-content">
+          <h4>Defective UPS Systems <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+          <div class="metric-value">${upsNotWorkingCount} <span style="font-size: 0.85rem; font-weight: 600; color: ${upsNotWorkingCount > 0 ? '#b91c1c' : '#059669'};">Units</span></div>
+          <div class="metric-sub">${upsNotWorkingCount > 0 ? 'Urgent Repair Required' : 'Zero Defective Systems'}</div>
+        </div>
+      </div>
+
+      <div class="metric-card cyan" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click to view Dedicated UPS Offices">
+        <div class="metric-icon"><i class="fa-solid fa-building-circle-check"></i></div>
+        <div class="metric-content">
+          <h4>UPS Office Coverage <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+          <div class="metric-value">${officesWithUps} <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Offices</span></div>
+          <div class="metric-sub">${officesWithoutUps > 0 ? `${officesWithoutUps} Offices Without Dedicated UPS` : '100% Dedicated UPS Coverage'}</div>
+        </div>
+      </div>
+
+      <div class="metric-card amber" onclick="drillDownDashboard('service_reports')" style="cursor: pointer;" title="Click to view TCO Service Reports Status">
+        <div class="metric-icon"><i class="fa-solid fa-file-signature"></i></div>
+        <div class="metric-content">
+          <h4>TCO Service Reports <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+          <div class="metric-value">${serviceReportsSentCount} <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Dispatched</span></div>
+          <div class="metric-sub">${entries.length - serviceReportsSentCount} Offices Pending Service Submission</div>
+        </div>
+      </div>
+    `;
+  }
+
+  // Row 5: Battery Infrastructure Audit & Provisioning Grid
+  const batGridEl = document.getElementById('batteryDetailsGrid');
+  if (batGridEl) {
+    const topMakes = Object.entries(batteryMakes).sort((a,b) => b[1] - a[1]).slice(0, 3).map(m => m[0]).join(', ') || 'Exide, Amaron, Quanta';
+    const topAh = Object.entries(batteryAhs).sort((a,b) => b[1] - a[1]).slice(0, 3).map(m => m[0]).join(', ') || '42 Ah, 65 Ah, 100 Ah';
+
+    batGridEl.innerHTML = `
+      <div class="metric-card emerald" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Battery Bank Details">
+        <div class="metric-icon"><i class="fa-solid fa-car-battery"></i></div>
+        <div class="metric-content">
+          <h4>Active Battery Banks <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+          <div class="metric-value">${totalBatteriesInUse} <span style="font-size: 0.85rem; font-weight: 600; color: #047857;">Units in Use</span></div>
+          <div class="metric-sub">Standby / Reserve: <strong>${totalBatteriesNotInUse} Units</strong></div>
+        </div>
+      </div>
+
+      <div class="metric-card ${batteryDeficitOffices > 0 ? 'rose' : 'emerald'}" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Provisioning Status">
+        <div class="metric-icon"><i class="fa-solid ${batteryDeficitOffices > 0 ? 'fa-triangle-exclamation' : 'fa-circle-check'}"></i></div>
+        <div class="metric-content">
+          <h4>Provisioning Sufficiency <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+          <div class="metric-value">${totalMinBatteriesRequired} <span style="font-size: 0.85rem; font-weight: 600; color: var(--text-muted);">Min Required</span></div>
+          <div class="metric-sub">${batteryDeficitOffices > 0 ? `<strong style="color: #b91c1c;">${batteryDeficitOffices} Offices with Battery Shortfall</strong>` : '<strong style="color: #047857;">All Offices Meet Minimum Provisioning</strong>'}</div>
+        </div>
+      </div>
+
+      <div class="metric-card indigo" onclick="drillDownDashboard('power')" style="cursor: pointer;" title="Click for Battery Makes & Ratings">
+        <div class="metric-icon"><i class="fa-solid fa-microchip"></i></div>
+        <div class="metric-content">
+          <h4>OEM Makes & Ah Ratings <i class="fa-solid fa-magnifying-glass-plus" style="font-size: 0.72rem;"></i></h4>
+          <div class="metric-value" style="font-size: 1.15rem; line-height: 1.3; margin: 4px 0;">${escapeHtml(topMakes)}</div>
+          <div class="metric-sub">Common Ratings: ${escapeHtml(topAh)}</div>
+        </div>
+      </div>
+    `;
   }
 }
 

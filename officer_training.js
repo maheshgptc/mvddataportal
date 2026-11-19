@@ -4120,15 +4120,24 @@ function printOfficeSummaryReport() {
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('print-active'));
   document.body.classList.add('printing-ot-report');
 
-  const otContainer = document.getElementById('officerTrainingContainer');
-  if (otContainer) otContainer.style.display = 'block';
   const repTab = document.getElementById('otTabContentReport');
+  const prevParent = repTab?.parentElement;
+  const otContainer = document.getElementById('officerTrainingContainer');
+
+  // If repTab is hosted inside adminSummaryReportHost, temporarily move it to otContainer for guaranteed non-blank print
+  if (repTab && otContainer && repTab.parentElement !== otContainer) {
+    otContainer.appendChild(repTab);
+  }
+  if (otContainer) otContainer.style.display = 'block';
   if (repTab) repTab.style.display = 'block';
 
   renderOfficeSummaryReport();
 
   const cleanup = () => {
     document.body.classList.remove('printing-ot-report');
+    if (prevParent && repTab && repTab.parentElement !== prevParent) {
+      prevParent.appendChild(repTab);
+    }
     window.removeEventListener('afterprint', cleanup);
   };
   window.addEventListener('afterprint', cleanup);
@@ -4137,6 +4146,318 @@ function printOfficeSummaryReport() {
   setTimeout(cleanup, 2500);
 }
 window.printOfficeSummaryReport = printOfficeSummaryReport;
+
+function downloadOfficeSummaryReportPDF(officeCode) {
+  const code = officeCode || (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode || document.getElementById('adminSubViewReportOfficeSelect')?.value || document.getElementById('otReportOfficeSelect')?.value || "KL01";
+  const officeObj = (typeof ALL_MVD_OFFICES !== 'undefined' && ALL_MVD_OFFICES.find(o => o.code === code)) || { code, name: code };
+
+  const allProfiles = otProfilesStore.filter(p => p.officeCode === code);
+  const submittedProfiles = allProfiles.filter(p => p.status === 'submitted');
+  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+  const canonCode = getCanonicalOfficeCode(code) || code;
+  const snapshot = snapStore[canonCode] || snapStore[code];
+  const isForwarded = snapshot && snapshot.isForwarded === true;
+
+  const jsPDF = window.jspdf ? window.jspdf.jsPDF : (typeof jspdf !== 'undefined' ? jspdf.jsPDF : null);
+  if (!jsPDF) {
+    if (typeof showToast === 'function') showToast("jsPDF library unavailable; opening print view...", "warning");
+    printOfficeSummaryReport();
+    return;
+  }
+
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'pt',
+    format: 'a4'
+  });
+
+  const now = new Date();
+  const dateStr = now.toLocaleDateString('en-IN') + ' ' + now.toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' });
+  const fileDate = now.toISOString().slice(0, 10);
+
+  // Top Government Header
+  doc.setFillColor(11, 59, 36);
+  doc.rect(0, 0, 595.28, 54, 'F');
+
+  doc.setTextColor(255, 255, 255);
+  doc.setFontSize(13);
+  doc.setFont('helvetica', 'bold');
+  doc.text("MOTOR VEHICLES DEPARTMENT, KERALA", 40, 24);
+
+  doc.setFontSize(9.5);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(167, 243, 208);
+  doc.text("OFFICER TRAINING & QUALIFICATION — SUMMARY REPORT", 40, 42);
+
+  doc.setFontSize(7.5);
+  doc.setTextColor(255, 255, 255);
+  doc.text(`Generated: ${dateStr}`, 440, 24);
+  doc.text(`Office Code: ${code}`, 440, 42);
+
+  let currentY = 70;
+
+  // Meta Grid Box
+  doc.setFillColor(248, 250, 252);
+  doc.setDrawColor(203, 213, 225);
+  doc.roundedRect(40, currentY, 515.28, 38, 4, 4, 'FD');
+
+  doc.setTextColor(15, 23, 42);
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`Office: ${officeObj.name} (${officeObj.code})`, 50, currentY + 16);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.text(`Status: ${isForwarded ? 'SENT TO TRANSPORT COMMISSIONERATE' : 'ASSIGNED / PENDING SUBMISSION'}`, 50, currentY + 30);
+  doc.text(`Report Date: ${snapshot?.forwardedDate || dateStr}`, 320, currentY + 16);
+  doc.text(`Officers Profiled: ${submittedProfiles.length}`, 320, currentY + 30);
+
+  currentY += 48;
+
+  // Forwarding / Dispatch Details Box if forwarded
+  if (isForwarded) {
+    doc.setFillColor(240, 253, 244);
+    doc.setDrawColor(134, 239, 172);
+    doc.roundedRect(40, currentY, 515.28, 28, 4, 4, 'FD');
+    doc.setTextColor(22, 101, 52);
+    doc.setFontSize(8);
+    doc.setFont('helvetica', 'bold');
+    doc.text(`Forwarded to Transport Commissionerate on ${snapshot?.forwardedDate || 'Record'}. Digitally Dispatched.`, 50, currentY + 18);
+    currentY += 36;
+  }
+
+  // Section C: Summary Measures Scorecards
+  const desigCounts = { RTO: 0, "Joint RTO": 0, MVI: 0, AMVI: 0 };
+  let withAddl = 0;
+  let pursuing = 0;
+  let withSkills = 0;
+  let withTrainings = 0;
+  let totalTrainings = 0;
+
+  submittedProfiles.forEach(p => {
+    if (desigCounts[p.designation] !== undefined) desigCounts[p.designation]++;
+    const hasComp = (p.additionalQualifications || []).some(q => q.status === 'Completed');
+    const hasPurs = (p.additionalQualifications || []).some(q => q.status === 'Pursuing');
+    if (hasComp) withAddl++;
+    if (hasPurs) pursuing++;
+    if ((p.specializedSkills || []).length > 0) withSkills++;
+    const tr = p.trainingHistory || [];
+    if (tr.length > 0) {
+      withTrainings++;
+      totalTrainings += tr.length;
+    }
+  });
+
+  doc.setTextColor(11, 59, 36);
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.text("C. Office Summary Measures (Non-Inflated Unique Counts)", 40, currentY + 10);
+  currentY += 16;
+
+  const scorecardsData = [
+    [
+      `Total Officers: ${submittedProfiles.length}`,
+      `RTO: ${desigCounts.RTO} | JRTO: ${desigCounts['Joint RTO']}`,
+      `MVI: ${desigCounts.MVI} | AMVI: ${desigCounts.AMVI}`
+    ],
+    [
+      `Completed Addl Quals: ${withAddl}`,
+      `Pursuing Quals: ${pursuing}`,
+      `Specialized Skills: ${withSkills}`
+    ],
+    [
+      `Trained Officers: ${withTrainings}`,
+      `Total Courses: ${totalTrainings}`,
+      `Forwarding: ${isForwarded ? 'Forwarded' : 'Pending'}`
+    ]
+  ];
+
+  if (doc.autoTable) {
+    doc.autoTable({
+      startY: currentY,
+      body: scorecardsData,
+      theme: 'grid',
+      styles: { fontSize: 8, cellPadding: 5, textColor: [15, 23, 42] },
+      alternateRowStyles: { fillColor: [248, 250, 252] },
+      margin: { left: 40, right: 40 }
+    });
+    currentY = doc.lastAutoTable.finalY + 16;
+  } else {
+    currentY += 40;
+  }
+
+  // Section D: Officer-wise Details Table
+  doc.setFontSize(10);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(11, 59, 36);
+  doc.text("D. Officer-wise Detailed Particulars", 40, currentY);
+  currentY += 6;
+
+  const tableRows = submittedProfiles.map((p, idx) => {
+    const addl = (p.additionalQualifications || []).map(q => `${q.qualification} (${q.status || 'Completed'})`).join('; ') || 'None';
+    const skills = (p.specializedSkills || []).join(', ') || 'None';
+    const trCount = (p.trainingHistory || []).length;
+    return [
+      String(idx + 1),
+      p.officerFullName || 'N/A',
+      p.pen || 'N/A',
+      p.designation || 'N/A',
+      p.basicQualification || 'N/A',
+      addl,
+      skills,
+      trCount > 0 ? `${trCount} courses` : '0',
+      (p.willingnessToContribute || 'No').trim()
+    ];
+  });
+
+  if (tableRows.length === 0) {
+    tableRows.push(['-', 'No submitted officer profiles recorded for this office', '-', '-', '-', '-', '-', '-', '-']);
+  }
+
+  if (doc.autoTable) {
+    doc.autoTable({
+      startY: currentY,
+      head: [['#', 'Officer Name', 'PEN', 'Designation', 'Basic Qual', 'Additional Quals', 'Skills', 'Trainings', 'Willingness']],
+      body: tableRows,
+      theme: 'grid',
+      headStyles: { fillColor: [11, 59, 36], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold' },
+      styles: { fontSize: 7, cellPadding: 4, overflow: 'linebreak' },
+      columnStyles: {
+        0: { cellWidth: 20, halign: 'center' },
+        1: { cellWidth: 75 },
+        2: { cellWidth: 50 },
+        3: { cellWidth: 55 },
+        4: { cellWidth: 60 },
+        5: { cellWidth: 85 },
+        6: { cellWidth: 70 },
+        7: { cellWidth: 40, halign: 'center' },
+        8: { cellWidth: 60 }
+      },
+      margin: { left: 40, right: 40 },
+      didDrawPage: (data) => {
+        const pageCount = doc.internal.getNumberOfPages();
+        doc.setFontSize(7.5);
+        doc.setTextColor(100, 116, 139);
+        doc.text(`Page ${data.pageNumber} of ${pageCount}`, 510, 825);
+        doc.text("Motor Vehicles Department • Government of Keralam", 40, 825);
+      }
+    });
+    currentY = doc.lastAutoTable.finalY + 16;
+  }
+
+  // Section E: Training Details Annexure if any
+  const allTrainings = [];
+  submittedProfiles.forEach(p => {
+    (p.trainingHistory || []).forEach(t => {
+      allTrainings.push([
+        String(allTrainings.length + 1),
+        p.officerFullName,
+        p.designation,
+        t.attended || t.courseName || 'Training Course',
+        t.institution || 'N/A',
+        String(t.year || 'N/A')
+      ]);
+    });
+  });
+
+  if (allTrainings.length > 0 && doc.autoTable) {
+    if (currentY > 700) {
+      doc.addPage();
+      currentY = 40;
+    }
+    doc.setFontSize(10);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(11, 59, 36);
+    doc.text("E. In-Service Training Details Annexure", 40, currentY);
+    currentY += 6;
+
+    doc.autoTable({
+      startY: currentY,
+      head: [['#', 'Officer Name', 'Designation', 'Course Attended', 'Institution', 'Year']],
+      body: allTrainings,
+      theme: 'grid',
+      headStyles: { fillColor: [4, 120, 87], textColor: [255, 255, 255], fontSize: 7.5, fontStyle: 'bold' },
+      styles: { fontSize: 7, cellPadding: 4 },
+      margin: { left: 40, right: 40 }
+    });
+    currentY = doc.lastAutoTable.finalY + 16;
+  }
+
+  // Footer Sign-off
+  if (currentY > 720) {
+    doc.addPage();
+    currentY = 40;
+  }
+  doc.setFontSize(8);
+  doc.setFont('helvetica', 'normal');
+  doc.setTextColor(51, 65, 85);
+  doc.text(`Place: ${officeObj.name}`, 40, currentY + 16);
+  doc.text(`Date: ${snapshot?.forwardedDate || dateStr}`, 40, currentY + 30);
+  doc.text("Verified and Forwarded by:", 380, currentY + 16);
+  doc.setFont('helvetica', 'bold');
+  doc.text(`${snapshot?.forwardedBy || 'Head of Office'}`, 380, currentY + 30);
+
+  doc.save(`MVD_Summary_Report_${code}_${fileDate}.pdf`);
+  if (typeof showToast === 'function') showToast(`Downloaded Summary Report PDF for ${officeObj.name} successfully!`, "success");
+}
+window.downloadOfficeSummaryReportPDF = downloadOfficeSummaryReportPDF;
+
+function updateAdminSummaryScorecards(officeCode) {
+  const code = officeCode || (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode || "KL01";
+  const allProfiles = otProfilesStore.filter(p => p.officeCode === code);
+  const submittedProfiles = allProfiles.filter(p => p.status === 'submitted');
+  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+  const canonCode = getCanonicalOfficeCode(code) || code;
+  const snapshot = snapStore[canonCode] || snapStore[code];
+  const isForwarded = snapshot && snapshot.isForwarded === true;
+
+  const total = submittedProfiles.length;
+  const desigCounts = { RTO: 0, "Joint RTO": 0, MVI: 0, AMVI: 0 };
+  let withAddl = 0;
+  let pursuing = 0;
+  let withSkills = 0;
+  let withTrainings = 0;
+
+  submittedProfiles.forEach(p => {
+    if (desigCounts[p.designation] !== undefined) desigCounts[p.designation]++;
+    const hasComp = (p.additionalQualifications || []).some(q => q.status === 'Completed');
+    const hasPurs = (p.additionalQualifications || []).some(q => q.status === 'Pursuing');
+    if (hasComp) withAddl++;
+    if (hasPurs) pursuing++;
+    if ((p.specializedSkills || []).length > 0) withSkills++;
+    if ((p.trainingHistory || []).length > 0) withTrainings++;
+  });
+
+  if (document.getElementById('adminScorecardTotalOfficers')) {
+    document.getElementById('adminScorecardTotalOfficers').textContent = total;
+  }
+  if (document.getElementById('adminScorecardDesigSub')) {
+    document.getElementById('adminScorecardDesigSub').textContent = `RTO: ${desigCounts.RTO} • JRTO: ${desigCounts['Joint RTO']} • MVI: ${desigCounts.MVI} • AMVI: ${desigCounts.AMVI}`;
+  }
+  if (document.getElementById('adminScorecardAddQual')) {
+    document.getElementById('adminScorecardAddQual').textContent = withAddl;
+  }
+  if (document.getElementById('adminScorecardAddQualSub')) {
+    document.getElementById('adminScorecardAddQualSub').textContent = `${withAddl} Completed • ${pursuing} Pursuing`;
+  }
+  if (document.getElementById('adminScorecardSkills')) {
+    document.getElementById('adminScorecardSkills').textContent = withSkills + withTrainings;
+  }
+  if (document.getElementById('adminScorecardSkillsSub')) {
+    document.getElementById('adminScorecardSkillsSub').textContent = `${withSkills} Specialized • ${withTrainings} Trained`;
+  }
+  if (document.getElementById('adminScorecardStatus')) {
+    document.getElementById('adminScorecardStatus').innerHTML = isForwarded
+      ? `<span style="color: #059669;"><i class="fa-solid fa-paper-plane"></i> SENT TO TC</span>`
+      : `<span style="color: #d97706;"><i class="fa-solid fa-clock"></i> PENDING SEND</span>`;
+  }
+  if (document.getElementById('adminScorecardStatusSub')) {
+    document.getElementById('adminScorecardStatusSub').textContent = isForwarded
+      ? `Forwarded on ${snapshot?.forwardedDate || 'Record'}`
+      : `Transport Commissionerate`;
+  }
+}
+window.updateAdminSummaryScorecards = updateAdminSummaryScorecards;
 
 function adminPrintOfficeSummaryReport(officeCode) {
   if (!officeCode) {
@@ -4156,6 +4477,7 @@ function adminPrintOfficeSummaryReport(officeCode) {
   if (modalRepSelect) modalRepSelect.value = officeCode;
 
   renderOfficeSummaryReport();
+  updateAdminSummaryScorecards(officeCode);
   printOfficeSummaryReport();
 }
 window.adminPrintOfficeSummaryReport = adminPrintOfficeSummaryReport;
@@ -4194,6 +4516,7 @@ function renderAdminSummaryReportView() {
   if (repSelect) repSelect.value = code;
 
   renderOfficeSummaryReport();
+  updateAdminSummaryScorecards(code);
 }
 window.renderAdminSummaryReportView = renderAdminSummaryReportView;
 
@@ -4208,6 +4531,7 @@ function handleAdminSubViewReportOfficeChange(officeCode) {
   if (repSelect) repSelect.value = officeCode;
 
   renderOfficeSummaryReport();
+  updateAdminSummaryScorecards(officeCode);
 }
 window.handleAdminSubViewReportOfficeChange = handleAdminSubViewReportOfficeChange;
 

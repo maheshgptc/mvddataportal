@@ -1946,25 +1946,36 @@ input:checked+.slider:before {
      MODE 1: Officer Training Summary Report Print
      ------------------------------------------------------------- */
   body.printing-ot-report #adminContainer,
+  body.printing-ot-report #adminSummaryReportSubView,
+  body.printing-ot-report #adminSummaryReportHost {
+    display: block !important;
+    visibility: visible !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
   body.printing-ot-report #adminOfficersSubView,
   body.printing-ot-report #adminDashboardSubView,
   body.printing-ot-report #adminOfficeLocksSubView,
   body.printing-ot-report #adminSummarySubView,
-  body.printing-ot-report #adminSummaryReportSubView,
   body.printing-ot-report #adminDirectorySubView,
   body.printing-ot-report #adminRolesSubView,
   body.printing-ot-report #adminEntrySubView,
   body.printing-ot-report #adminViewSubView,
   body.printing-ot-report #adminMenusSubView,
-  body.printing-ot-report #publicContainer,
+  body.printing-ot-report #adminSummaryReportSubView .summary-filter-bar,
+  body.printing-ot-report #adminSummaryReportScorecardsStrip,
   body.printing-ot-report .portal-sidebar,
   body.printing-ot-report .top-gov-bar,
   body.printing-ot-report .app-footer,
   body.printing-ot-report .ot-subtab-bar,
-  body.printing-ot-report .dashboard-grid-4,
+  body.printing-ot-report .dashboard-grid-4:not(.ot-report-official-container .dashboard-grid-4),
   body.printing-ot-report .charts-grid-2,
   body.printing-ot-report .ot-kpi-card,
-  body.printing-ot-report .summary-report-card,
   body.printing-ot-report .summary-filter-bar,
   body.printing-ot-report #otOfficesReportedModal,
   body.printing-ot-report #otRevertStatusModal,
@@ -2124,9 +2135,15 @@ input:checked+.slider:before {
   }
 
   body.printing-modal .modal-card,
-  body.printing-modal .printable-report-card {
+  body.printing-modal .printable-report-card,
+  body.printing-modal #publicOfficeSummaryModal.print-active .modal-card,
+  body.printing-modal #publicOfficeSummaryModal.print-active #publicModalOfficeBody {
     max-width: 100% !important;
     width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    overflow-y: visible !important;
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
