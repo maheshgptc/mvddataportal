@@ -1947,17 +1947,10 @@ input:checked+.slider:before {
      ------------------------------------------------------------- */
   body.printing-ot-report #adminContainer,
   body.printing-ot-report #adminSummaryReportSubView,
-  body.printing-ot-report #adminSummaryReportHost {
-    display: block !important;
-    visibility: visible !important;
-    background: transparent !important;
-    border: none !important;
-    box-shadow: none !important;
-    padding: 0 !important;
-    margin: 0 !important;
-    width: 100% !important;
-  }
-
+  body.printing-ot-report #adminSummaryReportHost,
+  body.printing-ot-report .admin-header-card,
+  body.printing-ot-report .admin-nav-bar,
+  body.printing-ot-report .admin-scope-selector-bar,
   body.printing-ot-report #adminOfficersSubView,
   body.printing-ot-report #adminDashboardSubView,
   body.printing-ot-report #adminOfficeLocksSubView,
@@ -1987,6 +1980,21 @@ input:checked+.slider:before {
   body.printing-ot-report .modal-overlay,
   body.printing-ot-report .btn,
   body.printing-ot-report button {
+    display: none !important;
+    visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
+  }
+
+  /* Universal Admin Portal print suppression: headers, navigation, scope selectors */
+  .admin-header-card,
+  .admin-nav-bar,
+  .admin-scope-selector-bar,
+  #adminSummaryReportScorecardsStrip,
+  #adminContainer > .card-section:first-child,
+  #adminSubViewReportOfficeSelect {
     display: none !important;
     visibility: hidden !important;
     height: 0 !important;

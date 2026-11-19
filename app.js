@@ -2485,9 +2485,6 @@ function openEnteredOfficeSummaryWindow(officeName) {
         </div>
         <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
           <span class="badge badge-working" style="font-size: 0.85rem; padding: 6px 12px;"><i class="fa-solid fa-circle-check"></i> RECORDED &amp; SYNCHRONIZED</span>
-          <button type="button" class="btn btn-sm print-hide" onclick="downloadEnteredOfficeSummaryPDF()" style="background: #10b981; color: #ffffff; font-weight: 700; border-radius: 6px; padding: 5px 12px; border: none; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
-            <i class="fa-solid fa-download"></i> Download PDF
-          </button>
           <button type="button" class="btn btn-outline btn-sm print-hide" onclick="printEnteredOfficeSummary()" style="background: #ffffff; color: #064e3b; border: 1.5px solid #059669; font-weight: 700; border-radius: 6px; padding: 5px 12px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-print"></i> Print
           </button>

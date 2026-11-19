@@ -4123,6 +4123,11 @@ function printOfficeSummaryReport() {
   const repTab = document.getElementById('otTabContentReport');
   const prevParent = repTab?.parentElement;
   const otContainer = document.getElementById('officerTrainingContainer');
+  const adminContainer = document.getElementById('adminContainer');
+  const prevAdminDisplay = adminContainer ? adminContainer.style.display : '';
+
+  // Explicitly hide entire Admin Portal container during print to prevent admin header/scope selector leaking
+  if (adminContainer) adminContainer.style.display = 'none';
 
   // If repTab is hosted inside adminSummaryReportHost, temporarily move it to otContainer for guaranteed non-blank print
   if (repTab && otContainer && repTab.parentElement !== otContainer) {
@@ -4135,6 +4140,7 @@ function printOfficeSummaryReport() {
 
   const cleanup = () => {
     document.body.classList.remove('printing-ot-report');
+    if (adminContainer) adminContainer.style.display = prevAdminDisplay;
     if (prevParent && repTab && repTab.parentElement !== prevParent) {
       prevParent.appendChild(repTab);
     }
@@ -4402,31 +4408,58 @@ function downloadOfficeSummaryReportPDF(officeCode) {
 }
 window.downloadOfficeSummaryReportPDF = downloadOfficeSummaryReportPDF;
 
-function updateAdminSummaryScorecards(officeCode) {
-  const code = officeCode || (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode || "KL01";
-  const allProfiles = otProfilesStore.filter(p => p.officeCode === code);
-  const submittedProfiles = allProfiles.filter(p => p.status === 'submitted');
-  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
-  const canonCode = getCanonicalOfficeCode(code) || code;
-  const snapshot = snapStore[canonCode] || snapStore[code];
-  const isForwarded = snapshot && snapshot.isForwarded === true;
+function updateAdminSummaryScorecards() {
+  // Aggregate across ALL offices statewide to reflect combined totals for the entire state
+  const allOfficers = (typeof getAdminOfficerDashboardData === 'function')
+    ? getAdminOfficerDashboardData()
+    : (typeof otProfilesStore !== 'undefined' ? otProfilesStore.filter(p => p && p.status === 'submitted') : []);
 
-  const total = submittedProfiles.length;
+  const total = allOfficers.length;
   const desigCounts = { RTO: 0, "Joint RTO": 0, MVI: 0, AMVI: 0 };
   let withAddl = 0;
-  let pursuing = 0;
+  let addlCompleted = 0;
+  let addlPursuing = 0;
   let withSkills = 0;
   let withTrainings = 0;
 
-  submittedProfiles.forEach(p => {
-    if (desigCounts[p.designation] !== undefined) desigCounts[p.designation]++;
-    const hasComp = (p.additionalQualifications || []).some(q => q.status === 'Completed');
-    const hasPurs = (p.additionalQualifications || []).some(q => q.status === 'Pursuing');
-    if (hasComp) withAddl++;
-    if (hasPurs) pursuing++;
-    if ((p.specializedSkills || []).length > 0) withSkills++;
-    if ((p.trainingHistory || []).length > 0) withTrainings++;
+  allOfficers.forEach(p => {
+    const desig = (p.designation || '').trim();
+    if (desigCounts[desig] !== undefined) {
+      desigCounts[desig]++;
+    } else if (/joint/i.test(desig)) {
+      desigCounts['Joint RTO']++;
+    } else if (/amvi/i.test(desig)) {
+      desigCounts['AMVI']++;
+    } else if (/mvi/i.test(desig)) {
+      desigCounts['MVI']++;
+    } else if (/rto/i.test(desig)) {
+      desigCounts['RTO']++;
+    }
+
+    const addl = p.additionalQualifications || [];
+    const hasComp = addl.some(q => (q.status || 'Completed').toLowerCase() === 'completed');
+    const hasPurs = addl.some(q => (q.status || '').toLowerCase() === 'pursuing');
+    if (addl.length > 0) withAddl++;
+    if (hasComp) addlCompleted++;
+    if (hasPurs) addlPursuing++;
+
+    const skills = p.specializedSkills || [];
+    const trains = p.trainingHistory || [];
+    if (skills.length > 0) withSkills++;
+    if (trains.length > 0) withTrainings++;
   });
+
+  // Calculate Forwarding Status across all 105 offices
+  const totalOfficesCount = (typeof ALL_MVD_OFFICES !== 'undefined' && Array.isArray(ALL_MVD_OFFICES) && ALL_MVD_OFFICES.length > 0) ? ALL_MVD_OFFICES.length : 105;
+  const snapStore = (typeof window !== 'undefined' && window.otReportSnapshotsStore) || otReportSnapshotsStore || {};
+  const forwardedOffices = new Set();
+  Object.entries(snapStore).forEach(([c, snap]) => {
+    if (snap && snap.isForwarded === true) {
+      forwardedOffices.add(getCanonicalOfficeCode(c) || c);
+    }
+  });
+  const offCompleted = forwardedOffices.size;
+  const offPending = Math.max(0, totalOfficesCount - offCompleted);
 
   if (document.getElementById('adminScorecardTotalOfficers')) {
     document.getElementById('adminScorecardTotalOfficers').textContent = total;
@@ -4438,7 +4471,7 @@ function updateAdminSummaryScorecards(officeCode) {
     document.getElementById('adminScorecardAddQual').textContent = withAddl;
   }
   if (document.getElementById('adminScorecardAddQualSub')) {
-    document.getElementById('adminScorecardAddQualSub').textContent = `${withAddl} Completed • ${pursuing} Pursuing`;
+    document.getElementById('adminScorecardAddQualSub').textContent = `${addlCompleted} Completed • ${addlPursuing} Pursuing`;
   }
   if (document.getElementById('adminScorecardSkills')) {
     document.getElementById('adminScorecardSkills').textContent = withSkills + withTrainings;
@@ -4447,14 +4480,15 @@ function updateAdminSummaryScorecards(officeCode) {
     document.getElementById('adminScorecardSkillsSub').textContent = `${withSkills} Specialized • ${withTrainings} Trained`;
   }
   if (document.getElementById('adminScorecardStatus')) {
-    document.getElementById('adminScorecardStatus').innerHTML = isForwarded
-      ? `<span style="color: #059669;"><i class="fa-solid fa-paper-plane"></i> SENT TO TC</span>`
-      : `<span style="color: #d97706;"><i class="fa-solid fa-clock"></i> PENDING SEND</span>`;
+    document.getElementById('adminScorecardStatus').innerHTML = `
+      <span style="font-size: 1.5rem; font-weight: 800; color: #0f766e;">${offCompleted}</span>
+      <span style="font-size: 0.85rem; font-weight: 700; color: #115e59;">/ ${totalOfficesCount} Offices</span>
+    `;
   }
   if (document.getElementById('adminScorecardStatusSub')) {
-    document.getElementById('adminScorecardStatusSub').textContent = isForwarded
-      ? `Forwarded on ${snapshot?.forwardedDate || 'Record'}`
-      : `Transport Commissionerate`;
+    document.getElementById('adminScorecardStatusSub').innerHTML = `
+      <span style="color: #059669; font-weight: 700;">${offCompleted} Dispatched</span> • <span style="color: #d97706; font-weight: 700;">${offPending} Pending Send</span>
+    `;
   }
 }
 window.updateAdminSummaryScorecards = updateAdminSummaryScorecards;
