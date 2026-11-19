@@ -1946,9 +1946,42 @@ input:checked+.slider:before {
      MODE 1: Officer Training Summary Report Print
      ------------------------------------------------------------- */
   body.printing-ot-report #adminContainer,
-  body.printing-ot-report #publicContainer {
+  body.printing-ot-report #adminOfficersSubView,
+  body.printing-ot-report #adminDashboardSubView,
+  body.printing-ot-report #adminOfficeLocksSubView,
+  body.printing-ot-report #adminSummarySubView,
+  body.printing-ot-report #adminSummaryReportSubView,
+  body.printing-ot-report #adminDirectorySubView,
+  body.printing-ot-report #adminRolesSubView,
+  body.printing-ot-report #adminEntrySubView,
+  body.printing-ot-report #adminViewSubView,
+  body.printing-ot-report #adminMenusSubView,
+  body.printing-ot-report #publicContainer,
+  body.printing-ot-report .portal-sidebar,
+  body.printing-ot-report .top-gov-bar,
+  body.printing-ot-report .app-footer,
+  body.printing-ot-report .ot-subtab-bar,
+  body.printing-ot-report .dashboard-grid-4,
+  body.printing-ot-report .charts-grid-2,
+  body.printing-ot-report .ot-kpi-card,
+  body.printing-ot-report .summary-report-card,
+  body.printing-ot-report .summary-filter-bar,
+  body.printing-ot-report #otOfficesReportedModal,
+  body.printing-ot-report #otRevertStatusModal,
+  body.printing-ot-report #otTabContentForm,
+  body.printing-ot-report #otTabContentDirectory,
+  body.printing-ot-report #otTabContentRoles,
+  body.printing-ot-report #otReportActionToolbar,
+  body.printing-ot-report #otReportExcludedDraftsAlert,
+  body.printing-ot-report .modal-overlay,
+  body.printing-ot-report .btn,
+  body.printing-ot-report button {
     display: none !important;
     visibility: hidden !important;
+    height: 0 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    overflow: hidden !important;
   }
 
   body.printing-ot-report #officerTrainingContainer,
@@ -1959,8 +1992,10 @@ input:checked+.slider:before {
     border: none !important;
     box-shadow: none !important;
     padding: 0 !important;
-    margin: 0 !important;
+    margin: 0 auto !important;
     width: 100% !important;
+    max-width: 100% !important;
+    background: #ffffff !important;
   }
 
   body.printing-ot-report .ot-report-official-container * {
@@ -2060,8 +2095,8 @@ input:checked+.slider:before {
      DEFAULT FALLBACK (when no print class is set on body)
      ------------------------------------------------------------- */
   body:not(.printing-ot-report):not(.printing-it-master-table):not(.printing-it-summary):not(.printing-modal) #adminContainer {
-    display: block !important;
-    visibility: visible !important;
+    display: none !important;
+    visibility: hidden !important;
   }
 
   /* When printing from an active modal */
@@ -2072,7 +2107,9 @@ input:checked+.slider:before {
   body.printing-modal .modal-overlay.print-active,
   body.printing-modal #otProfilePreviewModal.print-active,
   body.printing-modal #comprehensiveReportModal.print-active,
-  body.printing-modal #officerReportModal.print-active {
+  body.printing-modal #officerReportModal.print-active,
+  body.printing-modal #publicOfficeSummaryModal.print-active,
+  body.printing-modal #adminOfficeSummaryReportModal.print-active {
     display: block !important;
     position: static !important;
     left: 0 !important;

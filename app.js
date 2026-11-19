@@ -2433,55 +2433,278 @@ function openEnteredOfficeSummaryWindow(officeName) {
 
   title.innerHTML = `<i class="fa-solid fa-building"></i> Entered Office Name: <span style="color: #fef08a; font-weight: 800;">${escapeHtml(data.officeName)}</span>`;
 
+  const p = data.printers || {};
+  const dotW = p.dotMatrix?.working ?? data.dot_matrix_working ?? 0;
+  const dotNW = p.dotMatrix?.notWorking ?? data.dot_matrix_not_working ?? 0;
+  const dotMulti = !!(p.dotMatrix?.multipurpose);
+
+  const laserW = p.laser?.working ?? data.laser_working ?? 0;
+  const laserNW = p.laser?.notWorking ?? data.laser_not_working ?? 0;
+  const laserMulti = !!(p.laser?.multipurpose);
+
+  const inkW = p.inkjet?.working ?? data.inkjet_working ?? 0;
+  const inkNW = p.inkjet?.notWorking ?? data.inkjet_not_working ?? 0;
+  const inkMulti = !!(p.inkjet?.multipurpose);
+
+  const xeroxW = p.xerox?.working ?? data.xerox_working ?? 0;
+  const xeroxNW = p.xerox?.notWorking ?? data.xerox_not_working ?? 0;
+  const xeroxMulti = !!(p.xerox?.multipurpose);
+
+  const otherW = p.others?.working ?? data.others_working ?? 0;
+  const otherNW = p.others?.notWorking ?? data.others_not_working ?? 0;
+  const otherMulti = !!(p.others?.multipurpose);
+
+  const totalPrintersW = dotW + laserW + inkW + xeroxW + otherW;
+  const totalPrintersNW = dotNW + laserNW + inkNW + xeroxNW + otherNW;
+  const totalPrinters = totalPrintersW + totalPrintersNW;
+
+  const upsW = data.upsWorking ?? 0;
+  const upsNW = data.upsNotWorking ?? 0;
+  const upsTotal = (data.upsUnitsCount && data.upsUnitsCount > 0) ? data.upsUnitsCount : (upsW + upsNW);
+  const upsCap = data.upsCapacity ? (data.upsCapacity === 'Other' && data.upsCapacityOther ? `${data.upsCapacityOther} (Custom)` : data.upsCapacity) : (data.upsCapacityOther || 'Not Specified');
+  const batInUse = data.batteriesInUse ?? 0;
+  const batNotInUse = data.batteriesNotInUse ?? 0;
+  const minBat = data.minBatteriesRequired ?? 0;
+
+  const ageU3 = data.ageUnder3 ?? 0;
+  const age35 = data.age3To5 ?? 0;
+  const age58 = data.age5To8 ?? 0;
+  const ageA8 = data.ageAbove8 ?? 0;
+  const totalAged = ageU3 + age35 + age58 + ageA8;
+
   body.innerHTML = `
-    <div style="display: flex; flex-direction: column; gap: 16px;">
+    <div style="display: flex; flex-direction: column; gap: 18px;">
+      <!-- Banner -->
       <div style="background: linear-gradient(135deg, #f0fdf4 0%, #d1fae5 100%); border: 1.5px solid #a7f3d0; border-radius: 8px; padding: 14px 18px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
         <div>
-          <div style="font-size: 0.75rem; text-transform: uppercase; color: #047857; font-weight: 700;">Keralam MVD Official Office Profile</div>
+          <div style="font-size: 0.75rem; text-transform: uppercase; color: #047857; font-weight: 700;">Motor Vehicles Department, Kerala • Verified IT Infrastructure Record</div>
           <div style="font-size: 1.25rem; font-weight: 800; color: #064e3b;"><i class="fa-solid fa-building"></i> ${escapeHtml(data.officeName)}</div>
-          <div style="font-size: 0.82rem; color: #047857;"><i class="fa-regular fa-clock"></i> Record Timestamp: ${escapeHtml(data.lastUpdated || 'Saved')}</div>
+          <div style="font-size: 0.82rem; color: #047857;"><i class="fa-regular fa-clock"></i> Record Last Updated: ${escapeHtml(data.lastUpdated || 'Saved')}</div>
         </div>
-        <span class="badge badge-working" style="font-size: 0.9rem; padding: 6px 14px;"><i class="fa-solid fa-circle-check"></i> RECORDED & SYNCHRONIZED</span>
+        <div style="display: flex; gap: 8px; align-items: center; flex-wrap: wrap;">
+          <span class="badge badge-working" style="font-size: 0.85rem; padding: 6px 12px;"><i class="fa-solid fa-circle-check"></i> RECORDED &amp; SYNCHRONIZED</span>
+          <button type="button" class="btn btn-outline btn-sm print-hide" onclick="printEnteredOfficeSummary()" style="background: #ffffff; color: #064e3b; border: 1.5px solid #059669; font-weight: 700; border-radius: 6px; padding: 4px 10px;">
+            <i class="fa-solid fa-print"></i> Download / Print
+          </button>
+        </div>
       </div>
 
-      <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+      <!-- Officer Details & Connectivity -->
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
         <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
-          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-user-tie"></i> Entry Officer Details</h4>
-          <div style="font-size: 0.85rem; line-height: 1.6;">
-            <strong>Name:</strong> ${escapeHtml(data.entryOfficerName || 'N/A')}<br>
-            <strong>Designation:</strong> ${escapeHtml(data.entryOfficerDesignation || 'N/A')}<br>
-            <strong>Mobile:</strong> ${escapeHtml(data.entryOfficerMobile || 'N/A')}
+          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-user-tie" style="color: #0284c7;"></i> Submitting Officer Particulars
+          </h4>
+          <div style="font-size: 0.84rem; line-height: 1.6;">
+            <strong>Officer Name:</strong> ${escapeHtml(data.entryOfficerName || data.createdOfficerName || 'N/A')}<br>
+            <strong>Designation:</strong> ${escapeHtml(data.entryOfficerDesignation || data.createdOfficerDesignation || 'N/A')}<br>
+            <strong>Contact Mobile:</strong> ${escapeHtml(data.entryOfficerMobile || data.createdOfficerMobile || 'N/A')}<br>
+            <strong>Authenticated Email:</strong> ${escapeHtml(data.submittedByEmail || data.entryOfficerEmail || 'N/A')}
           </div>
         </div>
 
         <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
-          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px;"><i class="fa-solid fa-network-wired"></i> Connectivity & OS Profile</h4>
-          <div style="font-size: 0.85rem; line-height: 1.6;">
-            <strong>Network:</strong> <span class="badge badge-info">${escapeHtml(data.availableNetwork || 'N/A')}</span><br>
-            <strong>Speed:</strong> ${escapeHtml(data.networkSpeed || 'N/A')}<br>
-            <strong>OS:</strong> ${escapeHtml(data.operatingSystem || 'N/A')}
+          <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-network-wired" style="color: #059669;"></i> Connectivity &amp; Operating System
+          </h4>
+          <div style="font-size: 0.84rem; line-height: 1.6;">
+            <strong>Network Provider:</strong> <span class="badge badge-info">${escapeHtml(data.availableNetwork || 'N/A')}</span> ${data.otherNetworkDetails ? `(${escapeHtml(data.otherNetworkDetails)})` : ''}<br>
+            <strong>Bandwidth / Speed:</strong> ${escapeHtml(data.networkSpeed || 'N/A')}<br>
+            <strong>Network Switches:</strong> ${escapeHtml(data.switchesAvailable || 'N/A')} ${data.switchesDetails ? `— ${escapeHtml(data.switchesDetails)}` : ''}<br>
+            <strong>Operating System:</strong> ${escapeHtml(data.operatingSystem || 'N/A')}
           </div>
         </div>
       </div>
 
+      <!-- SECTION 1: Core IT Computing Hardware -->
       <div>
-        <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 8px;"><i class="fa-solid fa-desktop"></i> Core IT Hardware Inventory Status</h4>
-        <table class="data-table">
+        <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-desktop" style="color: #0284c7;"></i> Core IT Computing Hardware Inventory
+        </h4>
+        <table class="data-table" style="width: 100%; font-size: 0.85rem;">
           <thead>
             <tr>
               <th>Equipment Category</th>
-              <th>Working Count</th>
-              <th>Defective Count</th>
-              <th>Total Count</th>
+              <th style="text-align: center;">Working Units</th>
+              <th style="text-align: center;">Defective Units</th>
+              <th style="text-align: center;">Total Fleet</th>
             </tr>
           </thead>
           <tbody>
-            <tr><td>Monitors</td><td style="color:#047857; font-weight:700;">${data.monitorsWorking || 0}</td><td style="color:#b91c1c;">${data.monitorsNotWorking || 0}</td><td>${(data.monitorsWorking || 0) + (data.monitorsNotWorking || 0)}</td></tr>
-            <tr><td>CPU Units</td><td style="color:#047857; font-weight:700;">${data.cpuWorking || 0}</td><td style="color:#b91c1c;">${data.cpuNotWorking || 0}</td><td>${(data.cpuWorking || 0) + (data.cpuNotWorking || 0)}</td></tr>
-            <tr><td>Laptops</td><td style="color:#047857; font-weight:700;">${data.laptopsWorking || 0}</td><td style="color:#b91c1c;">${data.laptopsNotWorking || 0}</td><td>${(data.laptopsWorking || 0) + (data.laptopsNotWorking || 0)}</td></tr>
-            <tr><td>AIO PCs</td><td style="color:#047857; font-weight:700;">${data.aioWorking || 0}</td><td style="color:#b91c1c;">${data.aioNotWorking || 0}</td><td>${(data.aioWorking || 0) + (data.aioNotWorking || 0)}</td></tr>
+            <tr>
+              <td><strong>Monitors / TFT Screens</strong></td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${data.monitorsWorking ?? 0}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${data.monitorsNotWorking ?? 0}</td>
+              <td style="text-align: center; font-weight: 800;">${(data.monitorsWorking ?? 0) + (data.monitorsNotWorking ?? 0)}</td>
+            </tr>
+            <tr>
+              <td><strong>Desktop CPU Units</strong></td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${data.cpuWorking ?? 0}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${data.cpuNotWorking ?? 0}</td>
+              <td style="text-align: center; font-weight: 800;">${(data.cpuWorking ?? 0) + (data.cpuNotWorking ?? 0)}</td>
+            </tr>
+            <tr>
+              <td><strong>Laptops / Portable Workstations</strong></td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${data.laptopsWorking ?? 0}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${data.laptopsNotWorking ?? 0}</td>
+              <td style="text-align: center; font-weight: 800;">${(data.laptopsWorking ?? 0) + (data.laptopsNotWorking ?? 0)}</td>
+            </tr>
+            <tr>
+              <td><strong>All-in-One (AIO) PCs</strong></td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${data.aioWorking ?? 0}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${data.aioNotWorking ?? 0}</td>
+              <td style="text-align: center; font-weight: 800;">${(data.aioWorking ?? 0) + (data.aioNotWorking ?? 0)}</td>
+            </tr>
           </tbody>
         </table>
+      </div>
+
+      <!-- SECTION 2: Printer & Imaging Equipment Section -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-print" style="color: #7c3aed;"></i> Printer &amp; Imaging Equipment Section
+          </h4>
+          <span class="badge badge-info" style="font-size: 0.78rem; font-weight: 700;">Total Printers: ${totalPrinters} (${totalPrintersW} Working)</span>
+        </div>
+        <table class="data-table" style="width: 100%; font-size: 0.85rem;">
+          <thead>
+            <tr>
+              <th>Printer / Imaging Category</th>
+              <th style="text-align: center;">Working</th>
+              <th style="text-align: center;">Defective</th>
+              <th style="text-align: center;">Function Type</th>
+              <th style="text-align: center;">Category Total</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>Dot Matrix Printers</strong> (High-duty RC/Permit)</td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${dotW}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${dotNW}</td>
+              <td style="text-align: center;"><span class="badge ${dotMulti ? 'badge-working' : 'badge-secondary'}" style="font-size: 0.72rem;">${dotMulti ? 'Multipurpose' : 'Dedicated'}</span></td>
+              <td style="text-align: center; font-weight: 800;">${dotW + dotNW}</td>
+            </tr>
+            <tr>
+              <td><strong>Laser Printers</strong> (Office &amp; Counter)</td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${laserW}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${laserNW}</td>
+              <td style="text-align: center;"><span class="badge ${laserMulti ? 'badge-working' : 'badge-secondary'}" style="font-size: 0.72rem;">${laserMulti ? 'Multipurpose' : 'Dedicated'}</span></td>
+              <td style="text-align: center; font-weight: 800;">${laserW + laserNW}</td>
+            </tr>
+            <tr>
+              <td><strong>Inkjet Printers</strong> (Color/Draft)</td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${inkW}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${inkNW}</td>
+              <td style="text-align: center;"><span class="badge ${inkMulti ? 'badge-working' : 'badge-secondary'}" style="font-size: 0.72rem;">${inkMulti ? 'Multipurpose' : 'Dedicated'}</span></td>
+              <td style="text-align: center; font-weight: 800;">${inkW + inkNW}</td>
+            </tr>
+            <tr>
+              <td><strong>Photocopier / Multi-Function (Xerox)</strong></td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${xeroxW}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${xeroxNW}</td>
+              <td style="text-align: center;"><span class="badge ${xeroxMulti ? 'badge-working' : 'badge-secondary'}" style="font-size: 0.72rem;">${xeroxMulti ? 'Multipurpose' : 'Dedicated'}</span></td>
+              <td style="text-align: center; font-weight: 800;">${xeroxW + xeroxNW}</td>
+            </tr>
+            <tr>
+              <td><strong>Scanners &amp; Other Imaging Units</strong></td>
+              <td style="text-align: center; color:#047857; font-weight:700;">${otherW}</td>
+              <td style="text-align: center; color:#b91c1c; font-weight:700;">${otherNW}</td>
+              <td style="text-align: center;"><span class="badge ${otherMulti ? 'badge-working' : 'badge-secondary'}" style="font-size: 0.72rem;">${otherMulti ? 'Multipurpose' : 'Dedicated'}</span></td>
+              <td style="text-align: center; font-weight: 800;">${otherW + otherNW}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <!-- SECTION 3: Power and Battery Infrastructure -->
+      <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-car-battery" style="color: #059669;"></i> Power and Battery Infrastructure
+        </h4>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+          <!-- UPS Status -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
+            <div style="font-size: 0.74rem; font-weight: 700; color: #64748b; text-transform: uppercase;">UPS System Profile</div>
+            <div style="margin-top: 6px; font-size: 0.84rem; line-height: 1.7;">
+              <strong>UPS Available:</strong> <span class="badge ${data.upsAvailable === 'No' ? 'badge-danger' : 'badge-working'}">${escapeHtml(data.upsAvailable || 'Yes')}</span><br>
+              <strong>Units Count:</strong> Total: <strong>${upsTotal}</strong> (Working: <span style="color:#047857;">${upsW}</span>, Defective: <span style="color:#b91c1c;">${upsNW}</span>)<br>
+              <strong>Capacity:</strong> ${escapeHtml(upsCap)}<br>
+              <strong>Operational Condition:</strong> <span class="badge badge-info">${escapeHtml(data.upsCondition || 'Satisfactory')}</span>
+            </div>
+          </div>
+
+          <!-- Battery Infrastructure -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
+            <div style="font-size: 0.74rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Battery Bank Inventory</div>
+            <div style="margin-top: 6px; font-size: 0.84rem; line-height: 1.7;">
+              <strong>Battery Make:</strong> ${escapeHtml(data.batteryMake || 'N/A')}<br>
+              <strong>Rating / Ah:</strong> ${data.batteryAh ? `${data.batteryAh} Ah` : 'N/A'}<br>
+              <strong>Batteries in Use:</strong> <span style="font-weight: 700; color:#047857;">${batInUse} units</span><br>
+              <strong>Not in Use / Standby:</strong> <span style="font-weight: 700; color:#b45309;">${batNotInUse} units</span><br>
+              <strong>Minimum Required:</strong> <strong>${minBat} units</strong> ${minBat > batInUse ? '<span class="badge badge-danger" style="font-size:0.7rem; padding:1px 4px;">Shortfall</span>' : '<span class="badge badge-working" style="font-size:0.7rem; padding:1px 4px;">Adequate</span>'}
+            </div>
+          </div>
+
+          <!-- TCO Service & Power Remarks -->
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
+            <div style="font-size: 0.74rem; font-weight: 700; color: #64748b; text-transform: uppercase;">TCO Service &amp; Backup Remarks</div>
+            <div style="margin-top: 6px; font-size: 0.84rem; line-height: 1.7;">
+              <strong>TCO Service Report Sent:</strong> <span class="badge ${data.serviceReportSent === 'Yes' ? 'badge-working' : 'badge-warning'}">${escapeHtml(data.serviceReportSent || 'No')}</span><br>
+              <strong>Report Submission Date:</strong> ${escapeHtml(data.serviceReportDate || 'N/A')}<br>
+              <strong>Power Remarks:</strong> ${escapeHtml(data.powerRemarks || 'No power remarks specified.')}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 4: System Age Distribution -->
+      <div>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+          <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 6px;">
+            <i class="fa-solid fa-hourglass-half" style="color: #0284c7;"></i> System Age Distribution Profile
+          </h4>
+          <span style="font-size: 0.78rem; color: #64748b; font-weight: 600;">Total Hardware Categorized: <strong>${totalAged}</strong></span>
+        </div>
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
+          <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: #166534; text-transform: uppercase;">&lt; 3 Years</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #15803d; margin-top: 2px;">${ageU3}</div>
+            <div style="font-size: 0.7rem; color: #16a34a; font-weight: 600;">Modern Fleet</div>
+          </div>
+          <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: #1e40af; text-transform: uppercase;">3 – 5 Years</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #2563eb; margin-top: 2px;">${age35}</div>
+            <div style="font-size: 0.7rem; color: #3b82f6; font-weight: 600;">Standard Active</div>
+          </div>
+          <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: #92400e; text-transform: uppercase;">5 – 8 Years</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: #d97706; margin-top: 2px;">${age58}</div>
+            <div style="font-size: 0.7rem; color: #b45309; font-weight: 600;">Aging Hardware</div>
+          </div>
+          <div style="background: ${ageA8 > 0 ? '#fef2f2' : '#f8fafc'}; border: 1px solid ${ageA8 > 0 ? '#fca5a5' : '#cbd5e1'}; border-radius: 8px; padding: 10px; text-align: center;">
+            <div style="font-size: 0.7rem; font-weight: 700; color: ${ageA8 > 0 ? '#991b1b' : '#64748b'}; text-transform: uppercase;">&gt; 8 Years</div>
+            <div style="font-size: 1.4rem; font-weight: 800; color: ${ageA8 > 0 ? '#dc2626' : '#475569'}; margin-top: 2px;">${ageA8}</div>
+            <div style="font-size: 0.7rem; color: ${ageA8 > 0 ? '#ef4444' : '#64748b'}; font-weight: 600;">${ageA8 > 0 ? 'Replacement Due' : 'None'}</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SECTION 5: Specific Condition Remarks & Certification -->
+      <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+        <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
+          <i class="fa-solid fa-comment-dots" style="color: #6366f1;"></i> Specific Condition Remarks &amp; Certification
+        </h4>
+        <div style="font-size: 0.85rem; line-height: 1.6; color: #334155; margin-bottom: 12px; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+          <strong>General Hardware Remarks:</strong> ${escapeHtml(data.remarks || 'No general hardware remarks recorded.')}
+        </div>
+        <div style="background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 6px; padding: 10px 12px; font-size: 0.82rem; color: #065f46; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <i class="fa-solid fa-shield-check" style="font-size: 1.1rem; color: #059669;"></i>
+            <span><strong>Digital Certification:</strong> I hereby certify that the computing systems, printers, network, and power/battery infrastructure details listed above have been physically inspected and verified for this office.</span>
+          </div>
+          <span class="badge badge-working" style="font-size: 0.75rem;"><i class="fa-solid fa-check"></i> Certified Record</span>
+        </div>
       </div>
     </div>
   `;
@@ -2494,8 +2717,27 @@ function closePublicOfficeSummaryModal() {
   if (modal) modal.style.display = 'none';
 }
 
-function openStandalonePrintWindow() {
+function printEnteredOfficeSummary() {
+  document.body.classList.remove('printing-ot-report', 'printing-it-master-table', 'printing-it-summary');
+  document.body.classList.add('printing-modal');
+
+  const modal = document.getElementById('publicOfficeSummaryModal');
+  if (modal) modal.classList.add('print-active');
+
+  const cleanup = () => {
+    document.body.classList.remove('printing-modal');
+    if (modal) modal.classList.remove('print-active');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
   window.print();
+  setTimeout(cleanup, 2500);
+}
+window.printEnteredOfficeSummary = printEnteredOfficeSummary;
+
+function openStandalonePrintWindow() {
+  printEnteredOfficeSummary();
 }
 
 // --- 15. ADMIN AUTHENTICATION & SUBVIEW SWITCHER ---
@@ -2562,6 +2804,7 @@ function switchAdminSubView(view) {
   const btnOfficeLocks = document.getElementById('btnAdminNavOfficeLocks');
   const btnSumm = document.getElementById('btnAdminNavSummary');
   const btnOffs = document.getElementById('btnAdminNavOfficers');
+  const btnSummaryReport = document.getElementById('btnAdminNavSummaryReport');
   const btnDir = document.getElementById('btnAdminNavDirectory');
   const btnRoles = document.getElementById('btnAdminNavRoles');
   const btnEnt = document.getElementById('btnAdminNavEntry');
@@ -2572,6 +2815,7 @@ function switchAdminSubView(view) {
   const officeLocksSec = document.getElementById('adminOfficeLocksSubView');
   const summSec = document.getElementById('adminSummarySubView');
   const offsSec = document.getElementById('adminOfficersSubView');
+  const summaryReportSec = document.getElementById('adminSummaryReportSubView');
   const dirSec = document.getElementById('adminDirectorySubView');
   const rolesSec = document.getElementById('adminRolesSubView');
   const entSec = document.getElementById('adminEntrySubView');
@@ -2582,6 +2826,7 @@ function switchAdminSubView(view) {
   if (btnOfficeLocks) btnOfficeLocks.style.background = (view === 'officelocks') ? 'var(--primary-600)' : 'transparent';
   if (btnSumm) btnSumm.style.background = (view === 'summary') ? 'var(--primary-600)' : 'transparent';
   if (btnOffs) btnOffs.style.background = (view === 'officers') ? 'var(--primary-600)' : 'transparent';
+  if (btnSummaryReport) btnSummaryReport.style.background = (view === 'summaryreport') ? 'var(--primary-600)' : 'transparent';
   if (btnDir) btnDir.style.background = (view === 'directory') ? 'var(--primary-600)' : 'transparent';
   if (btnRoles) btnRoles.style.background = (view === 'roles') ? 'var(--primary-600)' : 'transparent';
   if (btnEnt) btnEnt.style.background = (view === 'entry') ? 'var(--primary-600)' : 'transparent';
@@ -2592,6 +2837,7 @@ function switchAdminSubView(view) {
   if (officeLocksSec) officeLocksSec.style.display = (view === 'officelocks') ? 'block' : 'none';
   if (summSec) summSec.style.display = (view === 'summary') ? 'block' : 'none';
   if (offsSec) offsSec.style.display = (view === 'officers') ? 'block' : 'none';
+  if (summaryReportSec) summaryReportSec.style.display = (view === 'summaryreport') ? 'block' : 'none';
   if (dirSec) dirSec.style.display = (view === 'directory') ? 'block' : 'none';
   if (rolesSec) rolesSec.style.display = (view === 'roles') ? 'block' : 'none';
   if (entSec) entSec.style.display = (view === 'entry') ? 'block' : 'none';
@@ -2604,6 +2850,23 @@ function switchAdminSubView(view) {
   if (view === 'officers') {
     if (typeof renderOfficerAdminDashboard === 'function') renderOfficerAdminDashboard();
     else if (typeof renderAdminOfficersTable === 'function') renderAdminOfficersTable();
+  }
+  if (view === 'summaryreport') {
+    const repTab = document.getElementById('otTabContentReport');
+    const host = document.getElementById('adminSummaryReportHost');
+    if (repTab && host) {
+      host.appendChild(repTab);
+      repTab.style.display = 'block';
+    }
+    if (typeof renderAdminSummaryReportView === 'function') {
+      renderAdminSummaryReportView();
+    }
+  } else {
+    const repTab = document.getElementById('otTabContentReport');
+    const otContainer = document.getElementById('officerTrainingContainer');
+    if (repTab && otContainer && !otContainer.contains(repTab)) {
+      otContainer.appendChild(repTab);
+    }
   }
   if (view === 'directory') {
     if (typeof initOfficerTrainingModule === 'function') initOfficerTrainingModule();

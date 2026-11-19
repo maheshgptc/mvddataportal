@@ -4114,13 +4114,180 @@ function printOfficeSummaryReport() {
       return;
     }
   }
-  document.body.classList.remove('printing-modal');
+
+  // Strictly isolate print to Officer Training Summary Report & Verification
+  document.body.classList.remove('printing-it-master-table', 'printing-it-summary', 'printing-modal');
   document.querySelectorAll('.modal-overlay').forEach(m => m.classList.remove('print-active'));
+  document.body.classList.add('printing-ot-report');
+
+  const otContainer = document.getElementById('officerTrainingContainer');
+  if (otContainer) otContainer.style.display = 'block';
   const repTab = document.getElementById('otTabContentReport');
   if (repTab) repTab.style.display = 'block';
+
   renderOfficeSummaryReport();
+
+  const cleanup = () => {
+    document.body.classList.remove('printing-ot-report');
+    window.removeEventListener('afterprint', cleanup);
+  };
+  window.addEventListener('afterprint', cleanup);
+
   window.print();
+  setTimeout(cleanup, 2500);
 }
+window.printOfficeSummaryReport = printOfficeSummaryReport;
+
+function adminPrintOfficeSummaryReport(officeCode) {
+  if (!officeCode) {
+    if (typeof showToast === 'function') showToast("Please specify an office to print.", "warning");
+    return;
+  }
+  otCurrentRole = 'admin';
+  window.otCurrentRole = 'admin';
+  otCurrentReportOfficeCode = officeCode;
+  window.otCurrentReportOfficeCode = officeCode;
+
+  const repSelect = document.getElementById('otReportOfficeSelect');
+  if (repSelect) repSelect.value = officeCode;
+  const adminRepSelect = document.getElementById('adminSubViewReportOfficeSelect');
+  if (adminRepSelect) adminRepSelect.value = officeCode;
+  const modalRepSelect = document.getElementById('adminModalReportOfficeSelect');
+  if (modalRepSelect) modalRepSelect.value = officeCode;
+
+  renderOfficeSummaryReport();
+  printOfficeSummaryReport();
+}
+window.adminPrintOfficeSummaryReport = adminPrintOfficeSummaryReport;
+
+function renderAdminSummaryReportView() {
+  otCurrentRole = 'admin';
+  window.otCurrentRole = 'admin';
+
+  const select = document.getElementById('adminSubViewReportOfficeSelect');
+  if (select && select.options.length <= 1) {
+    select.innerHTML = '<option value="">-- Select Office across all 105 Offices --</option>';
+    Object.entries(OT_OFFICE_GROUPS).forEach(([groupName, offices]) => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupName;
+      offices.forEach(off => {
+        const opt = document.createElement('option');
+        opt.value = off.code;
+        opt.textContent = `${off.code} — ${off.name}`;
+        optgroup.appendChild(opt);
+      });
+      select.appendChild(optgroup);
+    });
+  }
+
+  let code = (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode;
+  if (!code && select && select.options.length > 1) {
+    code = select.options[1].value;
+  }
+  if (!code) code = "KL01";
+
+  otCurrentReportOfficeCode = code;
+  window.otCurrentReportOfficeCode = code;
+  if (select) select.value = code;
+
+  const repSelect = document.getElementById('otReportOfficeSelect');
+  if (repSelect) repSelect.value = code;
+
+  renderOfficeSummaryReport();
+}
+window.renderAdminSummaryReportView = renderAdminSummaryReportView;
+
+function handleAdminSubViewReportOfficeChange(officeCode) {
+  if (!officeCode) return;
+  otCurrentRole = 'admin';
+  window.otCurrentRole = 'admin';
+  otCurrentReportOfficeCode = officeCode;
+  window.otCurrentReportOfficeCode = officeCode;
+
+  const repSelect = document.getElementById('otReportOfficeSelect');
+  if (repSelect) repSelect.value = officeCode;
+
+  renderOfficeSummaryReport();
+}
+window.handleAdminSubViewReportOfficeChange = handleAdminSubViewReportOfficeChange;
+
+function openAdminOfficeSummaryModal(officeCode) {
+  const modal = document.getElementById('adminOfficeSummaryReportModal');
+  if (!modal) return;
+
+  otCurrentRole = 'admin';
+  window.otCurrentRole = 'admin';
+
+  const select = document.getElementById('adminModalReportOfficeSelect');
+  if (select && select.options.length <= 1) {
+    select.innerHTML = '<option value="">-- Select Any of 105 MVD Offices --</option>';
+    Object.entries(OT_OFFICE_GROUPS).forEach(([groupName, offices]) => {
+      const optgroup = document.createElement('optgroup');
+      optgroup.label = groupName;
+      offices.forEach(off => {
+        const opt = document.createElement('option');
+        opt.value = off.code;
+        opt.textContent = `${off.code} — ${off.name}`;
+        optgroup.appendChild(opt);
+      });
+      select.appendChild(optgroup);
+    });
+  }
+
+  let targetCode = officeCode || (typeof window !== 'undefined' && window.otCurrentReportOfficeCode) || otCurrentReportOfficeCode || "KL01";
+  otCurrentReportOfficeCode = targetCode;
+  window.otCurrentReportOfficeCode = targetCode;
+  if (select) select.value = targetCode;
+
+  const repSelect = document.getElementById('otReportOfficeSelect');
+  if (repSelect) repSelect.value = targetCode;
+
+  renderOfficeSummaryReport();
+
+  // Clone or mirror the official container into modal preview
+  const sourceOfficial = document.querySelector('.ot-report-official-container');
+  const modalBody = document.getElementById('adminModalReportBody');
+  if (sourceOfficial && modalBody) {
+    modalBody.innerHTML = sourceOfficial.outerHTML;
+  }
+
+  modal.style.display = 'flex';
+}
+window.openAdminOfficeSummaryModal = openAdminOfficeSummaryModal;
+
+function closeAdminOfficeSummaryModal() {
+  const modal = document.getElementById('adminOfficeSummaryReportModal');
+  if (modal) modal.style.display = 'none';
+}
+window.closeAdminOfficeSummaryModal = closeAdminOfficeSummaryModal;
+
+function handleAdminModalOfficeSelectChange(officeCode) {
+  if (!officeCode) return;
+  otCurrentReportOfficeCode = officeCode;
+  window.otCurrentReportOfficeCode = officeCode;
+
+  const repSelect = document.getElementById('otReportOfficeSelect');
+  if (repSelect) repSelect.value = officeCode;
+  const adminRepSelect = document.getElementById('adminSubViewReportOfficeSelect');
+  if (adminRepSelect) adminRepSelect.value = officeCode;
+
+  renderOfficeSummaryReport();
+
+  const sourceOfficial = document.querySelector('.ot-report-official-container');
+  const modalBody = document.getElementById('adminModalReportBody');
+  if (sourceOfficial && modalBody) {
+    modalBody.innerHTML = sourceOfficial.outerHTML;
+  }
+}
+window.handleAdminModalOfficeSelectChange = handleAdminModalOfficeSelectChange;
+
+function adminPrintCurrentOfficeSummary() {
+  const select = document.getElementById('adminModalReportOfficeSelect');
+  const code = select?.value || otCurrentReportOfficeCode || "KL01";
+  closeAdminOfficeSummaryModal();
+  adminPrintOfficeSummaryReport(code);
+}
+window.adminPrintCurrentOfficeSummary = adminPrintCurrentOfficeSummary;
 
 // --- 14. ROLE SIMULATION & AUDIT LOG VIEWER ---
 
@@ -5731,7 +5898,10 @@ function renderOtOfficesReportedTable() {
               <td style="text-align: center;">${statusBadge}</td>
               <td style="text-align: center;">${forwardBadge}</td>
               <td style="text-align: center;">
-                <div style="display: flex; gap: 4px; justify-content: center;">
+                <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+                  <button class="btn btn-sm" onclick="adminPrintOfficeSummaryReport('${escapeHtml(item.code)}')" title="Download PDF / Print Summary Report for ${escapeHtml(item.name)}" style="background: #0284c7; color: white; border: none; padding: 3px 8px; font-size: 0.74rem;">
+                    <i class="fa-solid fa-file-invoice"></i> Report
+                  </button>
                   ${item.isEntered ? `
                     <button class="btn btn-outline btn-sm" onclick="inspectOfficeFromReportedModal('${escapeHtml(item.code)}')" title="Filter Dashboard to this Office" style="padding: 3px 8px; font-size: 0.74rem;">
                       <i class="fa-solid fa-filter"></i> View Profiles
@@ -5982,7 +6152,10 @@ function renderOfficerDashboardTable() {
         <td>${trBadge}</td>
         <td><div style="max-width: 180px;">${willBadge}</div></td>
         <td style="text-align: center;">
-          <div style="display: flex; gap: 4px; justify-content: center;">
+          <div style="display: flex; gap: 4px; justify-content: center; flex-wrap: wrap;">
+            <button class="btn btn-outline btn-sm" onclick="adminPrintOfficeSummaryReport('${escapeHtml(o.officeCode)}')" title="Download PDF / Print Summary Report for this Office" style="padding: 4px 8px; color: #0284c7; border-color: #0284c7;">
+              <i class="fa-solid fa-file-invoice"></i>
+            </button>
             <button class="btn btn-outline btn-sm" onclick="editOfficerInAdmin('${escapeHtml(o.id || o.pen)}')" title="Edit Profile in Entry Form" style="padding: 4px 8px;">
               <i class="fa-solid fa-pen-to-square"></i>
             </button>
