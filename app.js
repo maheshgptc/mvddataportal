@@ -530,6 +530,8 @@ function logoutGoogleUser() {
   if (appLayout) appLayout.style.display = 'none';
   if (userBar) userBar.style.display = 'none';
 
+  updateViewEnteredDataButtonVisibility();
+
   showToast('Signed out of Google Account. Authentication required to access portal.', 'info');
 }
 
@@ -630,6 +632,7 @@ function selectModuleMenu(moduleId) {
     if (genericCont) genericCont.style.display = 'none';
     if (officerCont) officerCont.style.display = 'none';
     if (publicCont) publicCont.style.display = appSettings.publicVisible ? 'block' : 'none';
+    updateViewEnteredDataButtonVisibility();
   } else if (moduleId === 'officer_training_qualification') {
     if (publicCont) publicCont.style.display = 'none';
     if (genericCont) genericCont.style.display = 'none';
@@ -780,6 +783,7 @@ function subscribeToRealtimeITEquipment() {
         if (drillModal && drillModal.style.display !== 'none' && typeof renderItDrillDownContent === 'function') {
           renderItDrillDownContent();
         }
+        updateViewEnteredDataButtonVisibility();
       }
     ).subscribe((status) => {
       console.log("Supabase Realtime IT Equipment subscription status:", status);
@@ -846,6 +850,7 @@ async function syncWithSupabaseBackend() {
     renderAdminDataTable();
     renderAdminSummaryReport();
     if (activeSession === 'admin') renderAdminDashboard();
+    updateViewEnteredDataButtonVisibility();
 
   } catch (err) {
     console.warn("Supabase equipment sync error, running with local data:", err);
@@ -1963,51 +1968,159 @@ function handleOfficeSelectChange(officeName) {
   updateViewEnteredDataButtonVisibility();
 }
 
+function checkIsUserAdmin() {
+  if (typeof activeSession !== 'undefined' && activeSession === 'admin') return true;
+  if (typeof isAdminAuthenticated !== 'undefined' && isAdminAuthenticated) return true;
+  if (typeof otCurrentRole !== 'undefined' && otCurrentRole === 'admin') return true;
+  if (typeof window !== 'undefined' && window.otCurrentRole === 'admin') return true;
+  if (googleAuthUser) {
+    if (googleAuthUser.isAdmin || googleAuthUser.role === 'admin') return true;
+    const email = (googleAuthUser.email || '').toLowerCase().trim();
+    if (email === 'admin@mvd.kerala.gov.in' || email === 'admin@keralam.gov.in') return true;
+  }
+  return false;
+}
+window.checkIsUserAdmin = checkIsUserAdmin;
+
+function getRecordOwnerEmail(rec) {
+  if (!rec) return '';
+  return (rec.createdOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || rec.entryOfficerEmail || '').toLowerCase().trim();
+}
+
 function updateViewEnteredDataButtonVisibility() {
   const btnViewData = document.getElementById('btnViewEnteredData');
   if (!btnViewData) return;
 
-  // Prominently keep visible in the top-right of Data Entry section so users can view entered records anytime
-  btnViewData.style.display = 'inline-flex';
-}
-
-function openCurrentUserRecordSummary() {
-  const selectedOffice = document.getElementById('officeSelect')?.value;
+  const isAdmin = checkIsUserAdmin();
+  const selectedOffice = document.getElementById('officeSelect')?.value?.trim();
   const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
 
-  // 1. If currently selected office in the form has entered data, open it immediately
-  if (selectedOffice && inventoryStore[selectedOffice]) {
-    openEnteredOfficeSummaryWindow(selectedOffice);
-    return;
-  }
-
-  // 2. If user has entered data for an office matching their email, open it
-  if (currentEmail) {
-    const userOffice = Object.values(inventoryStore).find(r => {
-      const oEmail = (r.createdOfficerEmail || r.submittedByEmail || r.updatedOfficerEmail || r.entryOfficerEmail || '').toLowerCase().trim();
-      return oEmail === currentEmail;
-    });
-    if (userOffice) {
-      openEnteredOfficeSummaryWindow(userOffice.officeName);
+  // 1. ADMIN OVERRIDE (Global Visibility)
+  // Users with Admin privileges bypass this restriction and can always see and use the
+  // "View Entered Data" button for all offices that have submitted data, regardless of which Gmail ID originally submitted the entry.
+  if (isAdmin) {
+    if (selectedOffice) {
+      if (inventoryStore[selectedOffice]) {
+        btnViewData.style.display = 'inline-flex';
+      } else {
+        btnViewData.style.display = 'none';
+      }
+      return;
+    } else {
+      const hasAnySubmittedData = Object.keys(inventoryStore).length > 0;
+      btnViewData.style.display = hasAnySubmittedData ? 'inline-flex' : 'none';
       return;
     }
   }
 
-  // 3. If an office is picked from dropdown (even if blank/new), open summary window
+  // 2. REGULAR USERS (Conditional Visibility based on Logged-in Gmail ID)
+  // Must be authenticated with a valid Google Account
+  if (!currentEmail) {
+    btnViewData.style.display = 'none';
+    return;
+  }
+
+  // If a specific office is currently selected in the form:
   if (selectedOffice) {
-    openEnteredOfficeSummaryWindow(selectedOffice);
+    const rec = inventoryStore[selectedOffice];
+    if (!rec) {
+      // This office has not yet submitted data -> completely hide
+      btnViewData.style.display = 'none';
+      return;
+    }
+
+    const ownerEmail = getRecordOwnerEmail(rec);
+    if (ownerEmail && ownerEmail === currentEmail) {
+      btnViewData.style.display = 'inline-flex';
+      return;
+    }
+
+    // Also check otLocks if applicable
+    const otLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks') || '{}');
+    const otOwner = (getOfficeLockEmail(selectedOffice, otLocks) || '').toLowerCase().trim();
+    if (otOwner && otOwner === currentEmail) {
+      btnViewData.style.display = 'inline-flex';
+      return;
+    }
+
+    // Currently logged-in Gmail ID does not match the authorized ID that submitted data -> completely hide
+    btnViewData.style.display = 'none';
     return;
   }
 
-  // 4. Fallback: If there are any offices in store, open the first entered office or prompt
-  const anyOfficeWithData = Object.values(inventoryStore)[0];
-  if (anyOfficeWithData && anyOfficeWithData.officeName) {
-    openEnteredOfficeSummaryWindow(anyOfficeWithData.officeName);
-    return;
-  }
+  // If NO office is currently selected in the dropdown:
+  // Show button only if the currently logged-in Gmail ID has already entered/submitted data for at least one office
+  const userHasSubmittedRecord = Object.values(inventoryStore).some(rec => {
+    const ownerEmail = getRecordOwnerEmail(rec);
+    return ownerEmail && ownerEmail === currentEmail;
+  });
 
-  showToast('Please select an Office Name from the dropdown above to view entered data.', 'info');
+  if (userHasSubmittedRecord) {
+    btnViewData.style.display = 'inline-flex';
+  } else {
+    // If a regular user has not yet submitted an entry for the IT Equipment List, completely hide
+    btnViewData.style.display = 'none';
+  }
 }
+window.updateViewEnteredDataButtonVisibility = updateViewEnteredDataButtonVisibility;
+
+function openCurrentUserRecordSummary() {
+  const isAdmin = checkIsUserAdmin();
+  const selectedOffice = document.getElementById('officeSelect')?.value?.trim();
+  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
+
+  // 1. ADMIN OVERRIDE: Can view any submitted office
+  if (isAdmin) {
+    if (selectedOffice && inventoryStore[selectedOffice]) {
+      openEnteredOfficeSummaryWindow(selectedOffice);
+      return;
+    }
+    const firstEnteredOffice = Object.keys(inventoryStore)[0];
+    if (firstEnteredOffice) {
+      openEnteredOfficeSummaryWindow(firstEnteredOffice);
+      return;
+    }
+    showToast('No submitted IT Equipment data found in database.', 'warning');
+    return;
+  }
+
+  // 2. REGULAR USER: Only allowed to view if their logged-in Gmail ID matches the authorized submitter
+  if (!currentEmail) {
+    showToast('Please sign in with your authorized Google Account.', 'warning');
+    return;
+  }
+
+  // If an office is picked in dropdown:
+  if (selectedOffice) {
+    const rec = inventoryStore[selectedOffice];
+    if (!rec) {
+      showToast(`No submitted IT Equipment data found for "${selectedOffice}".`, 'info');
+      return;
+    }
+    const ownerEmail = getRecordOwnerEmail(rec);
+    if (ownerEmail && ownerEmail === currentEmail) {
+      openEnteredOfficeSummaryWindow(selectedOffice);
+      return;
+    } else {
+      showToast(`Access restricted: Data for "${selectedOffice}" can only be viewed by the authorized submitter (${ownerEmail || 'another user'}).`, 'error');
+      return;
+    }
+  }
+
+  // If no office is picked, open the office record submitted by this user
+  const userOffice = Object.values(inventoryStore).find(r => {
+    const oEmail = getRecordOwnerEmail(r);
+    return oEmail && oEmail === currentEmail;
+  });
+
+  if (userOffice && userOffice.officeName) {
+    openEnteredOfficeSummaryWindow(userOffice.officeName);
+    return;
+  }
+
+  showToast('You have not yet submitted an entry for the IT Equipment List.', 'info');
+}
+window.openCurrentUserRecordSummary = openCurrentUserRecordSummary;
 
 function populateFormWithData(data) {
   if (!data) return;
@@ -2390,6 +2503,7 @@ async function handleFormSubmit(e) {
     renderAdminDataTable();
     renderPublicDataTable();
     if (activeSession === 'admin') renderAdminDashboard();
+    updateViewEnteredDataButtonVisibility();
 
     openEnteredOfficeSummaryWindow(officeName);
   } catch (err) {
@@ -2411,6 +2525,19 @@ function openSelectedOfficeSummaryWindow() {
 }
 
 function openEnteredOfficeSummaryWindow(officeName) {
+  const isAdmin = checkIsUserAdmin();
+  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
+
+  // Enforce access control for regular users: Must match the authorized ID that submitted data
+  if (inventoryStore[officeName] && !isAdmin) {
+    const existing = inventoryStore[officeName];
+    const ownerEmail = (existing.createdOfficerEmail || existing.submittedByEmail || existing.updatedOfficerEmail || existing.entryOfficerEmail || '').toLowerCase().trim();
+    if (ownerEmail && currentEmail && ownerEmail !== currentEmail) {
+      showToast(`Access restricted: Data for "${officeName}" can only be viewed by the authorized submitter (${ownerEmail}).`, 'error');
+      return;
+    }
+  }
+
   currentWindowOfficeName = officeName;
   const modal = document.getElementById('publicOfficeSummaryModal');
   const title = document.getElementById('publicModalOfficeTitle');
@@ -3221,6 +3348,8 @@ function switchSession(sessionType) {
 
     switchAdminSubView('dashboard');
   }
+
+  updateViewEnteredDataButtonVisibility();
 }
 
 function switchAdminSubView(view) {
@@ -4250,6 +4379,7 @@ async function deleteOfficeEntry(officeName) {
   renderAdminDataTable();
   renderAdminSummaryReport();
   if (activeSession === 'admin') renderAdminDashboard();
+  updateViewEnteredDataButtonVisibility();
 
   showToast(`Deleted "${officeName}"`, 'warning');
 }
