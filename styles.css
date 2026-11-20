@@ -2415,6 +2415,7 @@ input:checked+.slider:before {
 .verification-footer {
   page-break-inside: avoid !important;
   break-inside: avoid !important;
+  break-inside: avoid-page !important;
 }
 @media print {
   .verification-footer {
@@ -2422,6 +2423,7 @@ input:checked+.slider:before {
     visibility: visible !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
+    break-inside: avoid-page !important;
     margin-top: 24px !important;
     padding-top: 18px !important;
   }

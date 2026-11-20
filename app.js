@@ -2831,20 +2831,38 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- SECTION 6: Official Verification Footer -->
-      <div class="verification-footer" style="margin-top: 24px; padding-top: 18px; border-top: 2px dashed #cbd5e1; page-break-inside: avoid; break-inside: avoid;">
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
-          <div style="font-size: 0.8rem; color: #64748b; line-height: 1.5;">
+      <div class="verification-footer" style="margin-top: 28px; padding-top: 20px; border-top: 1.5px solid #cbd5e1; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 24px;">
+          <!-- Departmental Stamp & System Attestation -->
+          <div style="font-size: 0.8rem; color: #64748b; line-height: 1.6; max-width: 290px;">
             <div style="font-weight: 700; color: var(--primary-900); font-size: 0.85rem;">Motor Vehicles Department, Kerala</div>
-            <div>Verified IT Infrastructure &amp; Equipment Inventory Record</div>
+            <div>IT Infrastructure &amp; Equipment Verification Report</div>
             <div style="margin-top: 4px; font-size: 0.76rem;">Report Date: ${new Date().toLocaleDateString('en-IN')}</div>
+            <div style="margin-top: 12px; font-size: 0.74rem; color: #94a3b8; font-style: italic;">
+              * Official certification of verified physical computing equipment &amp; power infrastructure.
+            </div>
           </div>
-          <div style="text-align: right; min-width: 250px;">
-            <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; margin-bottom: 28px;">Verified by</div>
-            <div style="border-bottom: 1.5px solid #0f172a; width: 190px; margin-left: auto; margin-bottom: 6px;"></div>
-            <div style="font-size: 0.82rem; font-weight: 600; color: #64748b; font-style: italic; margin-bottom: 4px;">[Signature]</div>
-            <div style="font-size: 0.92rem; font-weight: 800; color: #0f172a;">${escapeHtml(headName)}</div>
-            <div style="font-size: 0.84rem; font-weight: 600; color: #334155;">${escapeHtml(headDesig)}</div>
-            <div style="font-size: 0.85rem; font-weight: 700; color: #064e3b; margin-top: 2px;">${escapeHtml(offName)}</div>
+
+          <!-- Structured Verification Signature Block -->
+          <div style="min-width: 320px; max-width: 420px; text-align: left;">
+            <div style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 50px;">Verified by</div>
+            
+            <div style="font-size: 0.82rem; font-weight: 600; color: #64748b; font-style: italic; margin-bottom: 24px;">[Signature]</div>
+            
+            <div style="font-size: 0.88rem; margin-bottom: 20px; display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Name of Head of Office :</span>
+              <span style="display: inline-block; min-width: 160px; min-height: 20px;"></span>
+            </div>
+            
+            <div style="font-size: 0.88rem; margin-bottom: 20px; display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Designation :</span>
+              <span style="display: inline-block; min-width: 160px; min-height: 20px;"></span>
+            </div>
+            
+            <div style="font-size: 0.9rem; display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Office Name :</span>
+              <span style="font-weight: 800; color: #064e3b;">${escapeHtml(data.officeName || offName || currentWindowOfficeName)}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -3231,43 +3249,40 @@ function downloadEnteredOfficeSummaryPDF(officeName) {
 
   // Official Verification Footer Block for PDF
   let sigY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY) + 24;
-  if (sigY > 700) {
+  if (sigY > 670) {
     doc.addPage();
     sigY = 50;
   }
 
-  const vHeadName = data.headOfOfficeName || (window.otOfficeReports && window.otOfficeReports[data.officeCode]?.headOfOfficeName) || data.entryOfficerName || data.createdOfficerName || '[Name of Head of Office]';
-  const vHeadDesig = data.headOfOfficeDesignation || (window.otOfficeReports && window.otOfficeReports[data.officeCode]?.headOfOfficeDesignation) || data.entryOfficerDesignation || data.createdOfficerDesignation || '[Designation]';
   const vOffName = data.officeName || name || '[Office name]';
 
-  doc.setFontSize(9);
+  doc.setFontSize(9.5);
   doc.setFont('helvetica', 'bold');
   doc.setTextColor(15, 23, 42);
-  doc.text("Verified by", 430, sigY);
+  doc.text("Verified by", 370, sigY);
 
-  doc.setDrawColor(15, 23, 42);
-  doc.setLineWidth(1);
-  doc.line(430, sigY + 28, 555.28, sigY + 28);
+  // Adequate vertical space for physical signature (45pt)
+  sigY += 45;
 
   doc.setFont('helvetica', 'italic');
   doc.setFontSize(8);
   doc.setTextColor(100, 116, 139);
-  doc.text("[Signature]", 430, sigY + 38);
-
-  doc.setFont('helvetica', 'bold');
-  doc.setFontSize(9);
-  doc.setTextColor(15, 23, 42);
-  doc.text(String(vHeadName), 430, sigY + 50);
-
-  doc.setFont('helvetica', 'normal');
-  doc.setFontSize(8);
-  doc.setTextColor(51, 65, 85);
-  doc.text(String(vHeadDesig), 430, sigY + 62);
+  doc.text("[Signature]", 370, sigY);
+  sigY += 24;
 
   doc.setFont('helvetica', 'bold');
   doc.setFontSize(8.5);
+  doc.setTextColor(30, 41, 59);
+  doc.text("Name of Head of Office :", 370, sigY);
+  sigY += 20; // Space for manual entry
+
+  doc.text("Designation :", 370, sigY);
+  sigY += 20; // Space for manual entry
+
+  doc.text("Office Name :", 370, sigY);
+  doc.setFont('helvetica', 'bold');
   doc.setTextColor(6, 78, 59);
-  doc.text(String(vOffName), 430, sigY + 74);
+  doc.text(String(vOffName), 435, sigY);
 
   // Page Numbers and Footer
   const totalPages = doc.internal.getNumberOfPages();
