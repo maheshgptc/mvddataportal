@@ -2866,40 +2866,6 @@ function openEnteredOfficeSummaryWindow(officeName) {
           </div>
         </div>
       </div>
-        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 24px;">
-          <!-- Departmental Stamp & System Attestation -->
-          <div style="font-size: 0.8rem; color: #64748b; line-height: 1.6; max-width: 290px;">
-            <div style="font-weight: 700; color: var(--primary-900); font-size: 0.85rem;">Motor Vehicles Department, Kerala</div>
-            <div>IT Infrastructure &amp; Equipment Verification Report</div>
-            <div style="margin-top: 4px; font-size: 0.76rem;">Report Date: ${new Date().toLocaleDateString('en-IN')}</div>
-            <div style="margin-top: 12px; font-size: 0.74rem; color: #94a3b8; font-style: italic;">
-              * Official certification of verified physical computing equipment &amp; power infrastructure.
-            </div>
-          </div>
-
-          <!-- Structured Verification Signature Block -->
-          <div style="min-width: 320px; max-width: 420px; text-align: left;">
-            <div style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 50px;">Verified by</div>
-            
-            <div style="font-size: 0.82rem; font-weight: 600; color: #64748b; font-style: italic; margin-bottom: 24px;">[Signature]</div>
-            
-            <div style="font-size: 0.88rem; margin-bottom: 20px; display: flex; align-items: baseline; gap: 10px;">
-              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Name of Head of Office :</span>
-              <span style="display: inline-block; min-width: 160px; min-height: 20px;"></span>
-            </div>
-            
-            <div style="font-size: 0.88rem; margin-bottom: 20px; display: flex; align-items: baseline; gap: 10px;">
-              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Designation :</span>
-              <span style="display: inline-block; min-width: 160px; min-height: 20px;"></span>
-            </div>
-            
-            <div style="font-size: 0.9rem; display: flex; align-items: baseline; gap: 10px;">
-              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Office Name :</span>
-              <span style="font-weight: 800; color: #064e3b;">${escapeHtml(data.officeName || offName || currentWindowOfficeName)}</span>
-            </div>
-          </div>
-        </div>
-      </div>
     </div>
   `;
 
