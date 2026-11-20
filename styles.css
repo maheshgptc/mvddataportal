@@ -1957,6 +1957,7 @@ input:checked+.slider:before {
   body.printing-ot-report #adminSummarySubView,
   body.printing-ot-report #adminDirectorySubView,
   body.printing-ot-report #adminRolesSubView,
+  body.printing-ot-report #adminAuditSubView,
   body.printing-ot-report #adminEntrySubView,
   body.printing-ot-report #adminViewSubView,
   body.printing-ot-report #adminMenusSubView,
@@ -2408,4 +2409,23 @@ input:checked+.slider:before {
   background: #fffbeb;
   color: #b45309;
   border: 1px solid #fde68a;
+}
+
+/* Verification Footer Styling */
+.verification-footer {
+  page-break-inside: avoid !important;
+  break-inside: avoid !important;
+}
+@media print {
+  .verification-footer {
+    display: block !important;
+    visibility: visible !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    margin-top: 24px !important;
+    padding-top: 18px !important;
+  }
+  .verification-footer * {
+    visibility: visible !important;
+  }
 }

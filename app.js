@@ -1967,44 +1967,21 @@ function updateViewEnteredDataButtonVisibility() {
   const btnViewData = document.getElementById('btnViewEnteredData');
   if (!btnViewData) return;
 
-  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
-  const selectedOffice = document.getElementById('officeSelect')?.value;
-
-  if (!currentEmail) {
-    btnViewData.style.display = 'none';
-    return;
-  }
-
-  if (selectedOffice && inventoryStore[selectedOffice]) {
-    const rec = inventoryStore[selectedOffice];
-    const oEmail = (rec.createdOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || rec.entryOfficerEmail || '').toLowerCase().trim();
-    if (oEmail === currentEmail) {
-      btnViewData.style.display = 'inline-flex';
-      return;
-    }
-  }
-
-  const userHasRecord = Object.values(inventoryStore).some(r => {
-    const oEmail = (r.createdOfficerEmail || r.submittedByEmail || r.updatedOfficerEmail || r.entryOfficerEmail || '').toLowerCase().trim();
-    return oEmail === currentEmail;
-  });
-
-  btnViewData.style.display = userHasRecord ? 'inline-flex' : 'none';
+  // Prominently keep visible in the top-right of Data Entry section so users can view entered records anytime
+  btnViewData.style.display = 'inline-flex';
 }
 
 function openCurrentUserRecordSummary() {
-  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
   const selectedOffice = document.getElementById('officeSelect')?.value;
+  const currentEmail = (googleAuthUser && googleAuthUser.email) ? googleAuthUser.email.toLowerCase().trim() : '';
 
+  // 1. If currently selected office in the form has entered data, open it immediately
   if (selectedOffice && inventoryStore[selectedOffice]) {
-    const rec = inventoryStore[selectedOffice];
-    const oEmail = (rec.createdOfficerEmail || rec.submittedByEmail || rec.updatedOfficerEmail || rec.entryOfficerEmail || '').toLowerCase().trim();
-    if (oEmail === currentEmail) {
-      openEnteredOfficeSummaryWindow(selectedOffice);
-      return;
-    }
+    openEnteredOfficeSummaryWindow(selectedOffice);
+    return;
   }
 
+  // 2. If user has entered data for an office matching their email, open it
   if (currentEmail) {
     const userOffice = Object.values(inventoryStore).find(r => {
       const oEmail = (r.createdOfficerEmail || r.submittedByEmail || r.updatedOfficerEmail || r.entryOfficerEmail || '').toLowerCase().trim();
@@ -2016,7 +1993,20 @@ function openCurrentUserRecordSummary() {
     }
   }
 
-  showToast('No submitted office record found for your logged-in Google account.', 'warning');
+  // 3. If an office is picked from dropdown (even if blank/new), open summary window
+  if (selectedOffice) {
+    openEnteredOfficeSummaryWindow(selectedOffice);
+    return;
+  }
+
+  // 4. Fallback: If there are any offices in store, open the first entered office or prompt
+  const anyOfficeWithData = Object.values(inventoryStore)[0];
+  if (anyOfficeWithData && anyOfficeWithData.officeName) {
+    openEnteredOfficeSummaryWindow(anyOfficeWithData.officeName);
+    return;
+  }
+
+  showToast('Please select an Office Name from the dropdown above to view entered data.', 'info');
 }
 
 function populateFormWithData(data) {
@@ -2433,6 +2423,10 @@ function openEnteredOfficeSummaryWindow(officeName) {
     lastUpdated: 'Just now'
   };
 
+  const headName = data.headOfOfficeName || (window.otOfficeReports && window.otOfficeReports[data.officeCode]?.headOfOfficeName) || data.entryOfficerName || data.createdOfficerName || '[Name of Head of Office]';
+  const headDesig = data.headOfOfficeDesignation || (window.otOfficeReports && window.otOfficeReports[data.officeCode]?.headOfOfficeDesignation) || data.entryOfficerDesignation || data.createdOfficerDesignation || '[Designation]';
+  const offName = data.officeName || '[Office name]';
+
   title.innerHTML = `<i class="fa-solid fa-building"></i> Entered Office Name: <span style="color: #fef08a; font-weight: 800;">${escapeHtml(data.officeName)}</span>`;
 
   const p = data.printers || {};
@@ -2706,6 +2700,25 @@ function openEnteredOfficeSummaryWindow(officeName) {
             <span><strong>Digital Certification:</strong> I hereby certify that the computing systems, printers, network, and power/battery infrastructure details listed above have been physically inspected and verified for this office.</span>
           </div>
           <span class="badge badge-working" style="font-size: 0.75rem;"><i class="fa-solid fa-check"></i> Certified Record</span>
+        </div>
+      </div>
+
+      <!-- SECTION 6: Official Verification Footer -->
+      <div class="verification-footer" style="margin-top: 24px; padding-top: 18px; border-top: 2px dashed #cbd5e1; page-break-inside: avoid; break-inside: avoid;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 20px;">
+          <div style="font-size: 0.8rem; color: #64748b; line-height: 1.5;">
+            <div style="font-weight: 700; color: var(--primary-900); font-size: 0.85rem;">Motor Vehicles Department, Kerala</div>
+            <div>Verified IT Infrastructure &amp; Equipment Inventory Record</div>
+            <div style="margin-top: 4px; font-size: 0.76rem;">Report Date: ${new Date().toLocaleDateString('en-IN')}</div>
+          </div>
+          <div style="text-align: right; min-width: 250px;">
+            <div style="font-size: 0.88rem; font-weight: 700; color: #0f172a; margin-bottom: 28px;">Verified by</div>
+            <div style="border-bottom: 1.5px solid #0f172a; width: 190px; margin-left: auto; margin-bottom: 6px;"></div>
+            <div style="font-size: 0.82rem; font-weight: 600; color: #64748b; font-style: italic; margin-bottom: 4px;">[Signature]</div>
+            <div style="font-size: 0.92rem; font-weight: 800; color: #0f172a;">${escapeHtml(headName)}</div>
+            <div style="font-size: 0.84rem; font-weight: 600; color: #334155;">${escapeHtml(headDesig)}</div>
+            <div style="font-size: 0.85rem; font-weight: 700; color: #064e3b; margin-top: 2px;">${escapeHtml(offName)}</div>
+          </div>
         </div>
       </div>
     </div>
@@ -3089,6 +3102,46 @@ function downloadEnteredOfficeSummaryPDF(officeName) {
     }
   });
 
+  // Official Verification Footer Block for PDF
+  let sigY = (doc.lastAutoTable ? doc.lastAutoTable.finalY : currentY) + 24;
+  if (sigY > 700) {
+    doc.addPage();
+    sigY = 50;
+  }
+
+  const vHeadName = data.headOfOfficeName || (window.otOfficeReports && window.otOfficeReports[data.officeCode]?.headOfOfficeName) || data.entryOfficerName || data.createdOfficerName || '[Name of Head of Office]';
+  const vHeadDesig = data.headOfOfficeDesignation || (window.otOfficeReports && window.otOfficeReports[data.officeCode]?.headOfOfficeDesignation) || data.entryOfficerDesignation || data.createdOfficerDesignation || '[Designation]';
+  const vOffName = data.officeName || name || '[Office name]';
+
+  doc.setFontSize(9);
+  doc.setFont('helvetica', 'bold');
+  doc.setTextColor(15, 23, 42);
+  doc.text("Verified by", 430, sigY);
+
+  doc.setDrawColor(15, 23, 42);
+  doc.setLineWidth(1);
+  doc.line(430, sigY + 28, 555.28, sigY + 28);
+
+  doc.setFont('helvetica', 'italic');
+  doc.setFontSize(8);
+  doc.setTextColor(100, 116, 139);
+  doc.text("[Signature]", 430, sigY + 38);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(9);
+  doc.setTextColor(15, 23, 42);
+  doc.text(String(vHeadName), 430, sigY + 50);
+
+  doc.setFont('helvetica', 'normal');
+  doc.setFontSize(8);
+  doc.setTextColor(51, 65, 85);
+  doc.text(String(vHeadDesig), 430, sigY + 62);
+
+  doc.setFont('helvetica', 'bold');
+  doc.setFontSize(8.5);
+  doc.setTextColor(6, 78, 59);
+  doc.text(String(vOffName), 430, sigY + 74);
+
   // Page Numbers and Footer
   const totalPages = doc.internal.getNumberOfPages();
   for (let i = 1; i <= totalPages; i++) {
@@ -3180,6 +3233,7 @@ function switchAdminSubView(view) {
   const btnSummaryReport = document.getElementById('btnAdminNavSummaryReport');
   const btnDir = document.getElementById('btnAdminNavDirectory');
   const btnRoles = document.getElementById('btnAdminNavRoles');
+  const btnAudit = document.getElementById('btnAdminNavAudit');
   const btnEnt = document.getElementById('btnAdminNavEntry');
   const btnVw = document.getElementById('btnAdminNavView');
   const btnMn = document.getElementById('btnAdminNavMenus');
@@ -3191,6 +3245,7 @@ function switchAdminSubView(view) {
   const summaryReportSec = document.getElementById('adminSummaryReportSubView');
   const dirSec = document.getElementById('adminDirectorySubView');
   const rolesSec = document.getElementById('adminRolesSubView');
+  const auditSec = document.getElementById('adminAuditSubView');
   const entSec = document.getElementById('adminEntrySubView');
   const vwSec = document.getElementById('adminViewSubView');
   const mnSec = document.getElementById('adminMenusSubView');
@@ -3201,7 +3256,8 @@ function switchAdminSubView(view) {
   if (btnOffs) btnOffs.style.background = (view === 'officers') ? 'var(--primary-600)' : 'transparent';
   if (btnSummaryReport) btnSummaryReport.style.background = (view === 'summaryreport') ? 'var(--primary-600)' : 'transparent';
   if (btnDir) btnDir.style.background = (view === 'directory') ? 'var(--primary-600)' : 'transparent';
-  if (btnRoles) btnRoles.style.background = (view === 'roles') ? 'var(--primary-600)' : 'transparent';
+  if (btnRoles) btnRoles.style.background = (view === 'roles' || view === 'roles_audit') ? 'var(--primary-600)' : 'transparent';
+  if (btnAudit) btnAudit.style.background = (view === 'audit') ? 'var(--primary-600)' : 'transparent';
   if (btnEnt) btnEnt.style.background = (view === 'entry') ? 'var(--primary-600)' : 'transparent';
   if (btnVw) btnVw.style.background = (view === 'view') ? 'var(--primary-600)' : 'transparent';
   if (btnMn) btnMn.style.background = (view === 'menus') ? 'var(--primary-600)' : 'transparent';
@@ -3211,8 +3267,19 @@ function switchAdminSubView(view) {
   if (summSec) summSec.style.display = (view === 'summary') ? 'block' : 'none';
   if (offsSec) offsSec.style.display = (view === 'officers') ? 'block' : 'none';
   if (summaryReportSec) summaryReportSec.style.display = (view === 'summaryreport') ? 'block' : 'none';
-  if (dirSec) dirSec.style.display = (view === 'directory') ? 'block' : 'none';
-  if (rolesSec) rolesSec.style.display = (view === 'roles') ? 'block' : 'none';
+  if (dirSec) {
+    dirSec.style.display = (view === 'directory') ? 'block' : 'none';
+    const dContent = document.getElementById('otTabContentDirectory');
+    if (dContent) dContent.style.display = 'block';
+  }
+  if (rolesSec) {
+    rolesSec.style.display = (view === 'roles' || view === 'roles_audit') ? 'block' : 'none';
+    const rContent = document.getElementById('otTabContentRoles');
+    if (rContent) rContent.style.display = 'block';
+  }
+  if (auditSec) {
+    auditSec.style.display = (view === 'audit') ? 'block' : 'none';
+  }
   if (entSec) entSec.style.display = (view === 'entry') ? 'block' : 'none';
   if (vwSec) vwSec.style.display = (view === 'view') ? 'block' : 'none';
   if (mnSec) mnSec.style.display = (view === 'menus') ? 'block' : 'none';
@@ -3243,11 +3310,19 @@ function switchAdminSubView(view) {
   }
   if (view === 'directory') {
     if (typeof initOfficerTrainingModule === 'function') initOfficerTrainingModule();
+    const dContent = document.getElementById('otTabContentDirectory');
+    if (dContent) dContent.style.display = 'block';
     if (typeof renderAdminOfficersDirectory === 'function') renderAdminOfficersDirectory();
   }
-  if (view === 'roles') {
+  if (view === 'roles' || view === 'roles_audit') {
     if (typeof initOfficerTrainingModule === 'function') initOfficerTrainingModule();
+    const rContent = document.getElementById('otTabContentRoles');
+    if (rContent) rContent.style.display = 'block';
     if (typeof renderRoleSwitcherUI === 'function') renderRoleSwitcherUI();
+  }
+  if (view === 'audit') {
+    if (typeof initOfficerTrainingModule === 'function') initOfficerTrainingModule();
+    if (typeof syncOfficerAuditLogsWithSupabase === 'function') syncOfficerAuditLogsWithSupabase();
     if (typeof renderAuditLogTable === 'function') renderAuditLogTable();
   }
   if (view === 'view') renderAdminDataTable();

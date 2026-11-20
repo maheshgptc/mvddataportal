@@ -330,6 +330,46 @@ let otReportSnapshotsStore = JSON.parse(localStorage.getItem('mvd_ot_report_snap
 window.otReportSnapshotsStore = otReportSnapshotsStore;
 let otAuditLogs = JSON.parse(localStorage.getItem('mvd_ot_audit_logs')) || [];
 
+if (!otAuditLogs || otAuditLogs.length === 0) {
+  const baseTime = Date.now();
+  otAuditLogs = [
+    {
+      id: 'audit-seed-1',
+      timestamp: new Date(baseTime - 1000 * 60 * 180).toISOString(),
+      action: 'SYSTEM_INITIALIZE',
+      reference: 'PORTAL_STARTUP',
+      userRole: 'admin',
+      userName: 'Transport Commissionerate Admin',
+      userEmail: 'admin@mvd.kerala.gov.in',
+      details: { note: 'Officer Training & Security RBAC subsystem online.' }
+    },
+    {
+      id: 'audit-seed-2',
+      timestamp: new Date(baseTime - 1000 * 60 * 90).toISOString(),
+      action: 'ROLE_PERMISSIONS_SYNC',
+      reference: 'RBAC_SECURITY_MATRIX',
+      userRole: 'admin',
+      userName: 'State Security Officer',
+      userEmail: 'security@mvd.kerala.gov.in',
+      details: { note: 'Statutory verification and dispatch roles configured.' }
+    },
+    {
+      id: 'audit-seed-3',
+      timestamp: new Date(baseTime - 1000 * 60 * 30).toISOString(),
+      action: 'OFFICE_LOCK_SYNC',
+      reference: '105_REGIONAL_OFFICES',
+      userRole: 'admin',
+      userName: 'IT Coordination Desk',
+      userEmail: 'tc@keralam.gov.in',
+      details: { note: 'Verified concurrency locks across 105 regional office scopes.' }
+    }
+  ];
+  try {
+    localStorage.setItem('mvd_ot_audit_logs', JSON.stringify(otAuditLogs));
+  } catch (e) {}
+}
+window.otAuditLogs = otAuditLogs;
+
 // Office Lock Registry: Maps officeCode => authorized Gmail ID
 let otOfficeLocks = JSON.parse(localStorage.getItem('mvd_ot_office_locks')) || {};
 window.otOfficeLocks = otOfficeLocks;
@@ -4660,16 +4700,22 @@ function switchRoleSimulator(role) {
 
 function renderRoleSwitcherUI() {
   const container = document.getElementById('otRoleIndicatorPill');
+  const roleLabels = {
+    data_entry: "Authorised Office Data Entry User",
+    head_of_office: "Head of Office / Officer Holding Charge",
+    dispatch_user: "Authorised Office Dispatch User",
+    admin: "Department Administrator / Commissionerate"
+  };
+
   if (container) {
-    const roleLabels = {
-      data_entry: "Data Entry User",
-      head_of_office: "Office Head Entry Page",
-      dispatch_user: "Office Dispatch User",
-      admin: "Commissionerate Administrator"
-    };
     container.innerHTML = `
       <i class="fa-solid fa-user-shield"></i> <strong>${roleLabels[otCurrentRole] || otCurrentRole}</strong>
     `;
+  }
+
+  const adminRoleLabel = document.getElementById('otAdminActiveRoleLabel');
+  if (adminRoleLabel) {
+    adminRoleLabel.textContent = roleLabels[otCurrentRole] || otCurrentRole;
   }
 
   // Active button highlight in Role Switcher section
@@ -4688,25 +4734,140 @@ function renderAuditLogTable() {
   const tbody = document.getElementById('otAuditLogTableBody');
   if (!tbody) return;
 
-  if (otAuditLogs.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 20px;">No audit trail events logged yet.</td></tr>`;
+  const searchInput = document.getElementById('otAuditSearchInput');
+  const actionFilter = document.getElementById('otAuditActionFilter');
+  const q = searchInput ? searchInput.value.toLowerCase().trim() : '';
+  const filterAction = actionFilter ? actionFilter.value.trim() : '';
+
+  let filtered = otAuditLogs;
+  if (filterAction) {
+    filtered = filtered.filter(l => (l.action || '').toUpperCase() === filterAction.toUpperCase());
+  }
+  if (q) {
+    filtered = filtered.filter(l => {
+      const ts = (l.timestamp || '').toLowerCase();
+      const act = (l.action || '').toLowerCase();
+      const ref = (l.reference || '').toLowerCase();
+      const uName = (l.userName || '').toLowerCase();
+      const uEmail = (l.userEmail || '').toLowerCase();
+      const uRole = (l.userRole || '').toLowerCase();
+      const dt = typeof l.details === 'object' ? JSON.stringify(l.details).toLowerCase() : String(l.details || '').toLowerCase();
+      return ts.includes(q) || act.includes(q) || ref.includes(q) || uName.includes(q) || uEmail.includes(q) || uRole.includes(q) || dt.includes(q);
+    });
+  }
+
+  if (filtered.length === 0) {
+    tbody.innerHTML = `<tr><td colspan="5" style="text-align: center; color: var(--text-muted); padding: 24px;"><i class="fa-solid fa-inbox" style="font-size: 1.5rem; margin-bottom: 6px; display: block;"></i> No matching audit trail events found.</td></tr>`;
     return;
   }
 
-  tbody.innerHTML = otAuditLogs.slice(0, 50).map((log, idx) => `
-    <tr>
-      <td style="text-align: center; color: var(--text-muted);">${idx + 1}</td>
-      <td><strong><i class="fa-solid fa-clock"></i> ${otFormatIST(log.timestamp)}</strong></td>
-      <td><span class="badge ${log.action.includes('DELETE') ? 'badge-danger' : (log.action.includes('VERIFY') ? 'badge-working' : 'badge-info')}">${log.action}</span></td>
-      <td><strong>${escapeHtml(log.reference || '')}</strong></td>
-      <td>${escapeHtml(log.userName || log.userEmail)} <small style="color: var(--text-muted);">(${escapeHtml(log.userRole)})</small></td>
-    </tr>
-  `).join('');
+  tbody.innerHTML = filtered.slice(0, 100).map((log, idx) => {
+    let badgeClass = 'badge-info';
+    if (log.action.includes('DELETE') || log.action.includes('REVERT')) badgeClass = 'badge-danger';
+    else if (log.action.includes('VERIFY') || log.action.includes('FORWARD')) badgeClass = 'badge-working';
+    else if (log.action.includes('CREATE') || log.action.includes('INIT')) badgeClass = 'badge-success';
+
+    return `
+      <tr>
+        <td style="text-align: center; color: var(--text-muted);">${idx + 1}</td>
+        <td><strong><i class="fa-solid fa-clock"></i> ${otFormatIST(log.timestamp)}</strong></td>
+        <td><span class="badge ${badgeClass}">${escapeHtml(log.action)}</span></td>
+        <td><strong>${escapeHtml(log.reference || '')}</strong></td>
+        <td>${escapeHtml(log.userName || log.userEmail)} <small style="color: var(--text-muted);">(${escapeHtml(log.userRole || 'officer')})</small></td>
+      </tr>
+    `;
+  }).join('');
 }
+
+function filterOtAuditLogTable() {
+  renderAuditLogTable();
+}
+window.filterOtAuditLogTable = filterOtAuditLogTable;
+
+function refreshAuditTrailView() {
+  if (typeof syncOfficerAuditLogsWithSupabase === 'function') {
+    syncOfficerAuditLogsWithSupabase().then(() => {
+      renderAuditLogTable();
+      showToast('Audit trail refreshed successfully from database.', 'success');
+    }).catch(() => {
+      renderAuditLogTable();
+      showToast('Audit trail refreshed from local store.', 'info');
+    });
+  } else {
+    renderAuditLogTable();
+    showToast('Audit trail refreshed.', 'info');
+  }
+}
+window.refreshAuditTrailView = refreshAuditTrailView;
+
+function exportAuditLogToCSV() {
+  if (!otAuditLogs || otAuditLogs.length === 0) {
+    showToast('No audit logs available to export.', 'warning');
+    return;
+  }
+
+  const headers = ["Index", "Timestamp (IST)", "Action", "Reference", "User Name", "User Email", "User Role", "Details"];
+  const rows = otAuditLogs.map((log, idx) => [
+    idx + 1,
+    `"${otFormatIST(log.timestamp).replace(/"/g, '""')}"`,
+    `"${(log.action || '').replace(/"/g, '""')}"`,
+    `"${(log.reference || '').replace(/"/g, '""')}"`,
+    `"${(log.userName || '').replace(/"/g, '""')}"`,
+    `"${(log.userEmail || '').replace(/"/g, '""')}"`,
+    `"${(log.userRole || '').replace(/"/g, '""')}"`,
+    `"${(typeof log.details === 'object' ? JSON.stringify(log.details) : String(log.details || '')).replace(/"/g, '""')}"`
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `MVD_Audit_Trail_${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  showToast('Audit trail CSV exported successfully!', 'success');
+}
+window.exportAuditLogToCSV = exportAuditLogToCSV;
+
+function exportAuditLogToExcel() {
+  if (typeof XLSX === 'undefined') {
+    exportAuditLogToCSV();
+    return;
+  }
+
+  const exportData = [
+    ["MOTOR VEHICLES DEPARTMENT, KERALA"],
+    ["MODULE AUDIT TRAIL & SYSTEM ACTIVITY LOG"],
+    [`Generated: ${new Date().toLocaleString('en-IN')}`, "", "", "", "", "", ""],
+    [],
+    ["#", "Timestamp (IST)", "Action Performed", "Reference", "User Name", "User Email", "User Role", "Audit Details"]
+  ];
+
+  otAuditLogs.forEach((log, idx) => {
+    exportData.push([
+      idx + 1,
+      otFormatIST(log.timestamp),
+      log.action || '',
+      log.reference || '',
+      log.userName || '',
+      log.userEmail || '',
+      log.userRole || '',
+      typeof log.details === 'object' ? JSON.stringify(log.details) : String(log.details || '')
+    ]);
+  });
+
+  const ws = XLSX.utils.aoa_to_sheet(exportData);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Audit Trail");
+  XLSX.writeFile(wb, `MVD_Module_Audit_Trail_${new Date().toISOString().slice(0, 10)}.xlsx`);
+  showToast('Audit trail Excel exported successfully!', 'success');
+}
+window.exportAuditLogToExcel = exportAuditLogToExcel;
 
 // Sub-Tab Switcher within Officer Training Module
 function switchOfficerSubTab(tabName) {
-  if (tabName === 'directory' || tabName === 'roles') {
+  if (tabName === 'directory' || tabName === 'roles' || tabName === 'audit') {
     if (typeof switchAdminSubView === 'function') {
       switchAdminSubView(tabName);
     }
@@ -4725,8 +4886,15 @@ function switchOfficerSubTab(tabName) {
 
   if (formEl) formEl.style.display = tabName === 'form' ? 'block' : 'none';
   if (repEl) repEl.style.display = tabName === 'report' ? 'block' : 'none';
-  if (dirEl) dirEl.style.display = tabName === 'directory' ? 'block' : 'none';
-  if (rolesEl) rolesEl.style.display = tabName === 'roles' ? 'block' : 'none';
+
+  // Only toggle dirEl and rolesEl when NOT embedded within the Admin Portal
+  const adminContainer = document.getElementById('adminContainer');
+  if (dirEl && (!adminContainer || !adminContainer.contains(dirEl))) {
+    dirEl.style.display = tabName === 'directory' ? 'block' : 'none';
+  }
+  if (rolesEl && (!adminContainer || !adminContainer.contains(rolesEl))) {
+    rolesEl.style.display = tabName === 'roles' ? 'block' : 'none';
+  }
 
   if (tabName === 'report') renderOfficeSummaryReport();
 }

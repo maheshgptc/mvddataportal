@@ -125,9 +125,6 @@
               <span id="userGoogleName" class="user-profile-name">Officer Account</span>
               <span id="userGoogleEmail" class="user-profile-email">officer@keralam.gov.in</span>
             </div>
-            <button type="button" id="btnViewEnteredData" class="btn btn-outline btn-sm" onclick="openCurrentUserRecordSummary()" style="display: none; margin-left: 10px; background: #ffffff; color: #064e3b; border: 1.5px solid #a7f3d0; font-weight: 700; border-radius: 6px; padding: 4px 10px;">
-              <i class="fa-solid fa-window-restore"></i> View Entered Data
-            </button>
             <button type="button" class="btn-signout" onclick="logoutGoogleUser()" title="Sign Out Google Account">
               <i class="fa-solid fa-right-from-bracket"></i> Sign Out
             </button>
@@ -160,7 +157,10 @@
                 </div>
               </div>
 
-              <div>
+              <div style="display: flex; align-items: center; gap: 10px; margin-left: auto;">
+                <button type="button" id="btnViewEnteredData" class="btn btn-sm" onclick="openCurrentUserRecordSummary()" style="display: inline-flex; align-items: center; gap: 8px; background: linear-gradient(135deg, #059669 0%, #047857 100%); color: #ffffff; border: 1.5px solid #047857; font-weight: 700; font-size: 0.88rem; border-radius: 6px; padding: 8px 16px; box-shadow: 0 2px 8px rgba(5, 150, 105, 0.3); cursor: pointer; transition: all 0.2s ease;">
+                  <i class="fa-solid fa-window-restore" style="font-size: 1rem;"></i> View Entered Data
+                </button>
                 <button type="button" id="btnOpenSelectedOfficeWindow" class="btn btn-outline btn-sm" style="display: none; align-items: center; gap: 8px; font-weight: 600;" onclick="openSelectedOfficeSummaryWindow()">
                   <i class="fa-solid fa-window-restore"></i> View Entered Office in New Window
                 </button>
@@ -1488,7 +1488,10 @@
                 <i class="fa-solid fa-address-book"></i> Officer Directory &amp; Search
               </button>
               <button class="btn btn-outline" id="btnAdminNavRoles" onclick="switchAdminSubView('roles')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
-                <i class="fa-solid fa-user-gear"></i> Role Permissions &amp; Audit Log
+                <i class="fa-solid fa-user-gear"></i> Role Permissions
+              </button>
+              <button class="btn btn-outline" id="btnAdminNavAudit" onclick="switchAdminSubView('audit')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
+                <i class="fa-solid fa-clock-rotate-left"></i> Audit Log
               </button>
               <button class="btn btn-outline" id="btnAdminNavEntry" onclick="switchAdminSubView('entry')" style="color: white; border-color: rgba(255, 255, 255, 0.3);">
                 <i class="fa-solid fa-plus-circle"></i> Direct IT Entry
@@ -2261,58 +2264,155 @@
 
           </div>
 
-          <!-- ADMIN ROLE PERMISSIONS & AUDIT LOG SUBVIEW -->
+          <!-- ADMIN ROLE PERMISSIONS SUBVIEW -->
           <div id="adminRolesSubView" style="display: none;">
-          <!-- ====================================================================
-               SUBTAB 4: ROLE ACCESS CONTROL & AUDIT TRAIL
-               ==================================================================== -->
-          <div id="otTabContentRoles" style="display: block;">
+            <div id="otTabContentRoles" style="display: block;">
+              <div class="card-section">
+                <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                  <div>
+                    <h3 class="section-title" style="margin: 0;">
+                      <i class="fa-solid fa-user-gear"></i> Role Permissions &amp; Access Control Simulation
+                    </h3>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
+                      Switch between departmental roles to test and simulate server-enforced access boundaries.
+                    </p>
+                  </div>
+                  <div>
+                    <button type="button" class="btn btn-outline btn-sm" onclick="switchAdminSubView('audit')" style="border-color: #0284c7; color: #0284c7; font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                      <i class="fa-solid fa-clock-rotate-left"></i> View Full Audit Trail
+                    </button>
+                  </div>
+                </div>
+
+                <!-- Active Role Indicator Banner -->
+                <div id="otActiveRoleStatusCard" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1.5px solid #86efac; border-radius: 8px; padding: 14px 18px; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
+                  <div style="display: flex; align-items: center; gap: 12px;">
+                    <div style="background: #15803d; color: white; width: 40px; height: 40px; border-radius: 8px; display: flex; align-items: center; justify-content: center; font-size: 1.2rem;">
+                      <i class="fa-solid fa-user-shield"></i>
+                    </div>
+                    <div>
+                      <div style="font-size: 0.75rem; text-transform: uppercase; color: #166534; font-weight: 700; letter-spacing: 0.5px;">Currently Active Simulation Role</div>
+                      <div id="otAdminActiveRoleLabel" style="font-size: 1.15rem; font-weight: 800; color: #14532d;">Head of Office / Officer Holding Charge</div>
+                    </div>
+                  </div>
+                  <span id="otAdminActiveRoleBadge" class="badge badge-working" style="font-size: 0.82rem; padding: 6px 14px;">
+                    <i class="fa-solid fa-check"></i> ACTIVE ROLE MODE
+                  </span>
+                </div>
+
+                <!-- Role Switcher Buttons -->
+                <div class="ot-role-switcher-box" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 18px; margin-bottom: 24px;">
+                  <label style="font-weight: 700; color: #0f172a; margin-bottom: 10px; display: block;">
+                    Select Simulated Portal User Role:
+                  </label>
+                  <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+                    <button type="button" class="ot-role-btn" data-role="data_entry" onclick="switchRoleSimulator('data_entry')">
+                      <i class="fa-solid fa-user-pen"></i> Authorised Office Data Entry User
+                    </button>
+                    <button type="button" class="ot-role-btn active" data-role="head_of_office" onclick="switchRoleSimulator('head_of_office')">
+                      <i class="fa-solid fa-user-tie"></i> Head of Office / Officer Holding Charge
+                    </button>
+                    <button type="button" class="ot-role-btn" data-role="dispatch_user" onclick="switchRoleSimulator('dispatch_user')">
+                      <i class="fa-solid fa-paper-plane"></i> Authorised Office Dispatch User
+                    </button>
+                    <button type="button" class="ot-role-btn" data-role="admin" onclick="switchRoleSimulator('admin')">
+                      <i class="fa-solid fa-shield-halved"></i> Department Administrator / Commissionerate
+                    </button>
+                  </div>
+
+                  <div style="margin-top: 14px; font-size: 0.84rem; line-height: 1.5; color: #475569; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+                    <strong>Active Permissions Matrix:</strong><br>
+                    • <strong>Data Entry:</strong> Create/update profiles, save drafts, prepare office report drafts.<br>
+                    • <strong>Head of Office:</strong> Full office access, verify report with statutory certification, authorize forwarding.<br>
+                    • <strong>Dispatch User:</strong> Record outward/dispatch numbers and dates for verified reports.<br>
+                    • <strong>Commissionerate Administrator:</strong> Statewide multi-office inspection, filtering, global exports.
+                  </div>
+                </div>
+
+                <!-- Access Control Simulation & Role Capabilities Grid -->
+                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; margin-top: 16px;">
+                  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; border-left: 4px solid #3b82f6;">
+                    <div style="font-weight: 700; color: #1e3a8a; font-size: 0.9rem; margin-bottom: 6px;">
+                      <i class="fa-solid fa-file-signature"></i> Profile Registration
+                    </div>
+                    <div style="font-size: 0.8rem; color: #475569; line-height: 1.4;">
+                      Authorized Data Entry &amp; Office Heads can register and update officer academic and technical profiles.
+                    </div>
+                  </div>
+                  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; border-left: 4px solid #10b981;">
+                    <div style="font-weight: 700; color: #065f46; font-size: 0.9rem; margin-bottom: 6px;">
+                      <i class="fa-solid fa-stamp"></i> Statutory Verification
+                    </div>
+                    <div style="font-size: 0.8rem; color: #475569; line-height: 1.4;">
+                      Only Head of Office is empowered to verify officer statements and sign the statutory declaration.
+                    </div>
+                  </div>
+                  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; border-left: 4px solid #f59e0b;">
+                    <div style="font-weight: 700; color: #92400e; font-size: 0.9rem; margin-bottom: 6px;">
+                      <i class="fa-solid fa-paper-plane"></i> Outward Dispatch
+                    </div>
+                    <div style="font-size: 0.8rem; color: #475569; line-height: 1.4;">
+                      Office Dispatch User and Office Head can record outward dispatch numbers and transmit to Transport Commissionerate.
+                    </div>
+                  </div>
+                  <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 8px; padding: 14px; border-left: 4px solid #8b5cf6;">
+                    <div style="font-weight: 700; color: #5b21b6; font-size: 0.9rem; margin-bottom: 6px;">
+                      <i class="fa-solid fa-shield-cat"></i> Administrative Override
+                    </div>
+                    <div style="font-size: 0.8rem; color: #475569; line-height: 1.4;">
+                      Commissionerate Admin has statewide visibility, audit inspection, status reversion, and global analytics.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ADMIN AUDIT LOG SUBVIEW -->
+          <div id="adminAuditSubView" style="display: none;">
             <div class="card-section">
-              <div class="section-header">
+              <div class="section-header" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 12px;">
                 <div>
                   <h3 class="section-title" style="margin: 0;">
-                    <i class="fa-solid fa-user-gear"></i> Role Permissions &amp; Access Control Simulation
+                    <i class="fa-solid fa-clock-rotate-left"></i> Module Audit Trail &amp; System Activity Log
                   </h3>
                   <p style="font-size: 0.82rem; color: var(--text-muted); margin: 4px 0 0 0;">
-                    Switch between departmental roles to test server-enforced access boundaries.
+                    Real-time immutable audit trail recorded in Indian Standard Time (Asia/Kolkata).
                   </p>
                 </div>
-              </div>
-
-              <!-- Role Switcher Buttons -->
-              <div class="ot-role-switcher-box" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 18px; margin-bottom: 24px;">
-                <label style="font-weight: 700; color: #0f172a; margin-bottom: 10px; display: block;">
-                  Select Simulated Portal User Role:
-                </label>
                 <div style="display: flex; gap: 10px; flex-wrap: wrap;">
-                  <button type="button" class="ot-role-btn" data-role="data_entry" onclick="switchRoleSimulator('data_entry')">
-                    <i class="fa-solid fa-user-pen"></i> Authorised Office Data Entry User
+                  <button type="button" class="btn btn-primary btn-sm" onclick="exportAuditLogToExcel()" style="background: var(--primary-800); border-color: var(--primary-900); font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-file-excel"></i> Export Excel
                   </button>
-                  <button type="button" class="ot-role-btn active" data-role="head_of_office" onclick="switchRoleSimulator('head_of_office')">
-                    <i class="fa-solid fa-user-tie"></i> Head of Office / Officer Holding Charge
+                  <button type="button" class="btn btn-outline btn-sm" onclick="exportAuditLogToCSV()" style="font-weight: 700; display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-file-csv"></i> Export CSV
                   </button>
-                  <button type="button" class="ot-role-btn" data-role="dispatch_user" onclick="switchRoleSimulator('dispatch_user')">
-                    <i class="fa-solid fa-paper-plane"></i> Authorised Office Dispatch User
+                  <button type="button" class="btn btn-secondary btn-sm" onclick="refreshAuditTrailView()" style="display: inline-flex; align-items: center; gap: 6px;">
+                    <i class="fa-solid fa-arrows-rotate"></i> Refresh Log
                   </button>
-                  <button type="button" class="ot-role-btn" data-role="admin" onclick="switchRoleSimulator('admin')">
-                    <i class="fa-solid fa-shield-halved"></i> Department Administrator / Commissionerate
-                  </button>
-                </div>
-
-                <div style="margin-top: 14px; font-size: 0.84rem; line-height: 1.5; color: #475569; background: #ffffff; padding: 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
-                  <strong>Active Permissions Matrix:</strong><br>
-                  • <strong>Data Entry:</strong> Create/update profiles, save drafts, prepare office report drafts.<br>
-                  • <strong>Head of Office:</strong> Full office access, verify report with statutory certification, authorize forwarding.<br>
-                  • <strong>Dispatch User:</strong> Record outward/dispatch numbers and dates for verified reports.<br>
-                  • <strong>Commissionerate Administrator:</strong> Statewide multi-office inspection, filtering, global exports.
                 </div>
               </div>
 
-              <!-- Comprehensive Audit Trail Table -->
-              <div class="section-header" style="margin-top: 20px;">
-                <h4 style="font-size: 1rem; font-weight: 700; color: var(--primary-900);">
-                  <i class="fa-solid fa-clock-rotate-left"></i> Module Audit Trail (Asia/Kolkata Time)
-                </h4>
+              <!-- Filter Toolbar -->
+              <div class="table-toolbar" style="background: #f8fafc; padding: 12px 16px; border-radius: 6px; border: 1px solid var(--border-color); margin-bottom: 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;">
+                <div class="search-box" style="flex: 1; min-width: 240px;">
+                  <i class="fa-solid fa-magnifying-glass"></i>
+                  <input type="text" id="otAuditSearchInput" class="form-control" placeholder="Search by officer, PEN, action, user email..." onkeyup="filterOtAuditLogTable()">
+                </div>
+                <div style="min-width: 200px;">
+                  <select id="otAuditActionFilter" class="form-control" onchange="filterOtAuditLogTable()" style="font-weight: 600;">
+                    <option value="">All Actions</option>
+                    <option value="CREATE_PROFILE">CREATE_PROFILE</option>
+                    <option value="UPDATE_PROFILE">UPDATE_PROFILE</option>
+                    <option value="DELETE_PROFILE">DELETE_PROFILE</option>
+                    <option value="VERIFY_REPORT">VERIFY_REPORT</option>
+                    <option value="FORWARD_REPORT">FORWARD_REPORT</option>
+                    <option value="REVERT_FORWARDING_STATUS">REVERT_FORWARDING_STATUS</option>
+                    <option value="OFFICE_LOCK_SYNC">OFFICE_LOCK_SYNC</option>
+                    <option value="ROLE_PERMISSIONS_SYNC">ROLE_PERMISSIONS_SYNC</option>
+                    <option value="SYSTEM_INITIALIZE">SYSTEM_INITIALIZE</option>
+                  </select>
+                </div>
               </div>
 
               <div class="data-table-container">
@@ -2320,10 +2420,10 @@
                   <thead>
                     <tr>
                       <th style="width: 40px; text-align: center;">#</th>
-                      <th>Timestamp (IST)</th>
-                      <th>Action Performed</th>
-                      <th>Profile / Report Reference</th>
-                      <th>Authenticated User &amp; Role</th>
+                      <th style="min-width: 170px;">Timestamp (IST)</th>
+                      <th style="min-width: 180px;">Action Performed</th>
+                      <th style="min-width: 200px;">Profile / Report Reference</th>
+                      <th style="min-width: 220px;">Authenticated User &amp; Role</th>
                     </tr>
                   </thead>
                   <tbody id="otAuditLogTableBody">
@@ -2332,7 +2432,6 @@
                 </table>
               </div>
             </div>
-          </div>
           </div>
 
           <!-- ADMIN DIRECT ENTRY SUBVIEW -->
