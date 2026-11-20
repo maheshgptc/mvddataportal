@@ -2613,8 +2613,8 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- Officer Details & Connectivity -->
-      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px;">
-        <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
+      <div class="modal-report-section" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 14px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; page-break-inside: avoid; break-inside: avoid;">
           <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-user-tie" style="color: #0284c7;"></i> Submitting Officer Particulars
           </h4>
@@ -2626,7 +2626,7 @@ function openEnteredOfficeSummaryWindow(officeName) {
           </div>
         </div>
 
-        <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px;">
+        <div style="background: #f8fafc; border: 1px solid var(--border-color); padding: 14px; border-radius: 8px; page-break-inside: avoid; break-inside: avoid;">
           <h4 style="font-size: 0.88rem; color: var(--primary-900); font-weight: 700; margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-network-wired" style="color: #059669;"></i> Connectivity &amp; Operating System
           </h4>
@@ -2640,11 +2640,11 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- SECTION 1: Core IT Computing Hardware -->
-      <div>
+      <div class="modal-report-section" style="page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
         <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
           <i class="fa-solid fa-desktop" style="color: #0284c7;"></i> Core IT Computing Hardware Inventory
         </h4>
-        <table class="data-table" style="width: 100%; font-size: 0.85rem;">
+        <table class="data-table" style="width: 100%; font-size: 0.85rem; page-break-inside: avoid; break-inside: avoid;">
           <thead>
             <tr>
               <th>Equipment Category</th>
@@ -2683,14 +2683,14 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- SECTION 2: Printer & Imaging Equipment Section -->
-      <div>
+      <div class="modal-report-section" style="page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-print" style="color: #7c3aed;"></i> Printer &amp; Imaging Equipment Section
           </h4>
           <span class="badge badge-info" style="font-size: 0.78rem; font-weight: 700;">Total Printers: ${totalPrinters} (${totalPrintersW} Working)</span>
         </div>
-        <table class="data-table" style="width: 100%; font-size: 0.85rem;">
+        <table class="data-table" style="width: 100%; font-size: 0.85rem; page-break-inside: avoid; break-inside: avoid;">
           <thead>
             <tr>
               <th>Printer / Imaging Category</th>
@@ -2741,13 +2741,13 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- SECTION 3: Power and Battery Infrastructure -->
-      <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+      <div class="modal-report-section" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
         <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 12px; display: flex; align-items: center; gap: 6px;">
           <i class="fa-solid fa-car-battery" style="color: #059669;"></i> Power and Battery Infrastructure
         </h4>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px;">
+        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 14px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
           <!-- UPS Status -->
-          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
             <div style="font-size: 0.74rem; font-weight: 700; color: #64748b; text-transform: uppercase;">UPS System Profile</div>
             <div style="margin-top: 6px; font-size: 0.84rem; line-height: 1.7;">
               <strong>UPS Available:</strong> <span class="badge ${data.upsAvailable === 'No' ? 'badge-danger' : 'badge-working'}">${escapeHtml(data.upsAvailable || 'Yes')}</span><br>
@@ -2758,7 +2758,7 @@ function openEnteredOfficeSummaryWindow(officeName) {
           </div>
 
           <!-- Battery Infrastructure -->
-          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
             <div style="font-size: 0.74rem; font-weight: 700; color: #64748b; text-transform: uppercase;">Battery Bank Inventory</div>
             <div style="margin-top: 6px; font-size: 0.84rem; line-height: 1.7;">
               <strong>Battery Make:</strong> ${escapeHtml(data.batteryMake || 'N/A')}<br>
@@ -2770,7 +2770,7 @@ function openEnteredOfficeSummaryWindow(officeName) {
           </div>
 
           <!-- TCO Service & Power Remarks -->
-          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px;">
+          <div style="background: #ffffff; border: 1px solid #e2e8f0; border-radius: 6px; padding: 12px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
             <div style="font-size: 0.74rem; font-weight: 700; color: #64748b; text-transform: uppercase;">TCO Service &amp; Backup Remarks</div>
             <div style="margin-top: 6px; font-size: 0.84rem; line-height: 1.7;">
               <strong>TCO Service Report Sent:</strong> <span class="badge ${data.serviceReportSent === 'Yes' ? 'badge-working' : 'badge-warning'}">${escapeHtml(data.serviceReportSent || 'No')}</span><br>
@@ -2782,30 +2782,30 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- SECTION 4: System Age Distribution -->
-      <div>
+      <div class="modal-report-section age-distribution-section" style="page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
           <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin: 0; display: flex; align-items: center; gap: 6px;">
             <i class="fa-solid fa-hourglass-half" style="color: #0284c7;"></i> System Age Distribution Profile
           </h4>
           <span style="font-size: 0.78rem; color: #64748b; font-weight: 600;">Total Hardware Categorized: <strong>${totalAged}</strong></span>
         </div>
-        <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px;">
-          <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px; text-align: center;">
+        <div class="age-distribution-grid" style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
+          <div class="age-card" style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 10px; text-align: center; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
             <div style="font-size: 0.7rem; font-weight: 700; color: #166534; text-transform: uppercase;">&lt; 3 Years</div>
             <div style="font-size: 1.4rem; font-weight: 800; color: #15803d; margin-top: 2px;">${ageU3}</div>
             <div style="font-size: 0.7rem; color: #16a34a; font-weight: 600;">Modern Fleet</div>
           </div>
-          <div style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 10px; text-align: center;">
+          <div class="age-card" style="background: #eff6ff; border: 1px solid #93c5fd; border-radius: 8px; padding: 10px; text-align: center; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
             <div style="font-size: 0.7rem; font-weight: 700; color: #1e40af; text-transform: uppercase;">3 – 5 Years</div>
             <div style="font-size: 1.4rem; font-weight: 800; color: #2563eb; margin-top: 2px;">${age35}</div>
             <div style="font-size: 0.7rem; color: #3b82f6; font-weight: 600;">Standard Active</div>
           </div>
-          <div style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px; text-align: center;">
+          <div class="age-card" style="background: #fffbeb; border: 1px solid #fde68a; border-radius: 8px; padding: 10px; text-align: center; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
             <div style="font-size: 0.7rem; font-weight: 700; color: #92400e; text-transform: uppercase;">5 – 8 Years</div>
             <div style="font-size: 1.4rem; font-weight: 800; color: #d97706; margin-top: 2px;">${age58}</div>
             <div style="font-size: 0.7rem; color: #b45309; font-weight: 600;">Aging Hardware</div>
           </div>
-          <div style="background: ${ageA8 > 0 ? '#fef2f2' : '#f8fafc'}; border: 1px solid ${ageA8 > 0 ? '#fca5a5' : '#cbd5e1'}; border-radius: 8px; padding: 10px; text-align: center;">
+          <div class="age-card" style="background: ${ageA8 > 0 ? '#fef2f2' : '#f8fafc'}; border: 1px solid ${ageA8 > 0 ? '#fca5a5' : '#cbd5e1'}; border-radius: 8px; padding: 10px; text-align: center; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
             <div style="font-size: 0.7rem; font-weight: 700; color: ${ageA8 > 0 ? '#991b1b' : '#64748b'}; text-transform: uppercase;">&gt; 8 Years</div>
             <div style="font-size: 1.4rem; font-weight: 800; color: ${ageA8 > 0 ? '#dc2626' : '#475569'}; margin-top: 2px;">${ageA8}</div>
             <div style="font-size: 0.7rem; color: ${ageA8 > 0 ? '#ef4444' : '#64748b'}; font-weight: 600;">${ageA8 > 0 ? 'Replacement Due' : 'None'}</div>
@@ -2814,14 +2814,14 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- SECTION 5: Specific Condition Remarks & Certification -->
-      <div style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px;">
+      <div class="modal-report-section" style="background: #f8fafc; border: 1px solid var(--border-color); border-radius: 8px; padding: 14px; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
         <h4 style="font-size: 0.92rem; font-weight: 700; color: var(--primary-900); margin-bottom: 8px; display: flex; align-items: center; gap: 6px;">
           <i class="fa-solid fa-comment-dots" style="color: #6366f1;"></i> Specific Condition Remarks &amp; Certification
         </h4>
-        <div style="font-size: 0.85rem; line-height: 1.6; color: #334155; margin-bottom: 12px; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #e2e8f0;">
+        <div style="font-size: 0.85rem; line-height: 1.6; color: #334155; margin-bottom: 12px; background: #ffffff; padding: 10px 12px; border-radius: 6px; border: 1px solid #e2e8f0; page-break-inside: avoid; break-inside: avoid;">
           <strong>General Hardware Remarks:</strong> ${escapeHtml(data.remarks || 'No general hardware remarks recorded.')}
         </div>
-        <div style="background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 6px; padding: 10px 12px; font-size: 0.82rem; color: #065f46; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+        <div style="background: #ecfdf5; border: 1px solid #6ee7b7; border-radius: 6px; padding: 10px 12px; font-size: 0.82rem; color: #065f46; display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px; page-break-inside: avoid; break-inside: avoid;">
           <div style="display: flex; align-items: center; gap: 8px;">
             <i class="fa-solid fa-shield-check" style="font-size: 1.1rem; color: #059669;"></i>
             <span><strong>Digital Certification:</strong> I hereby certify that the computing systems, printers, network, and power/battery infrastructure details listed above have been physically inspected and verified for this office.</span>
@@ -2831,7 +2831,41 @@ function openEnteredOfficeSummaryWindow(officeName) {
       </div>
 
       <!-- SECTION 6: Official Verification Footer -->
-      <div class="verification-footer" style="margin-top: 28px; padding-top: 20px; border-top: 1.5px solid #cbd5e1; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
+      <div class="verification-footer modal-report-section" style="margin-top: 24px; padding-top: 10px; border-top: none; page-break-inside: avoid; break-inside: avoid; break-inside: avoid-page;">
+        <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 24px;">
+          <!-- Departmental Stamp & System Attestation -->
+          <div style="font-size: 0.8rem; color: #64748b; line-height: 1.6; max-width: 290px;">
+            <div style="font-weight: 700; color: var(--primary-900); font-size: 0.85rem;">Motor Vehicles Department, Kerala</div>
+            <div>IT Infrastructure &amp; Equipment Verification Report</div>
+            <div style="margin-top: 4px; font-size: 0.76rem;">Report Date: ${new Date().toLocaleDateString('en-IN')}</div>
+            <div style="margin-top: 12px; font-size: 0.74rem; color: #94a3b8; font-style: italic;">
+              * Official certification of verified physical computing equipment &amp; power infrastructure.
+            </div>
+          </div>
+
+          <!-- Structured Verification Signature Block -->
+          <div style="min-width: 320px; max-width: 420px; text-align: left;">
+            <div style="font-size: 0.95rem; font-weight: 700; color: #0f172a; margin-bottom: 50px;">Verified by</div>
+            
+            <div style="font-size: 0.82rem; font-weight: 600; color: #64748b; font-style: italic; margin-bottom: 24px;">[Signature]</div>
+            
+            <div style="font-size: 0.88rem; margin-bottom: 20px; display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Name of Head of Office :</span>
+              <span style="display: inline-block; min-width: 160px; min-height: 20px;"></span>
+            </div>
+            
+            <div style="font-size: 0.88rem; margin-bottom: 20px; display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Designation :</span>
+              <span style="display: inline-block; min-width: 160px; min-height: 20px;"></span>
+            </div>
+            
+            <div style="font-size: 0.9rem; display: flex; align-items: baseline; gap: 10px;">
+              <span style="font-weight: 600; color: #1e293b; white-space: nowrap;">Office Name :</span>
+              <span style="font-weight: 800; color: #064e3b;">${escapeHtml(data.officeName || offName || currentWindowOfficeName)}</span>
+            </div>
+          </div>
+        </div>
+      </div>
         <div style="display: flex; justify-content: space-between; align-items: flex-end; flex-wrap: wrap; gap: 24px;">
           <!-- Departmental Stamp & System Attestation -->
           <div style="font-size: 0.8rem; color: #64748b; line-height: 1.6; max-width: 290px;">

@@ -2165,6 +2165,45 @@ input:checked+.slider:before {
     visibility: visible !important;
   }
 
+  /* View Entered Data Modal Print Page-Break Rules */
+  body.printing-modal #publicModalOfficeBody > div {
+    display: block !important;
+  }
+  body.printing-modal .modal-report-section {
+    display: block !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+    margin-bottom: 14px !important;
+  }
+  body.printing-modal .age-distribution-section {
+    display: block !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+    margin-bottom: 14px !important;
+  }
+  body.printing-modal .age-distribution-grid {
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr) !important;
+    gap: 8px !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+  }
+  body.printing-modal .age-card {
+    display: block !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid-page !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  body.printing-modal .age-card * {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
   .data-table-container {
     overflow: visible !important;
     width: 100% !important;
@@ -2413,6 +2452,8 @@ input:checked+.slider:before {
 
 /* Verification Footer Styling */
 .verification-footer {
+  border-top: none !important;
+  border: none !important;
   page-break-inside: avoid !important;
   break-inside: avoid !important;
   break-inside: avoid-page !important;
@@ -2421,11 +2462,13 @@ input:checked+.slider:before {
   .verification-footer {
     display: block !important;
     visibility: visible !important;
+    border-top: none !important;
+    border: none !important;
     page-break-inside: avoid !important;
     break-inside: avoid !important;
     break-inside: avoid-page !important;
     margin-top: 24px !important;
-    padding-top: 18px !important;
+    padding-top: 10px !important;
   }
   .verification-footer * {
     visibility: visible !important;
